@@ -1,5 +1,9 @@
 # jax-crosscat
 
+[![PyPI version](https://img.shields.io/pypi/v/jax-crosscat)](https://pypi.org/project/jax-crosscat/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 GPU-accelerated nonparametric cross-categorization in JAX.
 
 A modern reimplementation of [CrossCat](https://github.com/probcomp/crosscat) — the Bayesian
@@ -35,9 +39,18 @@ import crosscat
 # Coming soon — library is in active development
 ```
 
+## Development
+
+```bash
+git clone https://github.com/sambhal-labs/jaxcross.git
+cd jaxcross
+pip install -e ".[dev]"
+pytest
+```
+
 ## Status
 
-**Pre-alpha** — core inference engine under development. See the paper in `paper/` for methodology.
+**Pre-alpha** — core inference engine under development.
 
 ## References
 
