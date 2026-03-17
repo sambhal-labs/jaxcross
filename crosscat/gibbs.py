@@ -26,7 +26,7 @@ from crosscat.components import (
     NormalGamma,
     OrderedLogistic,
 )
-from crosscat.model import _compute_suffstats_for_view, _log_crp
+from crosscat.model import _compute_suffstats_for_view, _crp_sample, _log_crp
 from crosscat.types import (
     ColumnHypers,
     ColumnType,
@@ -171,30 +171,31 @@ def transition_column_assignments(
 
             log_probs.append(log_prior + log_lik)
 
-        # Score a new singleton view (each row in its own cluster initially)
+        # Score a new singleton view (sample row assignments from CRP prior)
         log_prior_new = jnp.log(alpha)
-        # For a new view, use all data in one cluster (CRP with alpha will split later)
-        new_row_assigns = jnp.zeros(n_rows, dtype=jnp.int32)
+        k_crp, k_cat = jax.random.split(keys[j])
+        new_row_assigns = _crp_sample(k_crp, float(state.views[0].row_crp_alpha), n_rows)
+        n_new_clusters = int(jnp.max(new_row_assigns)) + 1
         log_lik_new = _log_marginal_for_column_in_view(
-            data, j, col_type, hypers, new_row_assigns, 1
+            data, j, col_type, hypers, new_row_assigns, n_new_clusters
         )
         log_probs.append(log_prior_new + log_lik_new)
 
         # Sample new assignment
         log_probs_arr = jnp.array(log_probs)
         log_probs_arr = log_probs_arr - jnp.max(log_probs_arr)  # numerical stability
-        chosen = jax.random.categorical(keys[j], log_probs_arr)
+        chosen = jax.random.categorical(k_cat, log_probs_arr)
         chosen = int(chosen)
 
         if chosen == n_views:
-            # Create new view
-            new_row_assigns = jnp.zeros(n_rows, dtype=jnp.int32)
+            # Create new view (reuse CRP-sampled row assignments from proposal)
+            n_new_clusters = int(jnp.max(new_row_assigns)) + 1
             new_suffstats = _compute_suffstats_for_view(
                 data,
                 jnp.array([j]),
                 state.column_types,
                 new_row_assigns,
-                1,
+                n_new_clusters,
             )
             new_view = ViewState(
                 column_indices=jnp.array([j]),
@@ -685,8 +686,8 @@ def gibbs_sweep(
     *,
     n_sweeps: int = 1,
     kernels: tuple[str, ...] = (
-        "column_assignments",
         "row_assignments",
+        "column_assignments",
         "column_hypers",
         "crp_alphas",
     ),
