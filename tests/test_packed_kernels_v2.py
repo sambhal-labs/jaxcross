@@ -20,6 +20,7 @@ from crosscat.packed_state import (
     packed_transition_column_hypers_v2,
     packed_transition_crp_alphas_v2,
     packed_transition_row_assignments_v2,
+    unified_sample_posterior_predictive,
     unpack_state,
 )
 from crosscat.types import ColumnType
@@ -322,3 +323,56 @@ def test_packed_sweep_v2_jit_compiles(mixed_packed_state):
     assert errors == [], f"Validation errors after JIT sweep: {errors}"
     lj = float(log_joint(recovered, data))
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT sweep: {lj}"
+
+
+# ---------------------------------------------------------------------------
+# Task 8: unified_sample_posterior_predictive tests
+# ---------------------------------------------------------------------------
+
+
+def test_unified_sampler_continuous(mixed_packed_state):
+    """unified_sample_posterior_predictive produces a finite sample for continuous column."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(601)
+
+    # Find a continuous column
+    cont_col = None
+    for j, ct in enumerate(column_types):
+        if ct == ColumnType.CONTINUOUS:
+            cont_col = j
+            break
+    assert cont_col is not None, "No continuous column found in fixture"
+
+    # Find the view and local index for this column
+    v_idx = int(packed.column_assignments[cont_col])
+    n_cols_v = int(packed.view_n_columns[v_idx])
+    local_idx = None
+    for li in range(n_cols_v):
+        if int(packed.view_column_indices[v_idx, li]) == cont_col:
+            local_idx = li
+            break
+    assert local_idx is not None, "Column not found in its assigned view"
+
+    # Use cluster 0's suffstats
+    c = 0
+    sample = unified_sample_posterior_predictive(
+        key,
+        packed.col_type_ids[cont_col],
+        packed.ss_counts[v_idx, c, local_idx].astype(jnp.float32),
+        packed.ss_sum_x[v_idx, c, local_idx],
+        packed.ss_sum_x_sq[v_idx, c, local_idx],
+        packed.ss_cat_counts[v_idx, c, local_idx],
+        packed.ss_sum_sin[v_idx, c, local_idx],
+        packed.ss_sum_cos[v_idx, c, local_idx],
+        packed.hyper_mu[cont_col],
+        packed.hyper_r[cont_col],
+        packed.hyper_s[cont_col],
+        packed.hyper_nu[cont_col],
+        packed.hyper_dirichlet_alpha[cont_col],
+        packed.hyper_alpha[cont_col],
+        packed.hyper_beta[cont_col],
+        packed.hyper_kappa[cont_col],
+        packed.hyper_vm_mu[cont_col],
+    )
+
+    assert jnp.isfinite(sample), f"Sample is not finite: {sample}"
