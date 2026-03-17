@@ -699,6 +699,170 @@ def joint_predictive_probability(
     return log_p_joint
 
 
+def predictive_cdf(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+    query_col: int,
+    query_val: Array,
+    *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
+    row_id: int | None = None,
+    n_samples: int = 10000,
+) -> Array:
+    """Compute the posterior predictive CDF: P(X <= query_val | conditions).
+
+    For continuous and cyclic columns, estimated via Monte Carlo sampling.
+    For categorical, ordinal, and binary columns, computed analytically
+    by summing probabilities of categories <= query_val.
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: CrossCat state.
+        data: Full observation matrix.
+        query_col: Column index to evaluate CDF for.
+        query_val: Value at which to evaluate CDF.
+        condition_cols: Conditioning columns.
+        condition_vals: Conditioning values.
+        row_id: If provided, use observed row's cluster assignment.
+        n_samples: Number of MC samples (for continuous/cyclic columns).
+
+    Returns:
+        CDF value P(X <= query_val) in [0, 1].
+    """
+    col_type = state.column_types[query_col]
+
+    if col_type in (
+        ColumnType.CATEGORICAL,
+        ColumnType.ORDINAL,
+        ColumnType.BINARY,
+    ):
+        # Analytic CDF: sum p(x=k) for k <= query_val
+        view_idx = _get_view_for_column(state, query_col)
+        view = state.views[view_idx]
+        n_clusters = int(jnp.max(view.row_assignments)) + 1
+
+        # Get cluster weights
+        if row_id is not None:
+            weights = _cluster_weights_for_observed_row(view, row_id)
+        elif condition_cols:
+            weights = _cluster_weights_conditioned(
+                state, view, view_idx,
+                condition_cols or [], condition_vals, data
+            )
+        else:
+            weights = _cluster_weights(view, state.n_rows)
+
+        # Find local index
+        local_idx = None
+        for li, ci in enumerate(view.column_indices.tolist()):
+            if int(ci) == query_col:
+                local_idx = li
+                break
+
+        # Determine max category
+        if col_type == ColumnType.BINARY:
+            max_cat = 2
+        else:
+            # Get from suffstats of first cluster
+            max_cat = int(view.suffstats[0][local_idx].category_counts.shape[0])
+
+        # Sum p(x=k) for k <= query_val
+        comp = get_component(col_type)
+        hypers = state.column_hypers[query_col]
+        cdf_val = jnp.array(0.0)
+        for k in range(max_cat):
+            if k > int(query_val):
+                break
+            log_p_k = jnp.array(-jnp.inf)
+            for c in range(n_clusters):
+                ss = view.suffstats[c][local_idx]
+                log_lik = comp.posterior_predictive_logp(
+                    jnp.array(float(k)), ss, hypers
+                )
+                log_term = jnp.log(weights[c]) + log_lik
+                log_p_k = jnp.logaddexp(log_p_k, log_term)
+            cdf_val = cdf_val + jnp.exp(log_p_k)
+
+        return jnp.clip(cdf_val, 0.0, 1.0)
+
+    else:
+        # Continuous / Cyclic: MC estimate
+        samples = predictive_sample(
+            rng_key,
+            state,
+            data,
+            [query_col],
+            condition_cols=condition_cols,
+            condition_vals=condition_vals,
+            n_samples=n_samples,
+            row_id=row_id,
+        )
+        return jnp.mean(samples[:, 0] <= query_val)
+
+
+def sample_and_insert(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+    partial_row: Array,
+) -> tuple[CrossCatState, Array, Array]:
+    """Sample missing values for a partial row and insert into the state.
+
+    Combines predictive_sample and insert_rows: for each NaN entry in the
+    partial row, draw a sample from the posterior predictive conditioned on
+    the observed entries, then insert the completed row.
+
+    Useful for data augmentation, active learning, and what-if analysis.
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: CrossCat state.
+        data: Full observation matrix, shape (n_rows, n_cols).
+        partial_row: 1D array of shape (n_cols,) with NaN for missing entries.
+
+    Returns:
+        Tuple of (updated_state, updated_data, completed_row) where
+        completed_row has NaN entries filled with posterior predictive samples.
+    """
+    from crosscat.model import insert_rows
+
+    observed_mask = ~jnp.isnan(partial_row)
+    observed_cols = [int(i) for i in range(len(partial_row)) if observed_mask[i]]
+    missing_cols = [int(i) for i in range(len(partial_row)) if not observed_mask[i]]
+
+    completed = jnp.array(partial_row, copy=True)
+
+    if missing_cols:
+        observed_vals = (
+            jnp.array([float(partial_row[c]) for c in observed_cols])
+            if observed_cols
+            else None
+        )
+        cond_cols = observed_cols if observed_cols else None
+
+        k1, k2 = jax.random.split(rng_key)
+        samples = predictive_sample(
+            k1,
+            state,
+            data,
+            missing_cols,
+            condition_cols=cond_cols,
+            condition_vals=observed_vals,
+            n_samples=1,
+        )
+        for idx, col in enumerate(missing_cols):
+            completed = completed.at[col].set(samples[0, idx])
+    else:
+        k2 = rng_key
+
+    new_row = completed.reshape(1, -1)
+    new_state, new_data = insert_rows(k2, state, data, new_row)
+
+    return new_state, new_data, completed
+
+
 def conditional_entropy(
     rng_key: Array,
     states: list[CrossCatState],

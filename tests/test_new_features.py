@@ -375,3 +375,95 @@ class TestConditionalEntropy:
         )
         assert jnp.isfinite(h)
         assert float(h) >= 0  # Entropy is non-negative
+
+
+# --- Predictive CDF ---
+
+class TestPredictiveCDF:
+    def test_continuous_cdf_monotone(self, rng_key, simple_state):
+        from crosscat.inference import predictive_cdf
+
+        state, data, _ = simple_state
+        k1, k2, k3 = jax.random.split(rng_key, 3)
+        cdf_low = predictive_cdf(k1, state, data, 0, jnp.array(-10.0))
+        cdf_mid = predictive_cdf(k2, state, data, 0, jnp.array(2.5))
+        cdf_high = predictive_cdf(k3, state, data, 0, jnp.array(20.0))
+        assert float(cdf_low) <= float(cdf_mid) <= float(cdf_high)
+        assert float(cdf_low) < 0.5
+        assert float(cdf_high) > 0.5
+
+    def test_continuous_cdf_bounds(self, rng_key, simple_state):
+        from crosscat.inference import predictive_cdf
+
+        state, data, _ = simple_state
+        cdf = predictive_cdf(rng_key, state, data, 0, jnp.array(0.0))
+        assert 0.0 <= float(cdf) <= 1.0
+
+    def test_categorical_cdf(self, rng_key):
+        from crosscat.inference import predictive_cdf
+        from crosscat.model import initialize
+
+        data = jnp.array([
+            [0.0], [1.0], [2.0], [0.0], [1.0],
+            [2.0], [0.0], [1.0], [2.0], [0.0],
+        ])
+        column_types = [ColumnType.CATEGORICAL]
+        state = initialize(rng_key, data, column_types)
+        cdf_all = predictive_cdf(
+            rng_key, state, data, 0, jnp.array(2.0)
+        )
+        # CDF at max category should be ~1.0
+        assert float(cdf_all) > 0.99
+
+    def test_binary_cdf(self, rng_key):
+        from crosscat.inference import predictive_cdf
+        from crosscat.model import initialize
+
+        data = jnp.array([[0.0], [1.0], [0.0], [1.0], [0.0]])
+        column_types = [ColumnType.BINARY]
+        state = initialize(rng_key, data, column_types)
+        cdf_1 = predictive_cdf(rng_key, state, data, 0, jnp.array(1.0))
+        assert float(cdf_1) > 0.99
+
+
+# --- Sample and Insert ---
+
+class TestSampleAndInsert:
+    def test_basic(self, rng_key, simple_state):
+        from crosscat.inference import sample_and_insert
+
+        state, data, _ = simple_state
+        partial = jnp.array([1.0, jnp.nan, 3.0, jnp.nan])
+        new_state, new_data, completed = sample_and_insert(
+            rng_key, state, data, partial
+        )
+        assert new_state.n_rows == state.n_rows + 1
+        assert new_data.shape[0] == data.shape[0] + 1
+        # Observed values preserved
+        assert jnp.isclose(completed[0], 1.0)
+        assert jnp.isclose(completed[2], 3.0)
+        # Missing values filled
+        assert jnp.isfinite(completed[1])
+        assert jnp.isfinite(completed[3])
+
+    def test_no_missing(self, rng_key, simple_state):
+        from crosscat.inference import sample_and_insert
+
+        state, data, _ = simple_state
+        full_row = jnp.array([1.0, 2.0, 3.0, 4.0])
+        new_state, new_data, completed = sample_and_insert(
+            rng_key, state, data, full_row
+        )
+        assert new_state.n_rows == state.n_rows + 1
+        assert jnp.allclose(completed, full_row)
+
+    def test_all_missing(self, rng_key, simple_state):
+        from crosscat.inference import sample_and_insert
+
+        state, data, _ = simple_state
+        all_nan = jnp.full(4, jnp.nan)
+        new_state, new_data, completed = sample_and_insert(
+            rng_key, state, data, all_nan
+        )
+        assert new_state.n_rows == state.n_rows + 1
+        assert jnp.all(jnp.isfinite(completed))
