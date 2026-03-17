@@ -48,10 +48,7 @@ def check_all_column_constraints(
     Returns:
         True if all constraints are satisfied.
     """
-    return all(
-        check_column_dep_constraint(state, a, b, dep)
-        for a, b, dep in constraints
-    )
+    return all(check_column_dep_constraint(state, a, b, dep) for a, b, dep in constraints)
 
 
 def ensure_col_dep_constraints(
@@ -155,7 +152,9 @@ def ensure_row_dep_constraint(
     for _attempt in range(max_iterations):
         rng_key, subkey = jax.random.split(rng_key)
         state = gibbs_sweep(
-            subkey, state, data,
+            subkey,
+            state,
+            data,
             n_sweeps=n_sweeps_per_attempt,
             kernels=("row_assignments",),
         )

@@ -16,7 +16,6 @@ from crosscat.packed_state import (
     unified_sample_posterior_predictive,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
@@ -180,9 +179,7 @@ def packed_predictive_probability(
         else:
             weights = _cluster_weights_packed(packed, view_idx)
 
-        log_mixture = _logp_one_column_mixture(
-            packed, view_idx, col, query_vals[q_idx], weights
-        )
+        log_mixture = _logp_one_column_mixture(packed, view_idx, col, query_vals[q_idx], weights)
         log_p_total = log_p_total + log_mixture
 
     return log_p_total
@@ -218,7 +215,7 @@ def packed_predictive_sample(
     # Pre-compute view indices and weights per query column
     view_indices = [int(packed.column_assignments[col]) for col in query_cols]
     weights_list = []
-    for q_idx, col in enumerate(query_cols):
+    for q_idx, _col in enumerate(query_cols):
         v = view_indices[q_idx]
         if row_id is not None:
             w = _cluster_weights_for_row(packed, v, row_id)
@@ -228,10 +225,10 @@ def packed_predictive_sample(
     weights_arr = jnp.stack(weights_list)  # (n_q, max_clusters)
 
     # Pre-compute local indices for each query column
-    local_indices = jnp.array([
-        int(_find_local_col_index(packed, view_indices[q], query_cols[q]))
-        for q in range(n_q)
-    ], dtype=jnp.int32)
+    local_indices = jnp.array(
+        [int(_find_local_col_index(packed, view_indices[q], query_cols[q])) for q in range(n_q)],
+        dtype=jnp.int32,
+    )
     view_idx_arr = jnp.array(view_indices, dtype=jnp.int32)
     col_arr = jnp.array(query_cols, dtype=jnp.int32)
 
@@ -308,7 +305,7 @@ def packed_mutual_information(
         view_i = packed.column_assignments[col_i]
         view_j = packed.column_assignments[col_j]
 
-        same_view = (view_i == view_j)
+        same_view = view_i == view_j
 
         # If different views, MI = 0
         if not same_view:
@@ -324,9 +321,7 @@ def packed_mutual_information(
         total = counts.sum()
         probs = counts / jnp.maximum(total, 1e-30)
 
-        entropy_clustering = -jnp.sum(
-            jnp.where(probs > 0, probs * jnp.log(probs + 1e-30), 0.0)
-        )
+        entropy_clustering = -jnp.sum(jnp.where(probs > 0, probs * jnp.log(probs + 1e-30), 0.0))
 
         n_clusters = int(packed.view_n_clusters[v])
         mi_est = entropy_clustering * (1.0 - 1.0 / jnp.maximum(float(n_clusters), 1.0))
@@ -372,7 +367,9 @@ def packed_row_similarity(
             # If target_columns specified, check if this view contains any
             if target_columns is not None:
                 n_cols_v = int(packed.view_n_columns[v])
-                view_col_set = set(int(packed.view_column_indices[v, li]) for li in range(n_cols_v))
+                view_col_set = set(
+                    int(packed.view_column_indices[v, li]) for li in range(n_cols_v)
+                )
                 if not any(c in view_col_set for c in target_columns):
                     continue
 
@@ -414,9 +411,7 @@ def packed_impute_and_confidence(
     """
     from crosscat.packed_state import CONTINUOUS_ID
 
-    samples = packed_predictive_sample(
-        rng_key, packed, data, [query_col], n_samples=n_samples
-    )
+    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
     s = samples[:, 0]
 
     type_id = int(packed.col_type_ids[query_col])
@@ -507,7 +502,5 @@ def packed_predictive_cdf(
     Returns:
         CDF value P(X <= query_val) in [0, 1].
     """
-    samples = packed_predictive_sample(
-        rng_key, packed, data, [query_col], n_samples=n_samples
-    )
+    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
     return jnp.mean(samples[:, 0] <= query_val)

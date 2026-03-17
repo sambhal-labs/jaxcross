@@ -70,7 +70,14 @@ _ARRAY_FIELDS = (
 )
 
 # Static field names (pytree auxiliary data)
-_STATIC_FIELDS = ("n_rows", "n_cols", "max_views", "max_clusters", "max_categories", "max_cols_per_view")
+_STATIC_FIELDS = (
+    "n_rows",
+    "n_cols",
+    "max_views",
+    "max_clusters",
+    "max_categories",
+    "max_cols_per_view",
+)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -84,35 +91,35 @@ class PackedCrossCatState:
     """
 
     # Column partition
-    column_assignments: Array      # (n_cols,) int
-    column_crp_alpha: Array        # scalar
-    n_views: Array                 # scalar int
-    view_mask: Array               # (max_views,) bool
+    column_assignments: Array  # (n_cols,) int
+    column_crp_alpha: Array  # scalar
+    n_views: Array  # scalar int
+    view_mask: Array  # (max_views,) bool
 
     # Column type and hyperparameters — flat (n_cols,) arrays
-    col_type_ids: Array            # (n_cols,) int
-    hyper_mu: Array                # (n_cols,)
-    hyper_r: Array                 # (n_cols,)
-    hyper_s: Array                 # (n_cols,)
-    hyper_nu: Array                # (n_cols,)
-    hyper_dirichlet_alpha: Array   # (n_cols,)
-    hyper_alpha: Array             # (n_cols,)
-    hyper_beta: Array              # (n_cols,)
-    hyper_kappa: Array             # (n_cols,)
-    hyper_vm_mu: Array             # (n_cols,)
+    col_type_ids: Array  # (n_cols,) int
+    hyper_mu: Array  # (n_cols,)
+    hyper_r: Array  # (n_cols,)
+    hyper_s: Array  # (n_cols,)
+    hyper_nu: Array  # (n_cols,)
+    hyper_dirichlet_alpha: Array  # (n_cols,)
+    hyper_alpha: Array  # (n_cols,)
+    hyper_beta: Array  # (n_cols,)
+    hyper_kappa: Array  # (n_cols,)
+    hyper_vm_mu: Array  # (n_cols,)
 
     # View data — leading (max_views,) dimension
-    view_column_indices: Array     # (max_views, max_cols_per_view) int, -1=invalid
-    view_n_columns: Array          # (max_views,) int
-    view_row_assignments: Array    # (max_views, n_rows) int
-    view_n_clusters: Array         # (max_views,) int
-    view_row_crp_alpha: Array      # (max_views,)
+    view_column_indices: Array  # (max_views, max_cols_per_view) int, -1=invalid
+    view_n_columns: Array  # (max_views,) int
+    view_row_assignments: Array  # (max_views, n_rows) int
+    view_n_clusters: Array  # (max_views,) int
+    view_row_crp_alpha: Array  # (max_views,)
 
     # Sufficient statistics — (max_views, max_clusters, max_cols_per_view[, max_cats])
-    ss_counts: Array               # int
+    ss_counts: Array  # int
     ss_sum_x: Array
     ss_sum_x_sq: Array
-    ss_cat_counts: Array           # (max_views, max_clusters, max_cols_per_view, max_cats)
+    ss_cat_counts: Array  # (max_views, max_clusters, max_cols_per_view, max_cats)
     ss_sum_sin: Array
     ss_sum_cos: Array
 
@@ -217,9 +224,7 @@ def pack_state(
     ss_counts = jnp.zeros((max_views, max_clusters, max_cols_per_view), dtype=jnp.int32)
     ss_sum_x = jnp.zeros((max_views, max_clusters, max_cols_per_view))
     ss_sum_x_sq = jnp.zeros((max_views, max_clusters, max_cols_per_view))
-    ss_cat_counts = jnp.zeros(
-        (max_views, max_clusters, max_cols_per_view, max_categories)
-    )
+    ss_cat_counts = jnp.zeros((max_views, max_clusters, max_cols_per_view, max_categories))
     ss_sum_sin = jnp.zeros((max_views, max_clusters, max_cols_per_view))
     ss_sum_cos = jnp.zeros((max_views, max_clusters, max_cols_per_view))
 
@@ -243,22 +248,16 @@ def pack_state(
                     if ss.sum_x is not None:
                         ss_sum_x = ss_sum_x.at[v_idx, c_idx, l_idx].set(float(ss.sum_x))
                     if ss.sum_x_sq is not None:
-                        ss_sum_x_sq = ss_sum_x_sq.at[v_idx, c_idx, l_idx].set(
-                            float(ss.sum_x_sq)
-                        )
+                        ss_sum_x_sq = ss_sum_x_sq.at[v_idx, c_idx, l_idx].set(float(ss.sum_x_sq))
                     if ss.category_counts is not None:
                         nc_cats = min(len(ss.category_counts), max_categories)
-                        ss_cat_counts = ss_cat_counts.at[
-                            v_idx, c_idx, l_idx, :nc_cats
-                        ].set(ss.category_counts[:nc_cats])
+                        ss_cat_counts = ss_cat_counts.at[v_idx, c_idx, l_idx, :nc_cats].set(
+                            ss.category_counts[:nc_cats]
+                        )
                     if ss.sum_sin is not None:
-                        ss_sum_sin = ss_sum_sin.at[v_idx, c_idx, l_idx].set(
-                            float(ss.sum_sin)
-                        )
+                        ss_sum_sin = ss_sum_sin.at[v_idx, c_idx, l_idx].set(float(ss.sum_sin))
                     if ss.sum_cos is not None:
-                        ss_sum_cos = ss_sum_cos.at[v_idx, c_idx, l_idx].set(
-                            float(ss.sum_cos)
-                        )
+                        ss_sum_cos = ss_sum_cos.at[v_idx, c_idx, l_idx].set(float(ss.sum_cos))
 
     return PackedCrossCatState(
         column_assignments=col_assignments,
@@ -437,9 +436,9 @@ def compute_suffstats_vectorized(
         with shapes (max_clusters, n_cols_view[, max_categories]).
     """
     # Membership matrix: (n_rows, max_clusters) — binary indicator
-    membership = (
-        row_assignments[:, None] == jnp.arange(max_clusters)[None, :]
-    ).astype(jnp.float32)
+    membership = (row_assignments[:, None] == jnp.arange(max_clusters)[None, :]).astype(
+        jnp.float32
+    )
 
     # Gather column data, handling -1 padding with column 0 (masked out later)
     safe_indices = jnp.where(column_indices >= 0, column_indices, 0)
@@ -511,16 +510,32 @@ def recompute_all_suffstats(packed: PackedCrossCatState, data: Array) -> PackedC
 
         return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
 
-    init = (packed.ss_counts, packed.ss_sum_x, packed.ss_sum_x_sq,
-            packed.ss_cat_counts, packed.ss_sum_sin, packed.ss_sum_cos)
-    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = (
-        jax.lax.scan(recompute_one_view, init, jnp.arange(max_views))
+    init = (
+        packed.ss_counts,
+        packed.ss_sum_x,
+        packed.ss_sum_x_sq,
+        packed.ss_cat_counts,
+        packed.ss_sum_sin,
+        packed.ss_sum_cos,
+    )
+    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = jax.lax.scan(
+        recompute_one_view, init, jnp.arange(max_views)
     )
 
     return PackedCrossCatState(
-        **{name: getattr(packed, name) for name in _ARRAY_FIELDS
-           if name not in ("ss_counts", "ss_sum_x", "ss_sum_x_sq",
-                           "ss_cat_counts", "ss_sum_sin", "ss_sum_cos")},
+        **{
+            name: getattr(packed, name)
+            for name in _ARRAY_FIELDS
+            if name
+            not in (
+                "ss_counts",
+                "ss_sum_x",
+                "ss_sum_x_sq",
+                "ss_cat_counts",
+                "ss_sum_sin",
+                "ss_sum_cos",
+            )
+        },
         ss_counts=ss_counts,
         ss_sum_x=ss_sum_x,
         ss_sum_x_sq=ss_sum_x_sq,
@@ -588,9 +603,7 @@ def _remove_row_from_suffstats(
         clean_x = jnp.where(jnp.isnan(x), 0.0, x)
         is_sum_type = (type_id == CONTINUOUS_ID) | (type_id == BINARY_ID)
         sx_delta = clean_x * is_valid_f * is_sum_type.astype(jnp.float32)
-        sxsq_delta = (
-            clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
-        )
+        sxsq_delta = clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
         ss_sx = ss_sx.at[cluster_id, li].add(-sx_delta)
         ss_sxsq = ss_sxsq.at[cluster_id, li].add(-sxsq_delta)
 
@@ -602,18 +615,14 @@ def _remove_row_from_suffstats(
 
         # Cyclic: sum_sin -= sin(x), sum_cos -= cos(x)
         is_cyc = (type_id == CYCLIC_ID).astype(jnp.float32)
-        ss_sin = ss_sin.at[cluster_id, li].add(
-            -jnp.sin(clean_x) * is_valid_f * is_cyc
-        )
-        ss_cos = ss_cos.at[cluster_id, li].add(
-            -jnp.cos(clean_x) * is_valid_f * is_cyc
-        )
+        ss_sin = ss_sin.at[cluster_id, li].add(-jnp.sin(clean_x) * is_valid_f * is_cyc)
+        ss_cos = ss_cos.at[cluster_id, li].add(-jnp.cos(clean_x) * is_valid_f * is_cyc)
 
         return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
 
     carry = (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos)
-    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = (
-        jax.lax.scan(update_one_col, carry, jnp.arange(n_cols_v))
+    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = jax.lax.scan(
+        update_one_col, carry, jnp.arange(n_cols_v)
     )
     return ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
 
@@ -651,9 +660,7 @@ def _add_row_to_suffstats(
         clean_x = jnp.where(jnp.isnan(x), 0.0, x)
         is_sum_type = (type_id == CONTINUOUS_ID) | (type_id == BINARY_ID)
         sx_delta = clean_x * is_valid_f * is_sum_type.astype(jnp.float32)
-        sxsq_delta = (
-            clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
-        )
+        sxsq_delta = clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
         ss_sx = ss_sx.at[cluster_id, li].add(sx_delta)
         ss_sxsq = ss_sxsq.at[cluster_id, li].add(sxsq_delta)
 
@@ -663,18 +670,14 @@ def _add_row_to_suffstats(
         ss_cat = ss_cat.at[cluster_id, li, cat_idx].add(cat_delta)
 
         is_cyc = (type_id == CYCLIC_ID).astype(jnp.float32)
-        ss_sin = ss_sin.at[cluster_id, li].add(
-            jnp.sin(clean_x) * is_valid_f * is_cyc
-        )
-        ss_cos = ss_cos.at[cluster_id, li].add(
-            jnp.cos(clean_x) * is_valid_f * is_cyc
-        )
+        ss_sin = ss_sin.at[cluster_id, li].add(jnp.sin(clean_x) * is_valid_f * is_cyc)
+        ss_cos = ss_cos.at[cluster_id, li].add(jnp.cos(clean_x) * is_valid_f * is_cyc)
 
         return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
 
     carry = (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos)
-    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = (
-        jax.lax.scan(update_one_col, carry, jnp.arange(n_cols_v))
+    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = jax.lax.scan(
+        update_one_col, carry, jnp.arange(n_cols_v)
     )
     return ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
 
@@ -709,7 +712,9 @@ def _ng_log_marginal(n, sum_x, sum_x_sq, mu0, r, s, nu):
     nu_s = nu * s
     mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
     nu_n_s_n = (
-        nu_s + sum_x_sq - sum_x**2 / jnp.maximum(n, 1.0)
+        nu_s
+        + sum_x_sq
+        - sum_x**2 / jnp.maximum(n, 1.0)
         + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
@@ -770,8 +775,22 @@ def _vm_log_marginal(n, sum_sin, sum_cos, kappa):
 
 
 def unified_log_marginal(
-    type_id, count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos,
-    mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu,
+    type_id,
+    count,
+    sum_x,
+    sum_x_sq,
+    cat_counts,
+    sum_sin,
+    sum_cos,
+    mu,
+    r,
+    s,
+    nu,
+    dir_alpha,
+    alpha,
+    beta,
+    kappa,
+    vm_mu,
 ):
     """Compute log marginal likelihood for any column type without Python branching.
 
@@ -785,13 +804,17 @@ def unified_log_marginal(
     cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa)
 
     return jnp.where(
-        type_id == CONTINUOUS_ID, continuous_score,
+        type_id == CONTINUOUS_ID,
+        continuous_score,
         jnp.where(
-            type_id == CATEGORICAL_ID, cat_score,
+            type_id == CATEGORICAL_ID,
+            cat_score,
             jnp.where(
-                type_id == ORDINAL_ID, ordinal_score,
+                type_id == ORDINAL_ID,
+                ordinal_score,
                 jnp.where(
-                    type_id == BINARY_ID, binary_score,
+                    type_id == BINARY_ID,
+                    binary_score,
                     cyclic_score,
                 ),
             ),
@@ -813,7 +836,9 @@ def _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu0, r, s, nu):
     nu_s = nu * s
     mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
     nu_n_s_n = (
-        nu_s + sum_x_sq - sum_x**2 / jnp.maximum(n, 1.0)
+        nu_s
+        + sum_x_sq
+        - sum_x**2 / jnp.maximum(n, 1.0)
         + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
@@ -865,8 +890,23 @@ def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_mu):
 
 
 def unified_posterior_predictive_logp(
-    x, type_id, count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos,
-    mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu,
+    x,
+    type_id,
+    count,
+    sum_x,
+    sum_x_sq,
+    cat_counts,
+    sum_sin,
+    sum_cos,
+    mu,
+    r,
+    s,
+    nu,
+    dir_alpha,
+    alpha,
+    beta,
+    kappa,
+    vm_mu,
 ):
     """Compute posterior predictive logp for any column type without Python branching."""
     cont = _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu, r, s, nu)
@@ -876,11 +916,14 @@ def unified_posterior_predictive_logp(
     cyclic = _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_mu)
 
     return jnp.where(
-        type_id == CONTINUOUS_ID, cont,
+        type_id == CONTINUOUS_ID,
+        cont,
         jnp.where(
-            type_id == CATEGORICAL_ID, cat,
-            jnp.where(type_id == ORDINAL_ID, ordinal,
-                       jnp.where(type_id == BINARY_ID, binary, cyclic)),
+            type_id == CATEGORICAL_ID,
+            cat,
+            jnp.where(
+                type_id == ORDINAL_ID, ordinal, jnp.where(type_id == BINARY_ID, binary, cyclic)
+            ),
         ),
     )
 
@@ -902,7 +945,9 @@ def _ng_sample(rng_key, count, sum_x, sum_x_sq, mu0, r, s, nu):
     nu_s = nu * s
     mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
     nu_n_s_n = (
-        nu_s + sum_x_sq - sum_x**2 / jnp.maximum(n, 1.0)
+        nu_s
+        + sum_x_sq
+        - sum_x**2 / jnp.maximum(n, 1.0)
         + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
@@ -955,8 +1000,23 @@ def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_mu):
 
 
 def unified_sample_posterior_predictive(
-    rng_key, type_id, count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos,
-    mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu,
+    rng_key,
+    type_id,
+    count,
+    sum_x,
+    sum_x_sq,
+    cat_counts,
+    sum_sin,
+    sum_cos,
+    mu,
+    r,
+    s,
+    nu,
+    dir_alpha,
+    alpha,
+    beta,
+    kappa,
+    vm_mu,
 ):
     """Sample from posterior predictive for any column type without Python branching.
 
@@ -981,11 +1041,14 @@ def unified_sample_posterior_predictive(
     ordinal_sample = _dc_sample(k2, count, cat_counts, jnp.ones_like(dir_alpha))
 
     return jnp.where(
-        type_id == CONTINUOUS_ID, cont_sample,
+        type_id == CONTINUOUS_ID,
+        cont_sample,
         jnp.where(
-            type_id == CATEGORICAL_ID, cat_sample,
+            type_id == CATEGORICAL_ID,
+            cat_sample,
             jnp.where(
-                type_id == ORDINAL_ID, ordinal_sample,
+                type_id == ORDINAL_ID,
+                ordinal_sample,
                 jnp.where(type_id == BINARY_ID, binary_sample, cyclic_sample),
             ),
         ),
@@ -1041,16 +1104,23 @@ def _score_row_all_clusters(
             type_id = col_type_ids[col_idx]
 
             logp = unified_posterior_predictive_logp(
-                x, type_id,
+                x,
+                type_id,
                 ss_counts[c, li].astype(jnp.float32),
-                ss_sum_x[c, li], ss_sum_x_sq[c, li],
+                ss_sum_x[c, li],
+                ss_sum_x_sq[c, li],
                 ss_cat_counts[c, li],
-                ss_sum_sin[c, li], ss_sum_cos[c, li],
-                hyper_mu[col_idx], hyper_r[col_idx],
-                hyper_s[col_idx], hyper_nu[col_idx],
+                ss_sum_sin[c, li],
+                ss_sum_cos[c, li],
+                hyper_mu[col_idx],
+                hyper_r[col_idx],
+                hyper_s[col_idx],
+                hyper_nu[col_idx],
                 hyper_dirichlet_alpha[col_idx],
-                hyper_alpha[col_idx], hyper_beta[col_idx],
-                hyper_kappa[col_idx], hyper_vm_mu[col_idx],
+                hyper_alpha[col_idx],
+                hyper_beta[col_idx],
+                hyper_kappa[col_idx],
+                hyper_vm_mu[col_idx],
             )
             log_lik = log_lik + jnp.where(is_valid, logp, 0.0)
         return log_lik
@@ -1068,15 +1138,23 @@ def _score_row_all_clusters(
 
         # Empty suffstats (zeros)
         logp = unified_posterior_predictive_logp(
-            x, type_id,
-            jnp.array(0.0), jnp.array(0.0), jnp.array(0.0),
+            x,
+            type_id,
+            jnp.array(0.0),
+            jnp.array(0.0),
+            jnp.array(0.0),
             jnp.zeros(ss_cat_counts.shape[-1]),
-            jnp.array(0.0), jnp.array(0.0),
-            hyper_mu[col_idx], hyper_r[col_idx],
-            hyper_s[col_idx], hyper_nu[col_idx],
+            jnp.array(0.0),
+            jnp.array(0.0),
+            hyper_mu[col_idx],
+            hyper_r[col_idx],
+            hyper_s[col_idx],
+            hyper_nu[col_idx],
             hyper_dirichlet_alpha[col_idx],
-            hyper_alpha[col_idx], hyper_beta[col_idx],
-            hyper_kappa[col_idx], hyper_vm_mu[col_idx],
+            hyper_alpha[col_idx],
+            hyper_beta[col_idx],
+            hyper_kappa[col_idx],
+            hyper_vm_mu[col_idx],
         )
         log_lik_new = log_lik_new + jnp.where(is_valid, logp, 0.0)
 
@@ -1140,16 +1218,23 @@ def _score_row_one_cluster_v2(
         is_valid = (col_idx >= 0) & (li < n_columns) & (~jnp.isnan(x))
 
         logp = unified_posterior_predictive_logp(
-            x, type_id,
+            x,
+            type_id,
             ss_counts_c[li].astype(jnp.float32),
-            ss_sum_x_c[li], ss_sum_x_sq_c[li],
+            ss_sum_x_c[li],
+            ss_sum_x_sq_c[li],
             ss_cat_counts_c[li],
-            ss_sum_sin_c[li], ss_sum_cos_c[li],
-            hyper_mu[safe_col_idx], hyper_r[safe_col_idx],
-            hyper_s[safe_col_idx], hyper_nu[safe_col_idx],
+            ss_sum_sin_c[li],
+            ss_sum_cos_c[li],
+            hyper_mu[safe_col_idx],
+            hyper_r[safe_col_idx],
+            hyper_s[safe_col_idx],
+            hyper_nu[safe_col_idx],
             hyper_dir_alpha[safe_col_idx],
-            hyper_alpha[safe_col_idx], hyper_beta[safe_col_idx],
-            hyper_kappa[safe_col_idx], hyper_vm_mu[safe_col_idx],
+            hyper_alpha[safe_col_idx],
+            hyper_beta[safe_col_idx],
+            hyper_kappa[safe_col_idx],
+            hyper_vm_mu[safe_col_idx],
         )
         log_lik = log_lik + jnp.where(is_valid, logp, 0.0)
         return log_lik, None
@@ -1211,11 +1296,24 @@ def _score_row_all_clusters_v2(
     # vmap _score_row_one_cluster_v2 over the cluster dimension (axis 0 of ss_*)
     def score_one(ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos):
         return _score_row_one_cluster_v2(
-            row_data, col_indices, col_type_ids,
-            ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos,
-            hyper_mu, hyper_r, hyper_s, hyper_nu,
-            hyper_dir_alpha, hyper_alpha, hyper_beta,
-            hyper_kappa, hyper_vm_mu,
+            row_data,
+            col_indices,
+            col_type_ids,
+            ss_c,
+            ss_sx,
+            ss_sxsq,
+            ss_cat,
+            ss_sin,
+            ss_cos,
+            hyper_mu,
+            hyper_r,
+            hyper_s,
+            hyper_nu,
+            hyper_dir_alpha,
+            hyper_alpha,
+            hyper_beta,
+            hyper_kappa,
+            hyper_vm_mu,
             n_columns,
         )
 
@@ -1228,16 +1326,24 @@ def _score_row_all_clusters_v2(
     max_cols_per_view = col_indices.shape[0]
     max_cats = ss_cat_counts.shape[-1]
     log_lik_new = _score_row_one_cluster_v2(
-        row_data, col_indices, col_type_ids,
+        row_data,
+        col_indices,
+        col_type_ids,
         jnp.zeros(max_cols_per_view, dtype=jnp.int32),
         jnp.zeros(max_cols_per_view),
         jnp.zeros(max_cols_per_view),
         jnp.zeros((max_cols_per_view, max_cats)),
         jnp.zeros(max_cols_per_view),
         jnp.zeros(max_cols_per_view),
-        hyper_mu, hyper_r, hyper_s, hyper_nu,
-        hyper_dir_alpha, hyper_alpha, hyper_beta,
-        hyper_kappa, hyper_vm_mu,
+        hyper_mu,
+        hyper_r,
+        hyper_s,
+        hyper_nu,
+        hyper_dir_alpha,
+        hyper_alpha,
+        hyper_beta,
+        hyper_kappa,
+        hyper_vm_mu,
         n_columns,
     )
     log_prior_new = jnp.log(crp_alpha)
@@ -1314,7 +1420,7 @@ def packed_transition_row_assignments_v2(
         alpha = packed.view_row_crp_alpha[v_idx]
 
         # Working suffstats for this view (will be mutated row by row)
-        w_ss_c = packed.ss_counts[v_idx]      # (max_c, max_cols_per_view)
+        w_ss_c = packed.ss_counts[v_idx]  # (max_c, max_cols_per_view)
         w_ss_sx = packed.ss_sum_x[v_idx]
         w_ss_sxsq = packed.ss_sum_x_sq[v_idx]
         w_ss_cat = packed.ss_cat_counts[v_idx]  # (max_c, max_cols_per_view, max_cats)
@@ -1322,24 +1428,31 @@ def packed_transition_row_assignments_v2(
         w_ss_cos = packed.ss_sum_cos[v_idx]
 
         assigns = ra_all[v_idx]  # (n_rows,)
-        n_cl = nc_all[v_idx]     # scalar
+        n_cl = nc_all[v_idx]  # scalar
 
         def scan_one_row(row_carry, row_idx):
             """Process one row within a view."""
-            (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat,
-             r_ss_sin, r_ss_cos, r_n_cl) = row_carry
+            (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos, r_n_cl) = (
+                row_carry
+            )
             rk = row_keys[row_idx]
             row_data = data[row_idx]
 
             old_cluster = r_assigns[row_idx]
 
             # Remove row from old cluster's suffstats
-            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = (
-                _remove_row_from_suffstats(
-                    r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
-                    old_cluster, row_data, col_indices,
-                    packed.col_type_ids, max_cats,
-                )
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = _remove_row_from_suffstats(
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                old_cluster,
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                max_cats,
             )
 
             # Cluster counts excluding this row
@@ -1349,13 +1462,28 @@ def packed_transition_row_assignments_v2(
 
             # Score all clusters
             log_probs = _score_row_all_clusters_v2(
-                row_data, col_indices, n_columns, packed.col_type_ids,
+                row_data,
+                col_indices,
+                n_columns,
+                packed.col_type_ids,
                 counts,
-                r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
-                packed.hyper_mu, packed.hyper_r, packed.hyper_s, packed.hyper_nu,
-                packed.hyper_dirichlet_alpha, packed.hyper_alpha, packed.hyper_beta,
-                packed.hyper_kappa, packed.hyper_vm_mu,
-                alpha, max_c,
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_mu,
+                alpha,
+                max_c,
             )
 
             # If budget exhausted (n_cl >= max_c - 1), block new cluster
@@ -1385,29 +1513,40 @@ def packed_transition_row_assignments_v2(
             r_assigns = r_assigns.at[row_idx].set(actual_cluster)
 
             # Add row to chosen cluster's suffstats
-            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = (
-                _add_row_to_suffstats(
-                    r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
-                    actual_cluster, row_data, col_indices,
-                    packed.col_type_ids, max_cats,
-                )
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = _add_row_to_suffstats(
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                actual_cluster,
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                max_cats,
             )
 
-            new_carry = (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat,
-                         r_ss_sin, r_ss_cos, r_n_cl)
+            new_carry = (
+                r_assigns,
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                r_n_cl,
+            )
             return new_carry, None
 
         # Run inner scan over rows
-        row_init = (assigns, w_ss_c, w_ss_sx, w_ss_sxsq, w_ss_cat,
-                    w_ss_sin, w_ss_cos, n_cl)
+        row_init = (assigns, w_ss_c, w_ss_sx, w_ss_sxsq, w_ss_cat, w_ss_sin, w_ss_cos, n_cl)
         (final_assigns, _, _, _, _, _, _, final_n_cl), _ = jax.lax.scan(
             scan_one_row, row_init, jnp.arange(n_rows)
         )
 
         # Compact cluster IDs
-        compacted_assigns, compacted_n_cl = _compact_clusters(
-            final_assigns, n_rows, max_c
-        )
+        compacted_assigns, compacted_n_cl = _compact_clusters(final_assigns, n_rows, max_c)
 
         # Only update if view is active
         new_ra = jnp.where(is_active, compacted_assigns, ra_all[v_idx])
@@ -1419,18 +1558,23 @@ def packed_transition_row_assignments_v2(
         return (ra_all, nc_all), None
 
     # Outer scan over views
-    init_carry = (jnp.array(packed.view_row_assignments),
-                  jnp.array(packed.view_n_clusters))
+    init_carry = (jnp.array(packed.view_row_assignments), jnp.array(packed.view_n_clusters))
     (new_row_assigns, new_n_clusters), _ = jax.lax.scan(
         scan_one_view, init_carry, jnp.arange(max_views)
     )
 
     # Create updated packed state with new assignments
     updated = PackedCrossCatState(
-        **{name: (new_row_assigns if name == "view_row_assignments"
-                  else new_n_clusters if name == "view_n_clusters"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_row_assigns
+                if name == "view_row_assignments"
+                else new_n_clusters
+                if name == "view_n_clusters"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
     return recompute_all_suffstats(updated, data)
@@ -1480,13 +1624,28 @@ def packed_transition_row_assignments(
 
             # Score all clusters
             log_probs = _score_row_all_clusters(
-                data[i], col_indices, n_cols_v, packed.col_type_ids,
+                data[i],
+                col_indices,
+                n_cols_v,
+                packed.col_type_ids,
                 counts,
-                v_ss_counts, v_ss_sum_x, v_ss_sum_x_sq, v_ss_cat, v_ss_sin, v_ss_cos,
-                packed.hyper_mu, packed.hyper_r, packed.hyper_s, packed.hyper_nu,
-                packed.hyper_dirichlet_alpha, packed.hyper_alpha, packed.hyper_beta,
-                packed.hyper_kappa, packed.hyper_vm_mu,
-                alpha, max_c,
+                v_ss_counts,
+                v_ss_sum_x,
+                v_ss_sum_x_sq,
+                v_ss_cat,
+                v_ss_sin,
+                v_ss_cos,
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_mu,
+                alpha,
+                max_c,
             )
 
             # Numerical stability
@@ -1513,10 +1672,16 @@ def packed_transition_row_assignments(
 
     # Create updated packed state and recompute suffstats
     packed = PackedCrossCatState(
-        **{name: (new_row_assigns if name == "view_row_assignments"
-                  else new_n_clusters if name == "view_n_clusters"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_row_assigns
+                if name == "view_row_assignments"
+                else new_n_clusters
+                if name == "view_n_clusters"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
     return recompute_all_suffstats(packed, data)
@@ -1574,70 +1739,95 @@ def packed_transition_column_hypers(
 
             # Sample s
             s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
-            scores_s = jnp.array([
-                sum(
-                    float(_ng_log_marginal(
-                        packed.ss_counts[v_idx, c, local_idx],
-                        packed.ss_sum_x[v_idx, c, local_idx],
-                        packed.ss_sum_x_sq[v_idx, c, local_idx],
-                        jnp.array(cur_mu), jnp.array(cur_r), sv, jnp.array(cur_nu),
-                    ))
-                    for c in range(nc)
-                )
-                for sv in s_grid
-            ])
+            scores_s = jnp.array(
+                [
+                    sum(
+                        float(
+                            _ng_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_sum_x[v_idx, c, local_idx],
+                                packed.ss_sum_x_sq[v_idx, c, local_idx],
+                                jnp.array(cur_mu),
+                                jnp.array(cur_r),
+                                sv,
+                                jnp.array(cur_nu),
+                            )
+                        )
+                        for c in range(nc)
+                    )
+                    for sv in s_grid
+                ]
+            )
             scores_s = scores_s - jnp.max(scores_s)
             new_s_val = s_grid[jax.random.categorical(k1, scores_s)]
             new_s = new_s.at[j].set(new_s_val)
 
             # Sample mu
             mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
-            scores_mu = jnp.array([
-                sum(
-                    float(_ng_log_marginal(
-                        packed.ss_counts[v_idx, c, local_idx],
-                        packed.ss_sum_x[v_idx, c, local_idx],
-                        packed.ss_sum_x_sq[v_idx, c, local_idx],
-                        mv, jnp.array(cur_r), new_s_val, jnp.array(cur_nu),
-                    ))
-                    for c in range(nc)
-                )
-                for mv in mu_grid
-            ])
+            scores_mu = jnp.array(
+                [
+                    sum(
+                        float(
+                            _ng_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_sum_x[v_idx, c, local_idx],
+                                packed.ss_sum_x_sq[v_idx, c, local_idx],
+                                mv,
+                                jnp.array(cur_r),
+                                new_s_val,
+                                jnp.array(cur_nu),
+                            )
+                        )
+                        for c in range(nc)
+                    )
+                    for mv in mu_grid
+                ]
+            )
             scores_mu = scores_mu - jnp.max(scores_mu)
             new_mu_val = mu_grid[jax.random.categorical(k2, scores_mu)]
             new_mu = new_mu.at[j].set(new_mu_val)
 
             # Sample nu
             nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
-            scores_nu = jnp.array([
-                sum(
-                    float(_ng_log_marginal(
-                        packed.ss_counts[v_idx, c, local_idx],
-                        packed.ss_sum_x[v_idx, c, local_idx],
-                        packed.ss_sum_x_sq[v_idx, c, local_idx],
-                        new_mu_val, jnp.array(cur_r), new_s_val, nv,
-                    ))
-                    for c in range(nc)
-                )
-                for nv in nu_grid
-            ])
+            scores_nu = jnp.array(
+                [
+                    sum(
+                        float(
+                            _ng_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_sum_x[v_idx, c, local_idx],
+                                packed.ss_sum_x_sq[v_idx, c, local_idx],
+                                new_mu_val,
+                                jnp.array(cur_r),
+                                new_s_val,
+                                nv,
+                            )
+                        )
+                        for c in range(nc)
+                    )
+                    for nv in nu_grid
+                ]
+            )
             scores_nu = scores_nu - jnp.max(scores_nu)
             new_nu = new_nu.at[j].set(nu_grid[jax.random.categorical(k3, scores_nu)])
 
         elif type_id == CATEGORICAL_ID:
             alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0])
-            scores = jnp.array([
-                sum(
-                    float(_dc_log_marginal(
-                        packed.ss_counts[v_idx, c, local_idx],
-                        packed.ss_cat_counts[v_idx, c, local_idx],
-                        av,
-                    ))
-                    for c in range(nc)
-                )
-                for av in alpha_grid
-            ])
+            scores = jnp.array(
+                [
+                    sum(
+                        float(
+                            _dc_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_cat_counts[v_idx, c, local_idx],
+                                av,
+                            )
+                        )
+                        for c in range(nc)
+                    )
+                    for av in alpha_grid
+                ]
+            )
             scores = scores - jnp.max(scores)
             new_dir_alpha = new_dir_alpha.at[j].set(
                 alpha_grid[jax.random.categorical(keys[j], scores)]
@@ -1649,11 +1839,14 @@ def packed_transition_column_hypers(
             for a_val in ab_grid:
                 for b_val in ab_grid:
                     s = sum(
-                        float(_bb_log_marginal(
-                            packed.ss_counts[v_idx, c, local_idx],
-                            packed.ss_sum_x[v_idx, c, local_idx],
-                            a_val, b_val,
-                        ))
+                        float(
+                            _bb_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_sum_x[v_idx, c, local_idx],
+                                a_val,
+                                b_val,
+                            )
+                        )
                         for c in range(nc)
                     )
                     scores.append(s)
@@ -1666,34 +1859,48 @@ def packed_transition_column_hypers(
 
         elif type_id == CYCLIC_ID:
             kappa_grid = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
-            scores = jnp.array([
-                sum(
-                    float(_vm_log_marginal(
-                        packed.ss_counts[v_idx, c, local_idx],
-                        packed.ss_sum_sin[v_idx, c, local_idx],
-                        packed.ss_sum_cos[v_idx, c, local_idx],
-                        kv,
-                    ))
-                    for c in range(nc)
-                )
-                for kv in kappa_grid
-            ])
-            scores = scores - jnp.max(scores)
-            new_kappa = new_kappa.at[j].set(
-                kappa_grid[jax.random.categorical(keys[j], scores)]
+            scores = jnp.array(
+                [
+                    sum(
+                        float(
+                            _vm_log_marginal(
+                                packed.ss_counts[v_idx, c, local_idx],
+                                packed.ss_sum_sin[v_idx, c, local_idx],
+                                packed.ss_sum_cos[v_idx, c, local_idx],
+                                kv,
+                            )
+                        )
+                        for c in range(nc)
+                    )
+                    for kv in kappa_grid
+                ]
             )
+            scores = scores - jnp.max(scores)
+            new_kappa = new_kappa.at[j].set(kappa_grid[jax.random.categorical(keys[j], scores)])
 
     return PackedCrossCatState(
-        **{name: (new_mu if name == "hyper_mu"
-                  else new_r if name == "hyper_r"
-                  else new_s if name == "hyper_s"
-                  else new_nu if name == "hyper_nu"
-                  else new_dir_alpha if name == "hyper_dirichlet_alpha"
-                  else new_alpha if name == "hyper_alpha"
-                  else new_beta if name == "hyper_beta"
-                  else new_kappa if name == "hyper_kappa"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_mu
+                if name == "hyper_mu"
+                else new_r
+                if name == "hyper_r"
+                else new_s
+                if name == "hyper_s"
+                else new_nu
+                if name == "hyper_nu"
+                else new_dir_alpha
+                if name == "hyper_dirichlet_alpha"
+                else new_alpha
+                if name == "hyper_alpha"
+                else new_beta
+                if name == "hyper_beta"
+                else new_kappa
+                if name == "hyper_kappa"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
 
@@ -1718,7 +1925,6 @@ def packed_transition_column_hypers_v2(
     """
     n_cols = packed.n_cols
     max_c = packed.max_clusters
-    max_views = packed.max_views
     max_cpv = packed.max_cols_per_view
 
     # Pre-split keys: one per column
@@ -1726,27 +1932,33 @@ def packed_transition_column_hypers_v2(
 
     def _find_local_index(v_idx, col_j):
         """Find local column index within a view using lax.scan."""
+
         def scan_fn(found_idx, li):
             matches = packed.view_column_indices[v_idx, li] == col_j
             new_idx = jnp.where(matches & (found_idx < 0), li, found_idx)
             return new_idx, None
-        local_idx, _ = jax.lax.scan(scan_fn, jnp.array(-1, dtype=jnp.int32),
-                                     jnp.arange(max_cpv))
+
+        local_idx, _ = jax.lax.scan(scan_fn, jnp.array(-1, dtype=jnp.int32), jnp.arange(max_cpv))
         # Clamp to 0 if not found (should not happen for valid columns)
         return jnp.maximum(local_idx, 0)
 
     def _score_grid_ng(v_idx, local_idx, mu_val, r_val, s_grid_vals, nu_val):
         """Score a grid of s values for Normal-Gamma. Returns (n_grid,) scores."""
         nc = packed.view_n_clusters[v_idx]
-        counts_col = packed.ss_counts[v_idx, :, local_idx]     # (max_c,)
-        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]       # (max_c,)
-        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx] # (max_c,)
+        counts_col = packed.ss_counts[v_idx, :, local_idx]  # (max_c,)
+        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
+        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx]  # (max_c,)
 
         def score_one_grid_point(s_val):
             # Score across all clusters, mask inactive
             per_cluster = _ng_log_marginal(
-                counts_col, sum_x_col, sum_x_sq_col,
-                mu_val, r_val, s_val, nu_val,
+                counts_col,
+                sum_x_col,
+                sum_x_sq_col,
+                mu_val,
+                r_val,
+                s_val,
+                nu_val,
             )  # (max_c,)
             masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
             return jnp.sum(masked)
@@ -1762,8 +1974,13 @@ def packed_transition_column_hypers_v2(
 
         def score_one_grid_point(mu_val):
             per_cluster = _ng_log_marginal(
-                counts_col, sum_x_col, sum_x_sq_col,
-                mu_val, r_val, s_val, nu_val,
+                counts_col,
+                sum_x_col,
+                sum_x_sq_col,
+                mu_val,
+                r_val,
+                s_val,
+                nu_val,
             )
             masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
             return jnp.sum(masked)
@@ -1779,8 +1996,13 @@ def packed_transition_column_hypers_v2(
 
         def score_one_grid_point(nu_val):
             per_cluster = _ng_log_marginal(
-                counts_col, sum_x_col, sum_x_sq_col,
-                mu_val, r_val, s_val, nu_val,
+                counts_col,
+                sum_x_col,
+                sum_x_sq_col,
+                mu_val,
+                r_val,
+                s_val,
+                nu_val,
             )
             masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
             return jnp.sum(masked)
@@ -1849,8 +2071,8 @@ def packed_transition_column_hypers_v2(
         sum_x_col_bb = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
 
         # Create 2D grid: all combinations
-        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])    # (25,)
-        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])      # (25,)
+        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])  # (25,)
+        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])  # (25,)
 
         def score_bb_grid(ab_pair):
             a_val, b_val = ab_pair
@@ -1889,23 +2111,45 @@ def packed_transition_column_hypers_v2(
         out_beta = jnp.where(type_id == BINARY_ID, new_beta_val, packed.hyper_beta[j])
         out_kappa = jnp.where(type_id == CYCLIC_ID, new_kappa_val, packed.hyper_kappa[j])
 
-        return out_mu, packed.hyper_r[j], out_s, out_nu, out_dir_alpha, out_alpha, out_beta, out_kappa
+        return (
+            out_mu,
+            packed.hyper_r[j],
+            out_s,
+            out_nu,
+            out_dir_alpha,
+            out_alpha,
+            out_beta,
+            out_kappa,
+        )
 
     # vmap over all columns
-    (new_mu, new_r, new_s, new_nu, new_dir_alpha,
-     new_alpha, new_beta, new_kappa) = jax.vmap(process_one_column)(jnp.arange(n_cols))
+    (new_mu, new_r, new_s, new_nu, new_dir_alpha, new_alpha, new_beta, new_kappa) = jax.vmap(
+        process_one_column
+    )(jnp.arange(n_cols))
 
     return PackedCrossCatState(
-        **{name: (new_mu if name == "hyper_mu"
-                  else new_r if name == "hyper_r"
-                  else new_s if name == "hyper_s"
-                  else new_nu if name == "hyper_nu"
-                  else new_dir_alpha if name == "hyper_dirichlet_alpha"
-                  else new_alpha if name == "hyper_alpha"
-                  else new_beta if name == "hyper_beta"
-                  else new_kappa if name == "hyper_kappa"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_mu
+                if name == "hyper_mu"
+                else new_r
+                if name == "hyper_r"
+                else new_s
+                if name == "hyper_s"
+                else new_nu
+                if name == "hyper_nu"
+                else new_dir_alpha
+                if name == "hyper_dirichlet_alpha"
+                else new_alpha
+                if name == "hyper_alpha"
+                else new_beta
+                if name == "hyper_beta"
+                else new_kappa
+                if name == "hyper_kappa"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
 
@@ -1942,10 +2186,9 @@ def packed_transition_crp_alphas(
     # Outer CRP alpha
     from crosscat.model import _log_crp
 
-    log_scores = jnp.array([
-        float(_log_crp(packed.column_assignments, av)) - float(av)
-        for av in alpha_grid
-    ])
+    log_scores = jnp.array(
+        [float(_log_crp(packed.column_assignments, av)) - float(av) for av in alpha_grid]
+    )
     log_scores = log_scores - jnp.max(log_scores)
     new_col_alpha = alpha_grid[jax.random.categorical(keys[0], log_scores)]
 
@@ -1953,20 +2196,23 @@ def packed_transition_crp_alphas(
     new_view_alpha = jnp.array(packed.view_row_crp_alpha)
     for v in range(n_views):
         assigns = packed.view_row_assignments[v]
-        log_scores = jnp.array([
-            float(_log_crp(assigns, av)) - float(av)
-            for av in alpha_grid
-        ])
+        log_scores = jnp.array([float(_log_crp(assigns, av)) - float(av) for av in alpha_grid])
         log_scores = log_scores - jnp.max(log_scores)
         new_view_alpha = new_view_alpha.at[v].set(
             alpha_grid[jax.random.categorical(keys[v + 1], log_scores)]
         )
 
     return PackedCrossCatState(
-        **{name: (new_col_alpha if name == "column_crp_alpha"
-                  else new_view_alpha if name == "view_row_crp_alpha"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_col_alpha
+                if name == "column_crp_alpha"
+                else new_view_alpha
+                if name == "view_row_crp_alpha"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
 
@@ -1986,10 +2232,8 @@ def packed_transition_crp_alphas_v2(
     (row) CRP. Includes Exp(1) prior: log_score -= alpha_val.
     """
     alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
-    n_grid = alpha_grid.shape[0]
     max_views = packed.max_views
     n_cols = packed.n_cols
-    n_rows = packed.n_rows
     max_c = packed.max_clusters
 
     k_outer, k_inner = jax.random.split(rng_key)
@@ -2039,10 +2283,16 @@ def packed_transition_crp_alphas_v2(
     new_view_alpha = jax.vmap(sample_one_view)(jnp.arange(max_views))
 
     return PackedCrossCatState(
-        **{name: (new_col_alpha if name == "column_crp_alpha"
-                  else new_view_alpha if name == "view_row_crp_alpha"
-                  else getattr(packed, name))
-           for name in _ARRAY_FIELDS},
+        **{
+            name: (
+                new_col_alpha
+                if name == "column_crp_alpha"
+                else new_view_alpha
+                if name == "view_row_crp_alpha"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
 

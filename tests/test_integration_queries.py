@@ -58,9 +58,7 @@ def inferred_continuous_state():
         state = gibbs_sweep(k, state, data, n_sweeps=20)
         final_states.append(state)
 
-    best_idx = max(
-        range(len(final_states)), key=lambda i: float(log_joint(final_states[i], data))
-    )
+    best_idx = max(range(len(final_states)), key=lambda i: float(log_joint(final_states[i], data)))
 
     return {
         "states": final_states,
@@ -184,9 +182,7 @@ def test_mutual_information_self(inferred_continuous_state):
     states = d["states"]
     mi_self, _ = mutual_information(states, col_i=0, col_j=0)
     mi_other, _ = mutual_information(states, col_i=0, col_j=2)
-    assert float(mi_self) >= float(mi_other) - 0.01, (
-        f"Self-MI {mi_self} < cross-MI {mi_other}"
-    )
+    assert float(mi_self) >= float(mi_other) - 0.01, f"Self-MI {mi_self} < cross-MI {mi_other}"
 
 
 # ---------------------------------------------------------------------------
@@ -231,9 +227,7 @@ def test_check_row_dep_constraint():
     state = initialize(k2, data, column_types)
     view = state.views[0]
     # Find two rows in the same cluster
-    cluster_0_rows = [
-        i for i in range(state.n_rows) if int(view.row_assignments[i]) == 0
-    ]
+    cluster_0_rows = [i for i in range(state.n_rows) if int(view.row_assignments[i]) == 0]
     if len(cluster_0_rows) >= 2:
         r_a, r_b = cluster_0_rows[0], cluster_0_rows[1]
         assert check_row_dep_constraint(state, r_a, r_b, dependent=True, view_idx=0)
@@ -281,8 +275,15 @@ def test_ensure_row_dep_constraint(inferred_continuous_state):
     data = d["data"]
     # Constrain rows 0 and 1 to be in the same cluster (view 0)
     result = ensure_row_dep_constraint(
-        key, state, data, row_a=0, row_b=1, dependent=True,
-        view_idx=0, max_iterations=50, n_sweeps_per_attempt=3
+        key,
+        state,
+        data,
+        row_a=0,
+        row_b=1,
+        dependent=True,
+        view_idx=0,
+        max_iterations=50,
+        n_sweeps_per_attempt=3,
     )
     assert result is not None, "Failed to find state satisfying row dep constraint"
     assert check_row_dep_constraint(result, 0, 1, dependent=True, view_idx=0)

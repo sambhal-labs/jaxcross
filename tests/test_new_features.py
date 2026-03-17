@@ -40,6 +40,7 @@ def simple_state(rng_key):
 
 # --- NaN handling ---
 
+
 class TestNaNHandling:
     def test_normal_gamma_nan(self):
         from crosscat.components import NormalGamma
@@ -73,6 +74,7 @@ class TestNaNHandling:
 
 
 # --- Von Mises (Cyclic) ---
+
 
 class TestVonMises:
     def test_suffstats(self):
@@ -123,6 +125,7 @@ class TestVonMises:
 
 # --- Row Similarity ---
 
+
 class TestRowSimilarity:
     def test_same_cluster_rows(self, simple_state):
         from crosscat.inference import row_similarity
@@ -149,15 +152,14 @@ class TestRowSimilarity:
 
 # --- Observed vs Unobserved Row ---
 
+
 class TestObservedRowDistinction:
     def test_observed_row_prediction(self, rng_key, simple_state):
         from crosscat.inference import predictive_sample
 
         state, data, _ = simple_state
         # With row_id, should use actual cluster
-        samples_obs = predictive_sample(
-            rng_key, state, data, [0], row_id=0, n_samples=100
-        )
+        samples_obs = predictive_sample(rng_key, state, data, [0], row_id=0, n_samples=100)
         assert samples_obs.shape == (100, 1)
 
     def test_unobserved_marginalizes(self, rng_key, simple_state):
@@ -165,13 +167,12 @@ class TestObservedRowDistinction:
 
         state, data, _ = simple_state
         # Without row_id, marginalizes over clusters
-        samples_unobs = predictive_sample(
-            rng_key, state, data, [0], n_samples=100
-        )
+        samples_unobs = predictive_sample(rng_key, state, data, [0], n_samples=100)
         assert samples_unobs.shape == (100, 1)
 
 
 # --- Convergence Diagnostics ---
+
 
 class TestDiagnostics:
     def test_ari_perfect(self):
@@ -202,6 +203,7 @@ class TestDiagnostics:
 
 # --- Impute and Confidence ---
 
+
 class TestImputeAndConfidence:
     def test_continuous_impute(self, rng_key, simple_state):
         from crosscat.inference import impute_and_confidence
@@ -213,6 +215,7 @@ class TestImputeAndConfidence:
 
 
 # --- Initialization Modes ---
+
 
 class TestInitializationModes:
     def test_together(self, rng_key):
@@ -242,6 +245,7 @@ class TestInitializationModes:
 
 # --- Row Insertion ---
 
+
 class TestRowInsertion:
     def test_insert_rows(self, rng_key, simple_state):
         from crosscat.model import insert_rows
@@ -257,30 +261,32 @@ class TestRowInsertion:
 
 # --- Joint Predictive Probability ---
 
+
 class TestJointPredictiveProb:
     def test_chain_rule(self, simple_state):
         from crosscat.inference import joint_predictive_probability
 
         state, data, _ = simple_state
         # Joint probability of two query values
-        log_p_joint = joint_predictive_probability(
-            state, data, [0, 1], jnp.array([0.0, -2.0])
-        )
+        log_p_joint = joint_predictive_probability(state, data, [0, 1], jnp.array([0.0, -2.0]))
         assert jnp.isfinite(log_p_joint)
         assert log_p_joint < 0  # log probability
 
 
 # --- Data Utilities ---
 
+
 class TestDataUtils:
     def test_guess_column_types(self):
         from crosscat.data_utils import guess_column_types
 
-        data = jnp.column_stack([
-            jnp.array([1.1, 2.3, 3.5, 4.7, 5.9]),
-            jnp.array([0.0, 1.0, 0.0, 1.0, 0.0]),
-            jnp.array([0.0, 1.0, 2.0, 0.0, 1.0]),
-        ])
+        data = jnp.column_stack(
+            [
+                jnp.array([1.1, 2.3, 3.5, 4.7, 5.9]),
+                jnp.array([0.0, 1.0, 0.0, 1.0, 0.0]),
+                jnp.array([0.0, 1.0, 2.0, 0.0, 1.0]),
+            ]
+        )
         types = guess_column_types(data)
         assert types[0] == ColumnType.CONTINUOUS
         assert types[1] == ColumnType.BINARY
@@ -296,6 +302,7 @@ class TestDataUtils:
 
 
 # --- Synthetic Data Generator ---
+
 
 class TestSyntheticGenerator:
     def test_generate(self, rng_key):
@@ -323,6 +330,7 @@ class TestSyntheticGenerator:
 
 # --- State Validation ---
 
+
 class TestValidation:
     def test_valid_state(self, simple_state):
         from crosscat.validate import validate_state
@@ -340,6 +348,7 @@ class TestValidation:
 
 # --- MH Column Transitions ---
 
+
 class TestMHTransition:
     def test_mh_column_sweep(self, rng_key, simple_state):
         from crosscat.gibbs import transition_column_assignments_mh
@@ -355,7 +364,10 @@ class TestMHTransition:
 
         state, data, _ = simple_state
         new_state = gibbs_sweep(
-            rng_key, state, data, n_sweeps=1,
+            rng_key,
+            state,
+            data,
+            n_sweeps=1,
             kernels=("row_assignments", "column_assignments_mh", "crp_alphas"),
         )
         assert new_state.n_views >= 1
@@ -363,14 +375,18 @@ class TestMHTransition:
 
 # --- Conditional Entropy ---
 
+
 class TestConditionalEntropy:
     def test_conditional_entropy(self, rng_key, simple_state):
         from crosscat.inference import conditional_entropy
 
         state, data, _ = simple_state
         h = conditional_entropy(
-            rng_key, [state], data,
-            target_col=0, given_cols=[1],
+            rng_key,
+            [state],
+            data,
+            target_col=0,
+            given_cols=[1],
             n_samples=50,
         )
         assert jnp.isfinite(h)
@@ -378,6 +394,7 @@ class TestConditionalEntropy:
 
 
 # --- Predictive CDF ---
+
 
 class TestPredictiveCDF:
     def test_continuous_cdf_monotone(self, rng_key, simple_state):
@@ -403,15 +420,23 @@ class TestPredictiveCDF:
         from crosscat.inference import predictive_cdf
         from crosscat.model import initialize
 
-        data = jnp.array([
-            [0.0], [1.0], [2.0], [0.0], [1.0],
-            [2.0], [0.0], [1.0], [2.0], [0.0],
-        ])
+        data = jnp.array(
+            [
+                [0.0],
+                [1.0],
+                [2.0],
+                [0.0],
+                [1.0],
+                [2.0],
+                [0.0],
+                [1.0],
+                [2.0],
+                [0.0],
+            ]
+        )
         column_types = [ColumnType.CATEGORICAL]
         state = initialize(rng_key, data, column_types)
-        cdf_all = predictive_cdf(
-            rng_key, state, data, 0, jnp.array(2.0)
-        )
+        cdf_all = predictive_cdf(rng_key, state, data, 0, jnp.array(2.0))
         # CDF at max category should be ~1.0
         assert float(cdf_all) > 0.99
 
@@ -428,15 +453,14 @@ class TestPredictiveCDF:
 
 # --- Sample and Insert ---
 
+
 class TestSampleAndInsert:
     def test_basic(self, rng_key, simple_state):
         from crosscat.inference import sample_and_insert
 
         state, data, _ = simple_state
         partial = jnp.array([1.0, jnp.nan, 3.0, jnp.nan])
-        new_state, new_data, completed = sample_and_insert(
-            rng_key, state, data, partial
-        )
+        new_state, new_data, completed = sample_and_insert(rng_key, state, data, partial)
         assert new_state.n_rows == state.n_rows + 1
         assert new_data.shape[0] == data.shape[0] + 1
         # Observed values preserved
@@ -451,9 +475,7 @@ class TestSampleAndInsert:
 
         state, data, _ = simple_state
         full_row = jnp.array([1.0, 2.0, 3.0, 4.0])
-        new_state, new_data, completed = sample_and_insert(
-            rng_key, state, data, full_row
-        )
+        new_state, new_data, completed = sample_and_insert(rng_key, state, data, full_row)
         assert new_state.n_rows == state.n_rows + 1
         assert jnp.allclose(completed, full_row)
 
@@ -462,8 +484,6 @@ class TestSampleAndInsert:
 
         state, data, _ = simple_state
         all_nan = jnp.full(4, jnp.nan)
-        new_state, new_data, completed = sample_and_insert(
-            rng_key, state, data, all_nan
-        )
+        new_state, new_data, completed = sample_and_insert(rng_key, state, data, all_nan)
         assert new_state.n_rows == state.n_rows + 1
         assert jnp.all(jnp.isfinite(completed))

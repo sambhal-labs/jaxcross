@@ -81,12 +81,8 @@ def test_pack_unpack_roundtrip_continuous(continuous_state_and_data):
     assert float(recovered.column_crp_alpha) == pytest.approx(float(state.column_crp_alpha))
 
     for v in range(state.n_views):
-        assert jnp.array_equal(
-            recovered.views[v].row_assignments, state.views[v].row_assignments
-        )
-        assert jnp.array_equal(
-            recovered.views[v].column_indices, state.views[v].column_indices
-        )
+        assert jnp.array_equal(recovered.views[v].row_assignments, state.views[v].row_assignments)
+        assert jnp.array_equal(recovered.views[v].column_indices, state.views[v].column_indices)
 
 
 def test_pack_unpack_roundtrip_mixed(mixed_state_and_data):
@@ -145,8 +141,7 @@ def test_vectorized_suffstats_match_original(continuous_state_and_data):
     packed = pack_state(state, max_clusters=32, max_categories=16)
     col_type_ids = packed.col_type_ids
     counts, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos = compute_suffstats_vectorized(
-        data, view.column_indices, col_type_ids,
-        view.row_assignments, n_clusters, 32, 16
+        data, view.column_indices, col_type_ids, view.row_assignments, n_clusters, 32, 16
     )
 
     # Compare

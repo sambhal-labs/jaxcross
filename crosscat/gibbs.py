@@ -657,14 +657,16 @@ def transition_column_hypers(
                 return log_score
 
             # Sample s
-            log_scores_s = jnp.array([
-                _score_hypers(
-                    ColumnHypers(
-                        column_type=col_type, mu=hypers.mu, r=hypers.r, s=sv, nu=hypers.nu
+            log_scores_s = jnp.array(
+                [
+                    _score_hypers(
+                        ColumnHypers(
+                            column_type=col_type, mu=hypers.mu, r=hypers.r, s=sv, nu=hypers.nu
+                        )
                     )
-                )
-                for sv in s_grid
-            ])
+                    for sv in s_grid
+                ]
+            )
             log_scores_s = log_scores_s - jnp.max(log_scores_s)
             s_idx = jax.random.categorical(k1, log_scores_s)
             new_s = s_grid[s_idx]
@@ -674,24 +676,30 @@ def transition_column_hypers(
             data_std = jnp.std(col_data) + 1e-6
             mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
 
-            log_scores_mu = jnp.array([
-                _score_hypers(
-                    ColumnHypers(column_type=col_type, mu=mv, r=hypers.r, s=new_s, nu=hypers.nu)
-                )
-                for mv in mu_grid
-            ])
+            log_scores_mu = jnp.array(
+                [
+                    _score_hypers(
+                        ColumnHypers(
+                            column_type=col_type, mu=mv, r=hypers.r, s=new_s, nu=hypers.nu
+                        )
+                    )
+                    for mv in mu_grid
+                ]
+            )
             log_scores_mu = log_scores_mu - jnp.max(log_scores_mu)
             mu_idx = jax.random.categorical(k2, log_scores_mu)
             new_mu = mu_grid[mu_idx]
 
             # Sample nu (degrees of freedom) — matching original N_GRID approach
             nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
-            log_scores_nu = jnp.array([
-                _score_hypers(
-                    ColumnHypers(column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=nv)
-                )
-                for nv in nu_grid
-            ])
+            log_scores_nu = jnp.array(
+                [
+                    _score_hypers(
+                        ColumnHypers(column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=nv)
+                    )
+                    for nv in nu_grid
+                ]
+            )
             log_scores_nu = log_scores_nu - jnp.max(log_scores_nu)
             nu_idx = jax.random.categorical(k3, log_scores_nu)
             new_nu = nu_grid[nu_idx]
