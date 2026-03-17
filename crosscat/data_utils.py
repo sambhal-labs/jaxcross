@@ -10,7 +10,6 @@ Maps to original CrossCat data_utils.py:
 from __future__ import annotations
 
 import csv
-import io
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -41,7 +40,7 @@ def read_csv(
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
 
     filepath = Path(filepath)
-    with open(filepath, "r", newline="") as f:
+    with open(filepath, newline="") as f:
         reader = csv.reader(f)
         rows = list(reader)
 
@@ -53,7 +52,6 @@ def read_csv(
         col_names = [f"col_{i}" for i in range(len(data_rows[0]))]
 
     # Convert to float array, replacing nan_values with NaN
-    n_rows = len(data_rows)
     n_cols = len(col_names)
     values = []
     for row in data_rows:

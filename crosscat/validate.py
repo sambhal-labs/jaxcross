@@ -32,7 +32,8 @@ def validate_state(state: CrossCatState, data=None) -> list[str]:
     # Check dimensions
     if state.column_assignments.shape[0] != state.n_cols:
         errors.append(
-            f"column_assignments length {state.column_assignments.shape[0]} != n_cols {state.n_cols}"
+            f"column_assignments length {state.column_assignments.shape[0]} "
+            f"!= n_cols {state.n_cols}"
         )
 
     if len(state.column_hypers) != state.n_cols:

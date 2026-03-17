@@ -8,7 +8,6 @@ Maps to original CrossCat:
 from __future__ import annotations
 
 import jax
-import jax.numpy as jnp
 from jax import Array
 
 from crosscat.gibbs import gibbs_sweep
