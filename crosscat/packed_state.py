@@ -478,34 +478,44 @@ def recompute_all_suffstats(packed: PackedCrossCatState, data: Array) -> PackedC
     """Recompute all sufficient statistics from data and current assignments.
 
     This is useful after modifying row or column assignments.
+    Uses lax.scan over views for JIT compatibility.
     """
     max_c = packed.max_clusters
     max_cat = packed.max_categories
-    n_views = int(packed.n_views)
+    max_views = packed.max_views
 
-    ss_counts = packed.ss_counts
-    ss_sum_x = packed.ss_sum_x
-    ss_sum_x_sq = packed.ss_sum_x_sq
-    ss_cat_counts = packed.ss_cat_counts
-    ss_sum_sin = packed.ss_sum_sin
-    ss_sum_cos = packed.ss_sum_cos
-
-    for v in range(n_views):
-        n_cols_v = int(packed.view_n_columns[v])
-        col_indices = packed.view_column_indices[v, :n_cols_v]
-        row_assigns = packed.view_row_assignments[v]
-        nc = int(packed.view_n_clusters[v])
+    def recompute_one_view(carry, v_idx):
+        ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = carry
+        is_active = packed.view_mask[v_idx]
+        col_indices = packed.view_column_indices[v_idx]  # (max_cpv,) with -1 padding
+        row_assigns = packed.view_row_assignments[v_idx]
 
         counts, sx, sxsq, cc, ssin, scos = compute_suffstats_vectorized(
-            data, col_indices, packed.col_type_ids, row_assigns, nc, max_c, max_cat
+            data, col_indices, packed.col_type_ids, row_assigns, 0, max_c, max_cat
         )
 
-        ss_counts = ss_counts.at[v, :, :n_cols_v].set(counts[:, :n_cols_v])
-        ss_sum_x = ss_sum_x.at[v, :, :n_cols_v].set(sx[:, :n_cols_v])
-        ss_sum_x_sq = ss_sum_x_sq.at[v, :, :n_cols_v].set(sxsq[:, :n_cols_v])
-        ss_cat_counts = ss_cat_counts.at[v, :, :n_cols_v, :].set(cc[:, :n_cols_v, :])
-        ss_sum_sin = ss_sum_sin.at[v, :, :n_cols_v].set(ssin[:, :n_cols_v])
-        ss_sum_cos = ss_sum_cos.at[v, :, :n_cols_v].set(scos[:, :n_cols_v])
+        # Only update if view is active; otherwise keep old values
+        new_ss_c = jnp.where(is_active, counts, ss_c[v_idx])
+        new_ss_sx = jnp.where(is_active, sx, ss_sx[v_idx])
+        new_ss_sxsq = jnp.where(is_active, sxsq, ss_sxsq[v_idx])
+        new_ss_cat = jnp.where(is_active, cc, ss_cat[v_idx])
+        new_ss_sin = jnp.where(is_active, ssin, ss_sin[v_idx])
+        new_ss_cos = jnp.where(is_active, scos, ss_cos[v_idx])
+
+        ss_c = ss_c.at[v_idx].set(new_ss_c)
+        ss_sx = ss_sx.at[v_idx].set(new_ss_sx)
+        ss_sxsq = ss_sxsq.at[v_idx].set(new_ss_sxsq)
+        ss_cat = ss_cat.at[v_idx].set(new_ss_cat)
+        ss_sin = ss_sin.at[v_idx].set(new_ss_sin)
+        ss_cos = ss_cos.at[v_idx].set(new_ss_cos)
+
+        return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
+
+    init = (packed.ss_counts, packed.ss_sum_x, packed.ss_sum_x_sq,
+            packed.ss_cat_counts, packed.ss_sum_sin, packed.ss_sum_cos)
+    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = (
+        jax.lax.scan(recompute_one_view, init, jnp.arange(max_views))
+    )
 
     return PackedCrossCatState(
         **{name: getattr(packed, name) for name in _ARRAY_FIELDS
@@ -967,6 +977,356 @@ def _score_row_all_clusters(
     log_prob_new = log_prior_new + log_lik_new
 
     return jnp.concatenate([log_probs_existing, jnp.array([log_prob_new])])
+
+
+# ---------------------------------------------------------------------------
+# Vectorized v2 row scoring (lax.scan over columns, vmap over clusters)
+# ---------------------------------------------------------------------------
+
+
+def _score_row_one_cluster_v2(
+    row_data: Array,
+    col_indices: Array,
+    col_type_ids: Array,
+    ss_counts_c: Array,
+    ss_sum_x_c: Array,
+    ss_sum_x_sq_c: Array,
+    ss_cat_counts_c: Array,
+    ss_sum_sin_c: Array,
+    ss_sum_cos_c: Array,
+    hyper_mu: Array,
+    hyper_r: Array,
+    hyper_s: Array,
+    hyper_nu: Array,
+    hyper_dir_alpha: Array,
+    hyper_alpha: Array,
+    hyper_beta: Array,
+    hyper_kappa: Array,
+    hyper_vm_mu: Array,
+    n_columns: Array,
+) -> Array:
+    """Score a row against ONE cluster using lax.scan over columns.
+
+    Args:
+        row_data: (n_cols_total,) full row from data matrix.
+        col_indices: (max_cols_per_view,) column indices, -1 for padding.
+        col_type_ids: (n_cols_total,) type ID per column.
+        ss_counts_c: (max_cols_per_view,) counts for this cluster.
+        ss_sum_x_c, ss_sum_x_sq_c: (max_cols_per_view,) sum stats.
+        ss_cat_counts_c: (max_cols_per_view, max_categories) category counts.
+        ss_sum_sin_c, ss_sum_cos_c: (max_cols_per_view,) cyclic stats.
+        hyper_*: (n_cols_total,) hyperparameters indexed by global column.
+        n_columns: traced scalar — number of valid columns in this view.
+
+    Returns:
+        Scalar log likelihood of row under this cluster.
+    """
+    n_total_cols = row_data.shape[0]
+
+    def scan_body(log_lik, li):
+        col_idx = col_indices[li]
+        safe_col_idx = jnp.clip(col_idx, 0, n_total_cols - 1)
+        x = row_data[safe_col_idx]
+        type_id = col_type_ids[safe_col_idx]
+
+        # Valid if: not padding (-1), within active columns, and not NaN
+        is_valid = (col_idx >= 0) & (li < n_columns) & (~jnp.isnan(x))
+
+        logp = unified_posterior_predictive_logp(
+            x, type_id,
+            ss_counts_c[li].astype(jnp.float32),
+            ss_sum_x_c[li], ss_sum_x_sq_c[li],
+            ss_cat_counts_c[li],
+            ss_sum_sin_c[li], ss_sum_cos_c[li],
+            hyper_mu[safe_col_idx], hyper_r[safe_col_idx],
+            hyper_s[safe_col_idx], hyper_nu[safe_col_idx],
+            hyper_dir_alpha[safe_col_idx],
+            hyper_alpha[safe_col_idx], hyper_beta[safe_col_idx],
+            hyper_kappa[safe_col_idx], hyper_vm_mu[safe_col_idx],
+        )
+        log_lik = log_lik + jnp.where(is_valid, logp, 0.0)
+        return log_lik, None
+
+    max_cols_per_view = col_indices.shape[0]
+    log_lik, _ = jax.lax.scan(scan_body, jnp.array(0.0), jnp.arange(max_cols_per_view))
+    return log_lik
+
+
+def _score_row_all_clusters_v2(
+    row_data: Array,
+    col_indices: Array,
+    n_columns: Array,
+    col_type_ids: Array,
+    cluster_counts: Array,
+    ss_counts: Array,
+    ss_sum_x: Array,
+    ss_sum_x_sq: Array,
+    ss_cat_counts: Array,
+    ss_sum_sin: Array,
+    ss_sum_cos: Array,
+    hyper_mu: Array,
+    hyper_r: Array,
+    hyper_s: Array,
+    hyper_nu: Array,
+    hyper_dir_alpha: Array,
+    hyper_alpha: Array,
+    hyper_beta: Array,
+    hyper_kappa: Array,
+    hyper_vm_mu: Array,
+    crp_alpha: Array,
+    max_clusters: int,
+) -> Array:
+    """Score a row against ALL clusters (existing + one new) using vmap.
+
+    Uses vmap over the cluster axis instead of a Python for-loop.
+
+    Args:
+        row_data: (n_cols_total,) full row from data matrix.
+        col_indices: (max_cols_per_view,) column indices, -1 for padding.
+        n_columns: traced scalar — number of valid columns in this view.
+        col_type_ids: (n_cols_total,) type ID per column.
+        cluster_counts: (max_clusters,) counts per cluster.
+        ss_counts: (max_clusters, max_cols_per_view) int.
+        ss_sum_x, ss_sum_x_sq: (max_clusters, max_cols_per_view).
+        ss_cat_counts: (max_clusters, max_cols_per_view, max_categories).
+        ss_sum_sin, ss_sum_cos: (max_clusters, max_cols_per_view).
+        hyper_*: (n_cols_total,) hyperparameters.
+        crp_alpha: scalar CRP concentration.
+        max_clusters: int (static) — padding size.
+
+    Returns:
+        (max_clusters + 1,) array of log probabilities.
+    """
+    # CRP prior: log(count_c) for existing clusters, -inf for empty
+    log_prior = jnp.log(jnp.maximum(cluster_counts.astype(jnp.float32), 1e-30))
+    log_prior = jnp.where(cluster_counts > 0, log_prior, -jnp.inf)
+
+    # vmap _score_row_one_cluster_v2 over the cluster dimension (axis 0 of ss_*)
+    def score_one(ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos):
+        return _score_row_one_cluster_v2(
+            row_data, col_indices, col_type_ids,
+            ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos,
+            hyper_mu, hyper_r, hyper_s, hyper_nu,
+            hyper_dir_alpha, hyper_alpha, hyper_beta,
+            hyper_kappa, hyper_vm_mu,
+            n_columns,
+        )
+
+    log_liks = jax.vmap(score_one)(
+        ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
+    )
+    log_probs_existing = log_prior + log_liks
+
+    # New cluster: empty suffstats -> prior predictive
+    max_cols_per_view = col_indices.shape[0]
+    max_cats = ss_cat_counts.shape[-1]
+    log_lik_new = _score_row_one_cluster_v2(
+        row_data, col_indices, col_type_ids,
+        jnp.zeros(max_cols_per_view, dtype=jnp.int32),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros((max_cols_per_view, max_cats)),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros(max_cols_per_view),
+        hyper_mu, hyper_r, hyper_s, hyper_nu,
+        hyper_dir_alpha, hyper_alpha, hyper_beta,
+        hyper_kappa, hyper_vm_mu,
+        n_columns,
+    )
+    log_prior_new = jnp.log(crp_alpha)
+    log_prob_new = log_prior_new + log_lik_new
+
+    return jnp.concatenate([log_probs_existing, jnp.array([log_prob_new])])
+
+
+def _compact_clusters(
+    assignments: Array,
+    n_rows: int,
+    max_clusters: int,
+) -> tuple[Array, Array]:
+    """Remap cluster IDs to contiguous 0..K-1 range (JIT-compatible).
+
+    Uses bincount + cumsum instead of jnp.unique (which is not JIT-friendly).
+
+    Args:
+        assignments: (n_rows,) int — current cluster assignments.
+        n_rows: number of rows (Python int or static).
+        max_clusters: padding size (Python int, static).
+
+    Returns:
+        (new_assignments, new_n_clusters) where new_n_clusters is a scalar array.
+    """
+    # Count members per cluster: shape (max_clusters,)
+    counts = jnp.bincount(assignments, length=max_clusters)
+    occupied = (counts > 0).astype(jnp.int32)  # 1 if cluster has members
+    # cumsum gives new IDs: occupied clusters get 1,2,3,... and we subtract 1
+    # so first occupied cluster -> 0, second -> 1, etc.
+    new_ids = jnp.cumsum(occupied) - 1  # (max_clusters,) — new ID for each old ID
+    # For unoccupied clusters, new_ids will have gaps but we never index into them
+    new_assignments = new_ids[assignments]
+    new_n_clusters = jnp.sum(occupied)
+    return new_assignments, new_n_clusters
+
+
+def packed_transition_row_assignments_v2(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+) -> PackedCrossCatState:
+    """Gibbs sweep over row assignments using lax.scan (JIT-compatible).
+
+    Outer lax.scan over views, inner lax.scan over rows. Scores all clusters
+    via _score_row_all_clusters_v2 (vmap + lax.scan). After all rows in a view,
+    compacts cluster IDs. After all views, recomputes suffstats from scratch.
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+
+    Returns:
+        Updated PackedCrossCatState with new row assignments and suffstats.
+    """
+    n_rows = packed.n_rows
+    max_c = packed.max_clusters
+    max_views = packed.max_views
+    max_cats = packed.max_categories
+
+    # Pre-split keys for all views
+    view_keys = jax.random.split(rng_key, max_views)
+
+    def scan_one_view(carry, v_idx):
+        """Process one view: inner scan over rows."""
+        ra_all, nc_all = carry
+        view_key = view_keys[v_idx]
+        row_keys = jax.random.split(view_key, n_rows)
+
+        is_active = packed.view_mask[v_idx]
+        col_indices = packed.view_column_indices[v_idx]  # (max_cols_per_view,)
+        n_columns = packed.view_n_columns[v_idx]
+        alpha = packed.view_row_crp_alpha[v_idx]
+
+        # Working suffstats for this view (will be mutated row by row)
+        w_ss_c = packed.ss_counts[v_idx]      # (max_c, max_cols_per_view)
+        w_ss_sx = packed.ss_sum_x[v_idx]
+        w_ss_sxsq = packed.ss_sum_x_sq[v_idx]
+        w_ss_cat = packed.ss_cat_counts[v_idx]  # (max_c, max_cols_per_view, max_cats)
+        w_ss_sin = packed.ss_sum_sin[v_idx]
+        w_ss_cos = packed.ss_sum_cos[v_idx]
+
+        assigns = ra_all[v_idx]  # (n_rows,)
+        n_cl = nc_all[v_idx]     # scalar
+
+        def scan_one_row(row_carry, row_idx):
+            """Process one row within a view."""
+            (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat,
+             r_ss_sin, r_ss_cos, r_n_cl) = row_carry
+            rk = row_keys[row_idx]
+            row_data = data[row_idx]
+
+            old_cluster = r_assigns[row_idx]
+
+            # Remove row from old cluster's suffstats
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = (
+                _remove_row_from_suffstats(
+                    r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
+                    old_cluster, row_data, col_indices,
+                    packed.col_type_ids, max_cats,
+                )
+            )
+
+            # Cluster counts excluding this row
+            # Temporarily mark this row as an invalid cluster to exclude it
+            temp_assigns = r_assigns.at[row_idx].set(max_c)  # out of range
+            counts = jnp.bincount(temp_assigns, length=max_c).astype(jnp.int32)
+
+            # Score all clusters
+            log_probs = _score_row_all_clusters_v2(
+                row_data, col_indices, n_columns, packed.col_type_ids,
+                counts,
+                r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
+                packed.hyper_mu, packed.hyper_r, packed.hyper_s, packed.hyper_nu,
+                packed.hyper_dirichlet_alpha, packed.hyper_alpha, packed.hyper_beta,
+                packed.hyper_kappa, packed.hyper_vm_mu,
+                alpha, max_c,
+            )
+
+            # If budget exhausted (n_cl >= max_c - 1), block new cluster
+            budget_exhausted = r_n_cl >= (max_c - 1)
+            log_probs = log_probs.at[max_c].set(
+                jnp.where(budget_exhausted, -jnp.inf, log_probs[max_c])
+            )
+
+            # Normalize for numerical stability
+            log_probs = log_probs - jnp.max(log_probs)
+
+            # Sample
+            chosen = jax.random.categorical(rk, log_probs)
+
+            # If chosen == max_c (new cluster), find next free slot
+            # Next free slot is the first cluster with count == 0
+            # Use argmin on (counts > 0) to find first zero-count cluster
+            free_slot = jnp.argmin(counts)  # first cluster with count 0
+            # If all occupied, clamp to max_c-1 (budget_exhausted should prevent this)
+            is_new = chosen == max_c
+            actual_cluster = jnp.where(is_new, free_slot, chosen).astype(jnp.int32)
+
+            # Update n_clusters: if new cluster was chosen, increment
+            r_n_cl = jnp.where(is_new, r_n_cl + 1, r_n_cl)
+
+            # Update assignment
+            r_assigns = r_assigns.at[row_idx].set(actual_cluster)
+
+            # Add row to chosen cluster's suffstats
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = (
+                _add_row_to_suffstats(
+                    r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos,
+                    actual_cluster, row_data, col_indices,
+                    packed.col_type_ids, max_cats,
+                )
+            )
+
+            new_carry = (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat,
+                         r_ss_sin, r_ss_cos, r_n_cl)
+            return new_carry, None
+
+        # Run inner scan over rows
+        row_init = (assigns, w_ss_c, w_ss_sx, w_ss_sxsq, w_ss_cat,
+                    w_ss_sin, w_ss_cos, n_cl)
+        (final_assigns, _, _, _, _, _, _, final_n_cl), _ = jax.lax.scan(
+            scan_one_row, row_init, jnp.arange(n_rows)
+        )
+
+        # Compact cluster IDs
+        compacted_assigns, compacted_n_cl = _compact_clusters(
+            final_assigns, n_rows, max_c
+        )
+
+        # Only update if view is active
+        new_ra = jnp.where(is_active, compacted_assigns, ra_all[v_idx])
+        new_nc = jnp.where(is_active, compacted_n_cl, nc_all[v_idx])
+
+        ra_all = ra_all.at[v_idx].set(new_ra)
+        nc_all = nc_all.at[v_idx].set(new_nc)
+
+        return (ra_all, nc_all), None
+
+    # Outer scan over views
+    init_carry = (jnp.array(packed.view_row_assignments),
+                  jnp.array(packed.view_n_clusters))
+    (new_row_assigns, new_n_clusters), _ = jax.lax.scan(
+        scan_one_view, init_carry, jnp.arange(max_views)
+    )
+
+    # Create updated packed state with new assignments
+    updated = PackedCrossCatState(
+        **{name: (new_row_assigns if name == "view_row_assignments"
+                  else new_n_clusters if name == "view_n_clusters"
+                  else getattr(packed, name))
+           for name in _ARRAY_FIELDS},
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+    return recompute_all_suffstats(updated, data)
 
 
 def packed_transition_row_assignments(
