@@ -1865,6 +1865,82 @@ def packed_transition_crp_alphas(
 
 
 # ---------------------------------------------------------------------------
+# Vectorized CRP alpha sampling (v2 — JIT-compatible via vmap)
+# ---------------------------------------------------------------------------
+
+
+def packed_transition_crp_alphas_v2(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+) -> PackedCrossCatState:
+    """Sample CRP concentration parameters using vmap (JIT-compatible).
+
+    Scores a grid of alpha values for the outer (column) CRP and each inner
+    (row) CRP. Includes Exp(1) prior: log_score -= alpha_val.
+    """
+    alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
+    n_grid = alpha_grid.shape[0]
+    max_views = packed.max_views
+    n_cols = packed.n_cols
+    n_rows = packed.n_rows
+    max_c = packed.max_clusters
+
+    k_outer, k_inner = jax.random.split(rng_key)
+
+    # --- Helper: log CRP score for a given assignments vector ---
+    def log_crp_score(assignments, alpha_val, length):
+        """CRP log probability + Exp(1) prior on alpha."""
+        counts = jnp.bincount(assignments, length=length).astype(jnp.float32)
+        n_clusters = jnp.sum(counts > 0).astype(jnp.float32)
+        valid_counts = jnp.where(counts > 0, counts, 1.0)
+        n_total = jnp.sum(counts).astype(jnp.float32)
+        log_p = (
+            n_clusters * jnp.log(alpha_val)
+            + jnp.sum(jnp.where(counts > 0, gammaln(valid_counts), 0.0))
+            - gammaln(n_total + alpha_val)
+            + gammaln(alpha_val)
+        )
+        # Exp(1) prior: -alpha_val
+        return log_p - alpha_val
+
+    # --- Outer CRP alpha (column assignments) ---
+    def score_outer_one(alpha_val):
+        return log_crp_score(packed.column_assignments, alpha_val, n_cols)
+
+    outer_scores = jax.vmap(score_outer_one)(alpha_grid)
+    outer_scores = outer_scores - jnp.max(outer_scores)
+    new_col_alpha = alpha_grid[jax.random.categorical(k_outer, outer_scores)]
+
+    # --- Inner CRP alphas (row assignments per view) ---
+    view_keys = jax.random.split(k_inner, max_views)
+
+    def sample_one_view(v_idx):
+        """Sample CRP alpha for one view."""
+        assigns = packed.view_row_assignments[v_idx]  # (n_rows,)
+
+        def score_inner_one(alpha_val):
+            return log_crp_score(assigns, alpha_val, max_c)
+
+        scores = jax.vmap(score_inner_one)(alpha_grid)
+        scores = scores - jnp.max(scores)
+        chosen = alpha_grid[jax.random.categorical(view_keys[v_idx], scores)]
+
+        # Only update active views
+        is_active = packed.view_mask[v_idx]
+        return jnp.where(is_active, chosen, packed.view_row_crp_alpha[v_idx])
+
+    new_view_alpha = jax.vmap(sample_one_view)(jnp.arange(max_views))
+
+    return PackedCrossCatState(
+        **{name: (new_col_alpha if name == "column_crp_alpha"
+                  else new_view_alpha if name == "view_row_crp_alpha"
+                  else getattr(packed, name))
+           for name in _ARRAY_FIELDS},
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Packed Gibbs sweep
 # ---------------------------------------------------------------------------
 
