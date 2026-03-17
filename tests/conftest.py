@@ -6,6 +6,10 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+from crosscat.diagnostics import collect_diagnostics
+from crosscat.gibbs import gibbs_sweep
+from crosscat.model import initialize
+from crosscat.synthetic import add_missing_data, generate_crosscat_data
 from crosscat.types import ColumnType
 
 
@@ -49,3 +53,77 @@ def synthetic_continuous_data(rng_key):
         "n_rows": n_rows,
         "n_cols": 4,
     }
+
+
+@pytest.fixture(scope="session")
+def synthetic_cyclic_data():
+    """Synthetic cyclic data with known cluster structure.
+
+    200 rows, 4 CYCLIC columns, 2 views, 2 clusters.
+    Mean angles at 0 and pi for clear separation.
+    """
+    key = jax.random.key(100)
+    column_types = [ColumnType.CYCLIC] * 4
+    return generate_crosscat_data(
+        key, 200, column_types, n_views=2, n_clusters=2, cluster_separation=5.0
+    )
+
+
+@pytest.fixture(scope="session")
+def synthetic_mixed_data():
+    """Synthetic mixed-type data with known cluster structure.
+
+    300 rows, 6 columns of different types, 2 views, 2 clusters.
+    """
+    key = jax.random.key(200)
+    column_types = [
+        ColumnType.CONTINUOUS,
+        ColumnType.CATEGORICAL,
+        ColumnType.BINARY,
+        ColumnType.ORDINAL,
+        ColumnType.CYCLIC,
+        ColumnType.CONTINUOUS,
+    ]
+    return generate_crosscat_data(
+        key, 300, column_types, n_views=2, n_clusters=2, cluster_separation=5.0
+    )
+
+
+@pytest.fixture(scope="session")
+def synthetic_missing_data():
+    """Synthetic continuous data with 15% NaN values injected.
+
+    200 rows, 4 CONTINUOUS columns, 2 views, 2 clusters.
+    """
+    key = jax.random.key(300)
+    k1, k2 = jax.random.split(key)
+    column_types = [ColumnType.CONTINUOUS] * 4
+    result = generate_crosscat_data(
+        k1, 200, column_types, n_views=2, n_clusters=2, cluster_separation=5.0
+    )
+    result["data"] = add_missing_data(k2, result["data"], missing_fraction=0.15)
+    return result
+
+
+def run_multi_chain_with_diagnostics(
+    data, column_types, *, n_chains=4, n_sweeps=20, seed=42
+):
+    """Run multi-chain inference collecting diagnostics at each sweep.
+
+    Returns:
+        Tuple of (final_states, all_diagnostics) where all_diagnostics
+        is a list of lists: all_diagnostics[chain][sweep] = diagnostics dict.
+    """
+    key = jax.random.key(seed)
+    states = initialize(key, data, column_types, n_chains=n_chains)
+    all_diagnostics = []
+    for i, state in enumerate(states):
+        chain_diags = []
+        k = jax.random.fold_in(key, i + 1000)
+        for _s in range(n_sweeps):
+            k, subkey = jax.random.split(k)
+            state = gibbs_sweep(subkey, state, data, n_sweeps=1)
+            chain_diags.append(collect_diagnostics(state, data))
+        states[i] = state
+        all_diagnostics.append(chain_diags)
+    return states, all_diagnostics
