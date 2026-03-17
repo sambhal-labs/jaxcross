@@ -70,7 +70,7 @@ _ARRAY_FIELDS = (
 )
 
 # Static field names (pytree auxiliary data)
-_STATIC_FIELDS = ("n_rows", "n_cols", "max_views", "max_clusters", "max_categories")
+_STATIC_FIELDS = ("n_rows", "n_cols", "max_views", "max_clusters", "max_categories", "max_cols_per_view")
 
 
 @jax.tree_util.register_pytree_node_class
@@ -122,6 +122,7 @@ class PackedCrossCatState:
     max_views: int = 16
     max_clusters: int = 32
     max_categories: int = 16
+    max_cols_per_view: int = 16
 
     def tree_flatten(self):
         children = [getattr(self, name) for name in _ARRAY_FIELDS]
@@ -290,6 +291,7 @@ def pack_state(
         max_views=max_views,
         max_clusters=max_clusters,
         max_categories=max_categories,
+        max_cols_per_view=max_cols_per_view,
     )
 
 
