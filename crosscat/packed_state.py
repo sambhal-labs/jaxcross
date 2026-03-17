@@ -886,6 +886,113 @@ def unified_posterior_predictive_logp(
 
 
 # ---------------------------------------------------------------------------
+# Posterior predictive sampling (JIT-compatible, type-unified)
+# ---------------------------------------------------------------------------
+
+
+def _ng_sample(rng_key, count, sum_x, sum_x_sq, mu0, r, s, nu):
+    """Sample from Normal-Gamma posterior predictive (Student-t).
+
+    Uses Normal / sqrt(Chi2/df) representation of Student-t.
+    """
+    n = count.astype(jnp.float32)
+    r_n = r + n
+    mu_n = (r * mu0 + sum_x) / jnp.maximum(r_n, 1e-30)
+    nu_n = nu + n
+    nu_s = nu * s
+    mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
+    nu_n_s_n = (
+        nu_s + sum_x_sq - sum_x**2 / jnp.maximum(n, 1.0)
+        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+    )
+    nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+
+    df = nu_n
+    loc = mu_n
+    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, 1e-30)) * (1.0 + 1.0 / jnp.maximum(r_n, 1e-30))
+    scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+
+    # Student-t sample: loc + scale * Normal(0,1) / sqrt(Chi2(df)/df)
+    k1, k2 = jax.random.split(rng_key)
+    z = jax.random.normal(k1)
+    # Chi2(df) = sum of df standard normals squared; use gamma distribution
+    chi2 = 2.0 * jax.random.gamma(k2, df / 2.0)
+    chi2 = jnp.maximum(chi2, 1e-30)
+    return loc + scale * z / jnp.sqrt(chi2 / jnp.maximum(df, 1e-30))
+
+
+def _dc_sample(rng_key, count, cat_counts, dir_alpha):
+    """Sample from Dirichlet-Categorical posterior predictive."""
+    n = count.astype(jnp.float32)
+    k = jnp.array(cat_counts.shape[-1], dtype=jnp.float32)
+    probs = (cat_counts + dir_alpha) / jnp.maximum(n + k * dir_alpha, 1e-30)
+    log_probs = jnp.log(jnp.maximum(probs, 1e-30))
+    return jax.random.categorical(rng_key, log_probs).astype(jnp.float32)
+
+
+def _bb_sample(rng_key, count, sum_x, alpha, beta):
+    """Sample from Beta-Bernoulli posterior predictive."""
+    n = count.astype(jnp.float32)
+    p1 = (sum_x + alpha) / jnp.maximum(n + alpha + beta, 1e-30)
+    return jax.random.bernoulli(rng_key, p1).astype(jnp.float32)
+
+
+def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_mu):
+    """Sample from von Mises posterior predictive (wrapped normal approximation)."""
+    total_sin = sum_sin + kappa * jnp.sin(vm_mu)
+    total_cos = sum_cos + kappa * jnp.cos(vm_mu)
+    r_post = jnp.sqrt(total_sin**2 + total_cos**2)
+    mu_post = jnp.arctan2(total_sin, total_cos)
+    kappa_post = r_post
+
+    # Wrapped normal approximation: sigma = 1/sqrt(kappa)
+    sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa_post, 1e-30))
+    z = jax.random.normal(rng_key)
+    # Wrap to [0, 2*pi)
+    sample = mu_post + sigma * z
+    return sample % (2.0 * jnp.pi)
+
+
+def unified_sample_posterior_predictive(
+    rng_key, type_id, count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos,
+    mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu,
+):
+    """Sample from posterior predictive for any column type without Python branching.
+
+    Computes ALL type samples and selects the correct one via jnp.where.
+    This wastes trivial compute but enables full JIT compilation.
+
+    Args:
+        rng_key: PRNG key for sampling.
+        type_id: Integer column type ID.
+        count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos: Sufficient statistics.
+        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu: Hyperparameters.
+
+    Returns:
+        Scalar sample from the posterior predictive distribution.
+    """
+    k1, k2, k3, k4 = jax.random.split(rng_key, 4)
+
+    cont_sample = _ng_sample(k1, count, sum_x, sum_x_sq, mu, r, s, nu)
+    cat_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
+    binary_sample = _bb_sample(k3, count, sum_x, alpha, beta)
+    cyclic_sample = _vm_sample(k4, count, sum_sin, sum_cos, kappa, vm_mu)
+    ordinal_sample = _dc_sample(k2, count, cat_counts, jnp.ones_like(dir_alpha))
+
+    return jnp.where(
+        type_id == CONTINUOUS_ID, cont_sample,
+        jnp.where(
+            type_id == CATEGORICAL_ID, cat_sample,
+            jnp.where(
+                type_id == ORDINAL_ID, ordinal_sample,
+                jnp.where(type_id == BINARY_ID, binary_sample, cyclic_sample),
+            ),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Vectorized row assignment sweep (critical path)
 # ---------------------------------------------------------------------------
 
