@@ -12,8 +12,26 @@ Pattern:
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import pytest
+
+
+def _run_multi_chain(rng_key, data, column_types, n_chains=3, n_sweeps=20):
+    """Run multi-chain inference and return the best state by log_joint."""
+    from crosscat.gibbs import gibbs_sweep
+    from crosscat.model import initialize, log_joint
+
+    states = initialize(rng_key, data, column_types, n_chains=n_chains)
+    best_state, best_score = None, -jnp.inf
+    for i, s in enumerate(states):
+        key_i = jax.random.fold_in(rng_key, i + 1000)
+        s = gibbs_sweep(key_i, s, data, n_sweeps=n_sweeps)
+        score = log_joint(s, data)
+        if score > best_score:
+            best_score = score
+            best_state = s
+    return best_state
 
 
 def test_initialization_from_prior(rng_key, synthetic_continuous_data):
@@ -155,15 +173,11 @@ def test_column_partition_recovery(rng_key, synthetic_continuous_data):
     discover that columns 0,1 belong together and columns 2,3 belong
     together (two views).
     """
-    from crosscat.gibbs import gibbs_sweep
-    from crosscat.model import initialize
-
-    state = initialize(
+    state = _run_multi_chain(
         rng_key,
         synthetic_continuous_data["data"],
         synthetic_continuous_data["column_types"],
     )
-    state = gibbs_sweep(rng_key, state, synthetic_continuous_data["data"], n_sweeps=20)
 
     # Check column partition: cols 0,1 should be in same view, cols 2,3 in same view
     assert state.column_assignments[0] == state.column_assignments[1]
@@ -174,15 +188,11 @@ def test_column_partition_recovery(rng_key, synthetic_continuous_data):
 @pytest.mark.slow
 def test_row_cluster_recovery(rng_key, synthetic_continuous_data):
     """Verify that Gibbs inference recovers the true row clusters within views."""
-    from crosscat.gibbs import gibbs_sweep
-    from crosscat.model import initialize
-
-    state = initialize(
+    state = _run_multi_chain(
         rng_key,
         synthetic_continuous_data["data"],
         synthetic_continuous_data["column_types"],
     )
-    state = gibbs_sweep(rng_key, state, synthetic_continuous_data["data"], n_sweeps=20)
 
     # Each view should have discovered 2 clusters
     for view in state.views:
@@ -193,16 +203,13 @@ def test_row_cluster_recovery(rng_key, synthetic_continuous_data):
 @pytest.mark.slow
 def test_posterior_predictive_accuracy(rng_key, synthetic_continuous_data):
     """Verify that posterior predictive samples are calibrated."""
-    from crosscat.gibbs import gibbs_sweep
     from crosscat.inference import predictive_sample
-    from crosscat.model import initialize
 
-    state = initialize(
+    state = _run_multi_chain(
         rng_key,
         synthetic_continuous_data["data"],
         synthetic_continuous_data["column_types"],
     )
-    state = gibbs_sweep(rng_key, state, synthetic_continuous_data["data"], n_sweeps=20)
 
     # Predict column 0 given column 1 = -2.0 (should predict ~0.0, cluster 0)
     samples = predictive_sample(
