@@ -505,7 +505,7 @@ def row_similarity(
 
     for state in states:
         view_scores = []
-        for v_idx, view in enumerate(state.views):
+        for _v_idx, view in enumerate(state.views):
             # If target_columns specified, skip views not containing them
             if target_columns is not None:
                 view_cols = set(view.column_indices.tolist())
