@@ -57,16 +57,31 @@ def test_incremental_suffstats_correctness(mixed_packed_state):
 
     # Remove row
     ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = _remove_row_from_suffstats(
-        packed.ss_counts[v], packed.ss_sum_x[v], packed.ss_sum_x_sq[v],
-        packed.ss_cat_counts[v], packed.ss_sum_sin[v], packed.ss_sum_cos[v],
-        old_cluster, data[row_idx], col_indices, packed.col_type_ids,
+        packed.ss_counts[v],
+        packed.ss_sum_x[v],
+        packed.ss_sum_x_sq[v],
+        packed.ss_cat_counts[v],
+        packed.ss_sum_sin[v],
+        packed.ss_sum_cos[v],
+        old_cluster,
+        data[row_idx],
+        col_indices,
+        packed.col_type_ids,
         packed.max_categories,
     )
 
     # Add row back to same cluster
     ss_c2, ss_sx2, ss_sxsq2, ss_cat2, ss_sin2, ss_cos2 = _add_row_to_suffstats(
-        ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos,
-        old_cluster, data[row_idx], col_indices, packed.col_type_ids,
+        ss_c,
+        ss_sx,
+        ss_sxsq,
+        ss_cat,
+        ss_sin,
+        ss_cos,
+        old_cluster,
+        data[row_idx],
+        col_indices,
+        packed.col_type_ids,
         packed.max_categories,
     )
 
@@ -94,33 +109,60 @@ def test_score_row_all_clusters_v2_matches_v1(mixed_packed_state):
         for row_idx in [0, 5, 10]:
             # Cluster counts excluding this row
             assigns_excl = packed.view_row_assignments[v].at[row_idx].set(-1)
-            counts = jnp.array(
-                [jnp.sum(assigns_excl == c) for c in range(max_c)]
-            ).astype(jnp.int32)
+            counts = jnp.array([jnp.sum(assigns_excl == c) for c in range(max_c)]).astype(
+                jnp.int32
+            )
 
             # v1 (Python loop)
             log_probs_v1 = _score_row_all_clusters(
-                data[row_idx], col_indices_sliced, n_cols_v, packed.col_type_ids,
+                data[row_idx],
+                col_indices_sliced,
+                n_cols_v,
+                packed.col_type_ids,
                 counts,
-                packed.ss_counts[v], packed.ss_sum_x[v], packed.ss_sum_x_sq[v],
-                packed.ss_cat_counts[v], packed.ss_sum_sin[v], packed.ss_sum_cos[v],
-                packed.hyper_mu, packed.hyper_r, packed.hyper_s, packed.hyper_nu,
-                packed.hyper_dirichlet_alpha, packed.hyper_alpha, packed.hyper_beta,
-                packed.hyper_kappa, packed.hyper_vm_mu,
-                alpha, max_c,
+                packed.ss_counts[v],
+                packed.ss_sum_x[v],
+                packed.ss_sum_x_sq[v],
+                packed.ss_cat_counts[v],
+                packed.ss_sum_sin[v],
+                packed.ss_sum_cos[v],
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_mu,
+                alpha,
+                max_c,
             )
 
             # v2 (lax.scan + vmap)
             log_probs_v2 = _score_row_all_clusters_v2(
-                data[row_idx], col_indices_full,
-                packed.view_n_columns[v], packed.col_type_ids,
+                data[row_idx],
+                col_indices_full,
+                packed.view_n_columns[v],
+                packed.col_type_ids,
                 counts,
-                packed.ss_counts[v], packed.ss_sum_x[v], packed.ss_sum_x_sq[v],
-                packed.ss_cat_counts[v], packed.ss_sum_sin[v], packed.ss_sum_cos[v],
-                packed.hyper_mu, packed.hyper_r, packed.hyper_s, packed.hyper_nu,
-                packed.hyper_dirichlet_alpha, packed.hyper_alpha, packed.hyper_beta,
-                packed.hyper_kappa, packed.hyper_vm_mu,
-                alpha, max_c,
+                packed.ss_counts[v],
+                packed.ss_sum_x[v],
+                packed.ss_sum_x_sq[v],
+                packed.ss_cat_counts[v],
+                packed.ss_sum_sin[v],
+                packed.ss_sum_cos[v],
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_mu,
+                alpha,
+                max_c,
             )
 
             assert log_probs_v1.shape == log_probs_v2.shape == (max_c + 1,)
@@ -138,9 +180,7 @@ def test_score_row_all_clusters_v2_matches_v1(mixed_packed_state):
                 )
 
             # Non-finite entries should match (both -inf)
-            assert jnp.array_equal(
-                jnp.isfinite(log_probs_v1), jnp.isfinite(log_probs_v2)
-            ), (
+            assert jnp.array_equal(jnp.isfinite(log_probs_v1), jnp.isfinite(log_probs_v2)), (
                 f"v={v}, row={row_idx}: finite/inf pattern mismatch\n"
                 f"  v1 finite={jnp.isfinite(log_probs_v1)}\n"
                 f"  v2 finite={jnp.isfinite(log_probs_v2)}"
@@ -263,9 +303,9 @@ def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
 
     assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite after JIT"
     assert packed_new.column_crp_alpha > 0, "column_crp_alpha not positive after JIT"
-    assert jnp.all(
-        jnp.isfinite(packed_new.view_row_crp_alpha)
-    ), "view CRP alphas not finite after JIT"
+    assert jnp.all(jnp.isfinite(packed_new.view_row_crp_alpha)), (
+        "view CRP alphas not finite after JIT"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -295,19 +335,19 @@ def test_packed_sweep_v2_deterministic(mixed_packed_state):
     result2 = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=1)
 
     # Row assignments should be identical
-    assert jnp.array_equal(
-        result1.view_row_assignments, result2.view_row_assignments
-    ), "Row assignments differ between identical runs"
+    assert jnp.array_equal(result1.view_row_assignments, result2.view_row_assignments), (
+        "Row assignments differ between identical runs"
+    )
     # Hyperparameters should be identical
     assert jnp.allclose(result1.hyper_mu, result2.hyper_mu), "hyper_mu differs"
     assert jnp.allclose(result1.hyper_s, result2.hyper_s), "hyper_s differs"
     # CRP alphas should be identical
-    assert jnp.allclose(
-        result1.column_crp_alpha, result2.column_crp_alpha
-    ), "column_crp_alpha differs"
-    assert jnp.allclose(
-        result1.view_row_crp_alpha, result2.view_row_crp_alpha
-    ), "view_row_crp_alpha differs"
+    assert jnp.allclose(result1.column_crp_alpha, result2.column_crp_alpha), (
+        "column_crp_alpha differs"
+    )
+    assert jnp.allclose(result1.view_row_crp_alpha, result2.view_row_crp_alpha), (
+        "view_row_crp_alpha differs"
+    )
 
 
 def test_packed_sweep_v2_jit_compiles(mixed_packed_state):
@@ -438,9 +478,7 @@ def test_packed_predictive_probability_matches_original(inference_packed_state):
     query_cols_bin = [2]
     query_vals_bin = jnp.array([data[10, 2]])
     log_p_orig_bin = predictive_probability(state, data, query_cols_bin, query_vals_bin)
-    log_p_packed_bin = packed_predictive_probability(
-        packed, data, query_cols_bin, query_vals_bin
-    )
+    log_p_packed_bin = packed_predictive_probability(packed, data, query_cols_bin, query_vals_bin)
     assert jnp.allclose(log_p_orig_bin, log_p_packed_bin, atol=1e-3), (
         f"Binary mismatch: orig={log_p_orig_bin}, packed={log_p_packed_bin}"
     )
@@ -449,9 +487,7 @@ def test_packed_predictive_probability_matches_original(inference_packed_state):
     query_cols_cyc = [3]
     query_vals_cyc = jnp.array([data[10, 3]])
     log_p_orig_cyc = predictive_probability(state, data, query_cols_cyc, query_vals_cyc)
-    log_p_packed_cyc = packed_predictive_probability(
-        packed, data, query_cols_cyc, query_vals_cyc
-    )
+    log_p_packed_cyc = packed_predictive_probability(packed, data, query_cols_cyc, query_vals_cyc)
     assert jnp.allclose(log_p_orig_cyc, log_p_packed_cyc, atol=1e-3), (
         f"Cyclic mismatch: orig={log_p_orig_cyc}, packed={log_p_packed_cyc}"
     )
@@ -461,9 +497,7 @@ def test_packed_predictive_probability_matches_original(inference_packed_state):
     # Both should still produce finite, negative log probs.
     query_cols_cat = [1]
     query_vals_cat = jnp.array([data[10, 1]])
-    log_p_packed_cat = packed_predictive_probability(
-        packed, data, query_cols_cat, query_vals_cat
-    )
+    log_p_packed_cat = packed_predictive_probability(packed, data, query_cols_cat, query_vals_cat)
     assert jnp.isfinite(log_p_packed_cat), f"Categorical logp not finite: {log_p_packed_cat}"
     assert log_p_packed_cat < 0, f"Categorical logp should be negative: {log_p_packed_cat}"
 
@@ -544,9 +578,7 @@ def test_packed_row_similarity_matches_original(inference_packed_state):
 
     # Test with target_columns
     sim_orig_tc = row_similarity(states, 0, 1, target_columns=[0, 1])
-    sim_packed_tc = packed_row_similarity(
-        packed_states, column_types, 0, 1, target_columns=[0, 1]
-    )
+    sim_packed_tc = packed_row_similarity(packed_states, column_types, 0, 1, target_columns=[0, 1])
     assert jnp.allclose(sim_orig_tc, sim_packed_tc, atol=1e-3), (
         f"Similarity (target_columns) mismatch: orig={sim_orig_tc}, packed={sim_packed_tc}"
     )

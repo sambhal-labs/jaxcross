@@ -105,9 +105,7 @@ def synthetic_missing_data():
     return result
 
 
-def run_multi_chain_with_diagnostics(
-    data, column_types, *, n_chains=4, n_sweeps=20, seed=42
-):
+def run_multi_chain_with_diagnostics(data, column_types, *, n_chains=4, n_sweeps=20, seed=42):
     """Run multi-chain inference collecting diagnostics at each sweep.
 
     Returns:

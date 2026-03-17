@@ -216,9 +216,7 @@ def test_log_joint_improves_over_sweeps(synthetic_continuous_data):
     state = gibbs_sweep(k2, state, d["data"], n_sweeps=20)
     final_lj = float(log_joint(state, d["data"]))
 
-    assert final_lj > initial_lj, (
-        f"log_joint did not improve: {initial_lj:.2f} -> {final_lj:.2f}"
-    )
+    assert final_lj > initial_lj, f"log_joint did not improve: {initial_lj:.2f} -> {final_lj:.2f}"
 
 
 @pytest.mark.slow
