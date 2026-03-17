@@ -15,7 +15,13 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import gammaln
 
-from crosscat.components import BetaBernoulli, DirichletCategorical, NormalGamma, OrderedLogistic
+from crosscat.components import (
+    BetaBernoulli,
+    DirichletCategorical,
+    NormalGamma,
+    OrderedLogistic,
+    VonMises,
+)
 from crosscat.types import ColumnHypers, ColumnType, CrossCatState, SufficientStats, ViewState
 
 
@@ -95,6 +101,12 @@ def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
             column_type=column_type,
             cutpoints=jnp.linspace(0.0, 1.0, n_levels - 1) if n_levels > 1 else None,
         )
+    elif column_type == ColumnType.CYCLIC:
+        return ColumnHypers(
+            column_type=column_type,
+            kappa=jnp.array(1.0),
+            vm_mu=jnp.array(jnp.pi),  # prior mean at pi
+        )
     else:
         raise ValueError(f"Unknown column type: {column_type}")
 
@@ -123,13 +135,15 @@ def _compute_suffstats_for_view(
             if col_type == ColumnType.CONTINUOUS:
                 ss = NormalGamma.sufficient_statistics(col_data)
             elif col_type == ColumnType.CATEGORICAL:
-                n_cats = int(jnp.max(data[:, col_idx])) + 1
+                n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
                 ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
             elif col_type == ColumnType.BINARY:
                 ss = BetaBernoulli.sufficient_statistics(col_data)
             elif col_type == ColumnType.ORDINAL:
-                n_levels = int(jnp.max(data[:, col_idx])) + 1
+                n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
                 ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
+            elif col_type == ColumnType.CYCLIC:
+                ss = VonMises.sufficient_statistics(col_data)
             else:
                 raise ValueError(f"Unknown column type: {col_type}")
             cluster_stats.append(ss)
@@ -145,17 +159,12 @@ def initialize(
     n_chains: int = 1,
     column_crp_alpha: float = 1.0,
     row_crp_alpha: float = 1.0,
+    initialization: str = "from_the_prior",
 ) -> CrossCatState | list[CrossCatState]:
-    """Initialize CrossCat state(s) from the prior.
+    """Initialize CrossCat state(s).
 
     Maps to original LocalEngine.initialize() which calls State.__init__
     with initialization='from_the_prior'.
-
-    Procedure (following original CrossCat):
-    1. Sample column-to-view assignments from CRP(column_crp_alpha)
-    2. For each view, sample row-to-cluster assignments from CRP(row_crp_alpha)
-    3. Compute sufficient statistics for each (cluster, column) pair
-    4. Initialize column hyperparameters from data-driven defaults
 
     Args:
         rng_key: JAX PRNG key.
@@ -164,6 +173,10 @@ def initialize(
         n_chains: Number of independent chains to initialize.
         column_crp_alpha: Initial outer DP concentration.
         row_crp_alpha: Initial inner DP concentration per view.
+        initialization: One of 'from_the_prior', 'together', 'apart'.
+            'from_the_prior': Sample assignments from CRP (default).
+            'together': All columns in one view.
+            'apart': Each column in its own view.
 
     Returns:
         Single CrossCatState if n_chains=1, else list of states.
@@ -173,8 +186,15 @@ def initialize(
     def _init_one(key):
         k1, k2 = jax.random.split(key)
 
-        # Step 1: Sample column-to-view assignments from CRP
-        col_assignments = _crp_sample(k1, column_crp_alpha, n_cols)
+        # Step 1: Column-to-view assignments based on initialization mode
+        if initialization == "together":
+            col_assignments = jnp.zeros(n_cols, dtype=jnp.int32)
+        elif initialization == "apart":
+            col_assignments = jnp.arange(n_cols, dtype=jnp.int32)
+        else:
+            # from_the_prior: sample from CRP
+            col_assignments = _crp_sample(k1, column_crp_alpha, n_cols)
+
         n_views = int(jnp.max(col_assignments)) + 1
 
         # Step 2: Initialize column hyperparameters
@@ -186,8 +206,6 @@ def initialize(
         view_keys = jax.random.split(k2, n_views)
         views = []
         for v in range(n_views):
-            col_indices = jnp.where(col_assignments == v, size=n_cols)[0]
-            # Filter to actual columns in this view
             col_mask = col_assignments == v
             col_indices = jnp.arange(n_cols)[col_mask]
 
@@ -224,6 +242,118 @@ def initialize(
 
     keys = jax.random.split(rng_key, n_chains)
     return [_init_one(keys[i]) for i in range(n_chains)]
+
+
+def insert_rows(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+    new_rows: Array,
+) -> tuple[CrossCatState, Array]:
+    """Insert new rows into an existing CrossCat state.
+
+    Maps to original LocalEngine.insert(). New rows are assigned to clusters
+    via the CRP predictive distribution (no re-inference on existing rows).
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: Current CrossCat state.
+        data: Original observation matrix, shape (n_rows, n_cols).
+        new_rows: New observations, shape (n_new, n_cols).
+
+    Returns:
+        Tuple of (updated_state, updated_data) with new rows incorporated.
+    """
+    n_new = new_rows.shape[0]
+    updated_data = jnp.concatenate([data, new_rows], axis=0)
+    keys = jax.random.split(rng_key, len(state.views))
+
+    new_views = []
+    for v_idx, view in enumerate(state.views):
+        row_keys = jax.random.split(keys[v_idx], n_new)
+        row_assignments = view.row_assignments
+        n_clusters = int(jnp.max(row_assignments)) + 1
+        alpha = view.row_crp_alpha
+        n_existing_clusters = n_clusters
+
+        new_assigns = []
+        for i in range(n_new):
+            # CRP predictive: score each existing cluster + new cluster
+            cluster_counts = jnp.array(
+                [jnp.sum(row_assignments == c) for c in range(n_existing_clusters)]
+            ).astype(jnp.float32)
+            log_probs = jnp.log(cluster_counts + 1e-30)
+            # Add likelihood of row under each cluster using existing suffstats
+            row_data = new_rows[i]
+            for c in range(n_existing_clusters):
+                for local_idx, col_idx_val in enumerate(view.column_indices.tolist()):
+                    col_idx = int(col_idx_val)
+                    col_type = state.column_types[col_idx]
+                    hypers = state.column_hypers[col_idx]
+                    ss = view.suffstats[c][local_idx]
+                    comp = _get_component_class(col_type)
+                    x = row_data[col_idx]
+                    if not jnp.isnan(x):
+                        log_lik = comp.posterior_predictive_logp(x, ss, hypers)
+                        log_probs = log_probs.at[c].add(log_lik)
+
+            # New cluster — use CRP prior only (empty cluster prior predictive)
+            log_new = jnp.log(alpha)
+            log_probs = jnp.concatenate([log_probs, jnp.array([log_new])])
+            log_probs = log_probs - jnp.max(log_probs)
+            chosen = int(jax.random.categorical(row_keys[i], log_probs))
+
+            if chosen >= n_existing_clusters:
+                chosen = n_clusters
+                n_clusters += 1
+            new_assigns.append(chosen)
+
+        # Extend row assignments
+        new_row_assigns = jnp.concatenate(
+            [row_assignments, jnp.array(new_assigns, dtype=jnp.int32)]
+        )
+
+        # Recompute suffstats with extended data
+        n_clusters_final = int(jnp.max(new_row_assigns)) + 1
+        suffstats = _compute_suffstats_for_view(
+            updated_data, view.column_indices, state.column_types, new_row_assigns, n_clusters_final
+        )
+
+        new_views.append(
+            ViewState(
+                column_indices=view.column_indices,
+                row_assignments=new_row_assigns,
+                row_crp_alpha=view.row_crp_alpha,
+                suffstats=suffstats,
+            )
+        )
+
+    new_state = CrossCatState(
+        column_assignments=state.column_assignments,
+        column_crp_alpha=state.column_crp_alpha,
+        column_hypers=state.column_hypers,
+        column_types=state.column_types,
+        views=new_views,
+        n_rows=state.n_rows + n_new,
+        n_cols=state.n_cols,
+    )
+    return new_state, updated_data
+
+
+def _get_component_class(col_type: ColumnType):
+    """Return component model class for dispatch."""
+    if col_type == ColumnType.CONTINUOUS:
+        return NormalGamma
+    elif col_type == ColumnType.CATEGORICAL:
+        return DirichletCategorical
+    elif col_type == ColumnType.BINARY:
+        return BetaBernoulli
+    elif col_type == ColumnType.ORDINAL:
+        return OrderedLogistic
+    elif col_type == ColumnType.CYCLIC:
+        return VonMises
+    else:
+        raise ValueError(f"Unknown column type: {col_type}")
 
 
 def _log_crp(assignments: Array, alpha: Array) -> Array:
@@ -285,14 +415,8 @@ def log_joint(state: CrossCatState, data: Array) -> Array:
                     ss = view.suffstats[c][local_idx]
                     col_type = state.column_types[col_idx]
 
-                    if col_type == ColumnType.CONTINUOUS:
-                        log_p = log_p + NormalGamma.log_marginal_likelihood(ss, hypers)
-                    elif col_type == ColumnType.CATEGORICAL:
-                        log_p = log_p + DirichletCategorical.log_marginal_likelihood(ss, hypers)
-                    elif col_type == ColumnType.BINARY:
-                        log_p = log_p + BetaBernoulli.log_marginal_likelihood(ss, hypers)
-                    elif col_type == ColumnType.ORDINAL:
-                        log_p = log_p + OrderedLogistic.log_marginal_likelihood(ss, hypers)
+                    comp = _get_component_class(col_type)
+                    log_p = log_p + comp.log_marginal_likelihood(ss, hypers)
 
     # 3. Gamma(1,1) prior on CRP alphas
     log_p = log_p - state.column_crp_alpha  # Exp(1) prior

@@ -36,6 +36,7 @@ class ColumnType(enum.Enum):
     CATEGORICAL = "categorical"
     ORDINAL = "ordinal"
     BINARY = "binary"
+    CYCLIC = "cyclic"
 
 
 @dataclass
@@ -59,6 +60,9 @@ class SufficientStats:
     sum_x_sq: Array | None = None  # scalar float
     # Categorical / Ordinal
     category_counts: Array | None = None  # shape (n_categories,)
+    # Cyclic (Von Mises)
+    sum_sin: Array | None = None  # scalar float
+    sum_cos: Array | None = None  # scalar float
 
 
 @dataclass
@@ -92,6 +96,9 @@ class ColumnHypers:
     beta: Array | None = None
     # Ordinal
     cutpoints: Array | None = None
+    # Cyclic (Von Mises)
+    kappa: Array | None = None  # concentration
+    vm_mu: Array | None = None  # prior mean direction
 
 
 @dataclass
