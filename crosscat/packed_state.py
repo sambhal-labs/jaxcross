@@ -1592,6 +1592,218 @@ def packed_transition_column_hypers(
 
 
 # ---------------------------------------------------------------------------
+# Vectorized column hypers sampling (v2 — JIT-compatible via vmap)
+# ---------------------------------------------------------------------------
+
+
+def packed_transition_column_hypers_v2(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+) -> PackedCrossCatState:
+    """Grid-based Gibbs sampling for column hyperparameters, vmapped over columns.
+
+    For each column, scores a grid of hyperparameter values across all clusters
+    in the column's assigned view. Uses jnp.where on type_id to select which
+    type-specific results to keep.
+
+    Fully JIT-compatible: no Python loops over columns, views, or clusters.
+    """
+    n_cols = packed.n_cols
+    max_c = packed.max_clusters
+    max_views = packed.max_views
+    max_cpv = packed.max_cols_per_view
+
+    # Pre-split keys: one per column
+    col_keys = jax.random.split(rng_key, n_cols)
+
+    def _find_local_index(v_idx, col_j):
+        """Find local column index within a view using lax.scan."""
+        def scan_fn(found_idx, li):
+            matches = packed.view_column_indices[v_idx, li] == col_j
+            new_idx = jnp.where(matches & (found_idx < 0), li, found_idx)
+            return new_idx, None
+        local_idx, _ = jax.lax.scan(scan_fn, jnp.array(-1, dtype=jnp.int32),
+                                     jnp.arange(max_cpv))
+        # Clamp to 0 if not found (should not happen for valid columns)
+        return jnp.maximum(local_idx, 0)
+
+    def _score_grid_ng(v_idx, local_idx, mu_val, r_val, s_grid_vals, nu_val):
+        """Score a grid of s values for Normal-Gamma. Returns (n_grid,) scores."""
+        nc = packed.view_n_clusters[v_idx]
+        counts_col = packed.ss_counts[v_idx, :, local_idx]     # (max_c,)
+        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]       # (max_c,)
+        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx] # (max_c,)
+
+        def score_one_grid_point(s_val):
+            # Score across all clusters, mask inactive
+            per_cluster = _ng_log_marginal(
+                counts_col, sum_x_col, sum_x_sq_col,
+                mu_val, r_val, s_val, nu_val,
+            )  # (max_c,)
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        return jax.vmap(score_one_grid_point)(s_grid_vals)
+
+    def _score_grid_ng_mu(v_idx, local_idx, mu_grid_vals, r_val, s_val, nu_val):
+        """Score a grid of mu values for Normal-Gamma."""
+        nc = packed.view_n_clusters[v_idx]
+        counts_col = packed.ss_counts[v_idx, :, local_idx]
+        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]
+        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx]
+
+        def score_one_grid_point(mu_val):
+            per_cluster = _ng_log_marginal(
+                counts_col, sum_x_col, sum_x_sq_col,
+                mu_val, r_val, s_val, nu_val,
+            )
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        return jax.vmap(score_one_grid_point)(mu_grid_vals)
+
+    def _score_grid_ng_nu(v_idx, local_idx, mu_val, r_val, s_val, nu_grid_vals):
+        """Score a grid of nu values for Normal-Gamma."""
+        nc = packed.view_n_clusters[v_idx]
+        counts_col = packed.ss_counts[v_idx, :, local_idx]
+        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]
+        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx]
+
+        def score_one_grid_point(nu_val):
+            per_cluster = _ng_log_marginal(
+                counts_col, sum_x_col, sum_x_sq_col,
+                mu_val, r_val, s_val, nu_val,
+            )
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        return jax.vmap(score_one_grid_point)(nu_grid_vals)
+
+    def process_one_column(j):
+        """Process column j: sample hypers based on type. Returns updated hyper values."""
+        key = col_keys[j]
+        type_id = packed.col_type_ids[j]
+        v_idx = packed.column_assignments[j]
+        local_idx = _find_local_index(v_idx, j)
+
+        k1, k2, k3, k4 = jax.random.split(key, 4)
+
+        # --- Continuous: sample s, then mu, then nu ---
+        cur_mu = packed.hyper_mu[j]
+        cur_r = packed.hyper_r[j]
+        cur_nu = packed.hyper_nu[j]
+
+        # Data statistics for grid construction
+        col_data = data[:, j]
+        valid_mask = ~jnp.isnan(col_data)
+        n_valid = jnp.sum(valid_mask).astype(jnp.float32)
+        safe_n = jnp.maximum(n_valid, 1.0)
+        data_mean = jnp.sum(jnp.where(valid_mask, col_data, 0.0)) / safe_n
+        data_var = jnp.sum(jnp.where(valid_mask, (col_data - data_mean) ** 2, 0.0)) / safe_n
+        data_var = data_var + 1e-6
+        data_std = jnp.sqrt(data_var)
+
+        # Sample s
+        s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
+        s_scores = _score_grid_ng(v_idx, local_idx, cur_mu, cur_r, s_grid, cur_nu)
+        s_scores = s_scores - jnp.max(s_scores)
+        new_s_val = s_grid[jax.random.categorical(k1, s_scores)]
+
+        # Sample mu (conditioned on new s)
+        mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
+        mu_scores = _score_grid_ng_mu(v_idx, local_idx, mu_grid, cur_r, new_s_val, cur_nu)
+        mu_scores = mu_scores - jnp.max(mu_scores)
+        new_mu_val = mu_grid[jax.random.categorical(k2, mu_scores)]
+
+        # Sample nu (conditioned on new s, new mu)
+        nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
+        nu_scores = _score_grid_ng_nu(v_idx, local_idx, new_mu_val, cur_r, new_s_val, nu_grid)
+        nu_scores = nu_scores - jnp.max(nu_scores)
+        new_nu_val = nu_grid[jax.random.categorical(k3, nu_scores)]
+
+        # --- Categorical: sample dirichlet_alpha ---
+        nc = packed.view_n_clusters[v_idx]
+        cat_alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0])
+        counts_col_cat = packed.ss_counts[v_idx, :, local_idx]
+        cat_counts_col = packed.ss_cat_counts[v_idx, :, local_idx]  # (max_c, max_cats)
+
+        def score_cat_grid(alpha_val):
+            per_cluster = _dc_log_marginal(counts_col_cat, cat_counts_col, alpha_val)
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        cat_scores = jax.vmap(score_cat_grid)(cat_alpha_grid)
+        cat_scores = cat_scores - jnp.max(cat_scores)
+        new_dir_alpha_val = cat_alpha_grid[jax.random.categorical(k1, cat_scores)]
+
+        # --- Binary: sample alpha, beta from 2D grid ---
+        ab_grid = jnp.array([0.5, 1.0, 2.0, 5.0, 10.0])
+        sum_x_col_bb = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
+
+        # Create 2D grid: all combinations
+        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])    # (25,)
+        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])      # (25,)
+
+        def score_bb_grid(ab_pair):
+            a_val, b_val = ab_pair
+            per_cluster = _bb_log_marginal(counts_col_cat, sum_x_col_bb, a_val, b_val)
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        bb_scores = jax.vmap(score_bb_grid)(jnp.stack([a_grid_2d, b_grid_2d], axis=1))
+        bb_scores = bb_scores - jnp.max(bb_scores)
+        bb_idx = jax.random.categorical(k1, bb_scores)
+        new_alpha_val = a_grid_2d[bb_idx]
+        new_beta_val = b_grid_2d[bb_idx]
+
+        # --- Cyclic: sample kappa ---
+        kappa_grid = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+        sum_sin_col = packed.ss_sum_sin[v_idx, :, local_idx]  # (max_c,)
+        sum_cos_col = packed.ss_sum_cos[v_idx, :, local_idx]  # (max_c,)
+
+        def score_vm_grid(kappa_val):
+            per_cluster = _vm_log_marginal(counts_col_cat, sum_sin_col, sum_cos_col, kappa_val)
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        vm_scores = jax.vmap(score_vm_grid)(kappa_grid)
+        vm_scores = vm_scores - jnp.max(vm_scores)
+        new_kappa_val = kappa_grid[jax.random.categorical(k1, vm_scores)]
+
+        # --- Select results based on type_id ---
+        out_mu = jnp.where(type_id == CONTINUOUS_ID, new_mu_val, packed.hyper_mu[j])
+        out_s = jnp.where(type_id == CONTINUOUS_ID, new_s_val, packed.hyper_s[j])
+        out_nu = jnp.where(type_id == CONTINUOUS_ID, new_nu_val, packed.hyper_nu[j])
+        out_dir_alpha = jnp.where(
+            type_id == CATEGORICAL_ID, new_dir_alpha_val, packed.hyper_dirichlet_alpha[j]
+        )
+        out_alpha = jnp.where(type_id == BINARY_ID, new_alpha_val, packed.hyper_alpha[j])
+        out_beta = jnp.where(type_id == BINARY_ID, new_beta_val, packed.hyper_beta[j])
+        out_kappa = jnp.where(type_id == CYCLIC_ID, new_kappa_val, packed.hyper_kappa[j])
+
+        return out_mu, packed.hyper_r[j], out_s, out_nu, out_dir_alpha, out_alpha, out_beta, out_kappa
+
+    # vmap over all columns
+    (new_mu, new_r, new_s, new_nu, new_dir_alpha,
+     new_alpha, new_beta, new_kappa) = jax.vmap(process_one_column)(jnp.arange(n_cols))
+
+    return PackedCrossCatState(
+        **{name: (new_mu if name == "hyper_mu"
+                  else new_r if name == "hyper_r"
+                  else new_s if name == "hyper_s"
+                  else new_nu if name == "hyper_nu"
+                  else new_dir_alpha if name == "hyper_dirichlet_alpha"
+                  else new_alpha if name == "hyper_alpha"
+                  else new_beta if name == "hyper_beta"
+                  else new_kappa if name == "hyper_kappa"
+                  else getattr(packed, name))
+           for name in _ARRAY_FIELDS},
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Vectorized CRP alpha sampling
 # ---------------------------------------------------------------------------
 

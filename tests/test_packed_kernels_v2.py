@@ -16,6 +16,7 @@ from crosscat.packed_state import (
     _score_row_all_clusters,
     _score_row_all_clusters_v2,
     pack_state,
+    packed_transition_column_hypers_v2,
     packed_transition_row_assignments_v2,
     unpack_state,
 )
@@ -174,3 +175,53 @@ def test_scan_row_assignments_jit_compiles(mixed_packed_state):
     assert errors == [], f"Validation errors after JIT: {errors}"
     lj = float(log_joint(recovered, data))
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT: {lj}"
+
+
+# ---------------------------------------------------------------------------
+# Task 5: vmap column hypers kernel tests
+# ---------------------------------------------------------------------------
+
+
+def test_vmap_column_hypers_produces_valid_state(mixed_packed_state):
+    """packed_transition_column_hypers_v2 produces finite and positive hypers."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(301)
+    packed_new = packed_transition_column_hypers_v2(key, packed, data)
+
+    # All hypers should be finite
+    assert jnp.all(jnp.isfinite(packed_new.hyper_mu)), "hyper_mu has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_r)), "hyper_r has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_s)), "hyper_s has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_nu)), "hyper_nu has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_dirichlet_alpha)), (
+        "hyper_dirichlet_alpha has non-finite values"
+    )
+    assert jnp.all(jnp.isfinite(packed_new.hyper_alpha)), "hyper_alpha has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_beta)), "hyper_beta has non-finite values"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_kappa)), "hyper_kappa has non-finite values"
+
+    # Positive-definite hypers should be positive
+    assert jnp.all(packed_new.hyper_r > 0), "hyper_r should be positive"
+    assert jnp.all(packed_new.hyper_s > 0), "hyper_s should be positive"
+    assert jnp.all(packed_new.hyper_nu > 0), "hyper_nu should be positive"
+    assert jnp.all(packed_new.hyper_dirichlet_alpha > 0), (
+        "hyper_dirichlet_alpha should be positive"
+    )
+    assert jnp.all(packed_new.hyper_alpha > 0), "hyper_alpha should be positive"
+    assert jnp.all(packed_new.hyper_beta > 0), "hyper_beta should be positive"
+    assert jnp.all(packed_new.hyper_kappa > 0), "hyper_kappa should be positive"
+
+
+def test_vmap_column_hypers_jit_compiles(mixed_packed_state):
+    """packed_transition_column_hypers_v2 works under jax.jit."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(302)
+
+    jitted_fn = jax.jit(packed_transition_column_hypers_v2)
+    packed_new = jitted_fn(key, packed, data)
+
+    # Verify all hypers are finite after JIT
+    assert jnp.all(jnp.isfinite(packed_new.hyper_mu)), "hyper_mu non-finite after JIT"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_s)), "hyper_s non-finite after JIT"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_nu)), "hyper_nu non-finite after JIT"
+    assert jnp.all(jnp.isfinite(packed_new.hyper_kappa)), "hyper_kappa non-finite after JIT"
