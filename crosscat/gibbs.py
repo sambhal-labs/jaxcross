@@ -25,6 +25,8 @@ from crosscat.components import (
     DirichletCategorical,
     NormalGamma,
     OrderedLogistic,
+    VonMises,
+    _filter_nan,
 )
 from crosscat.model import _compute_suffstats_for_view, _crp_sample, _log_crp
 from crosscat.types import (
@@ -36,20 +38,53 @@ from crosscat.types import (
 )
 
 
+def _empty_suffstats(col_type: ColumnType, data: Array, col_idx: int) -> SufficientStats:
+    """Create empty sufficient statistics for a column type (new cluster)."""
+    if col_type == ColumnType.CONTINUOUS:
+        return SufficientStats(
+            column_type=col_type,
+            count=jnp.array(0, dtype=jnp.int32),
+            sum_x=jnp.array(0.0),
+            sum_x_sq=jnp.array(0.0),
+        )
+    elif col_type == ColumnType.CATEGORICAL:
+        n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+        return SufficientStats(
+            column_type=col_type,
+            count=jnp.array(0, dtype=jnp.int32),
+            category_counts=jnp.zeros(n_cats),
+        )
+    elif col_type == ColumnType.BINARY:
+        return SufficientStats(
+            column_type=col_type,
+            count=jnp.array(0, dtype=jnp.int32),
+            sum_x=jnp.array(0.0),
+        )
+    elif col_type == ColumnType.ORDINAL:
+        n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+        return SufficientStats(
+            column_type=col_type,
+            count=jnp.array(0, dtype=jnp.int32),
+            category_counts=jnp.zeros(n_levels),
+        )
+    elif col_type == ColumnType.CYCLIC:
+        return SufficientStats(
+            column_type=col_type,
+            count=jnp.array(0, dtype=jnp.int32),
+            sum_sin=jnp.array(0.0),
+            sum_cos=jnp.array(0.0),
+        )
+    else:
+        raise ValueError(f"Unknown column type: {col_type}")
+
+
 def _component_log_marginal(
     suffstats: SufficientStats, hypers: ColumnHypers, col_type: ColumnType
 ) -> Array:
     """Dispatch log marginal likelihood to the correct component model."""
-    if col_type == ColumnType.CONTINUOUS:
-        return NormalGamma.log_marginal_likelihood(suffstats, hypers)
-    elif col_type == ColumnType.CATEGORICAL:
-        return DirichletCategorical.log_marginal_likelihood(suffstats, hypers)
-    elif col_type == ColumnType.BINARY:
-        return BetaBernoulli.log_marginal_likelihood(suffstats, hypers)
-    elif col_type == ColumnType.ORDINAL:
-        return OrderedLogistic.log_marginal_likelihood(suffstats, hypers)
-    else:
-        raise ValueError(f"Unknown column type: {col_type}")
+    from crosscat.model import _get_component_class
+
+    return _get_component_class(col_type).log_marginal_likelihood(suffstats, hypers)
 
 
 def _compute_suffstats_for_column(
@@ -63,13 +98,15 @@ def _compute_suffstats_for_column(
         if col_type == ColumnType.CONTINUOUS:
             ss = NormalGamma.sufficient_statistics(col_data)
         elif col_type == ColumnType.CATEGORICAL:
-            n_cats = int(jnp.max(data[:, col_idx])) + 1
+            n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
             ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
         elif col_type == ColumnType.BINARY:
             ss = BetaBernoulli.sufficient_statistics(col_data)
         elif col_type == ColumnType.ORDINAL:
-            n_levels = int(jnp.max(data[:, col_idx])) + 1
+            n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
             ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
+        elif col_type == ColumnType.CYCLIC:
+            ss = VonMises.sufficient_statistics(col_data)
         else:
             raise ValueError(f"Unknown column type: {col_type}")
         stats.append(ss)
@@ -93,16 +130,19 @@ def _log_marginal_for_column_in_view(
             ss = NormalGamma.sufficient_statistics(col_data)
             log_ml = log_ml + NormalGamma.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.CATEGORICAL:
-            n_cats = int(jnp.max(data[:, col_idx])) + 1
+            n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
             ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
             log_ml = log_ml + DirichletCategorical.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.BINARY:
             ss = BetaBernoulli.sufficient_statistics(col_data)
             log_ml = log_ml + BetaBernoulli.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.ORDINAL:
-            n_levels = int(jnp.max(data[:, col_idx])) + 1
+            n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
             ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
             log_ml = log_ml + OrderedLogistic.log_marginal_likelihood(ss, hypers)
+        elif col_type == ColumnType.CYCLIC:
+            ss = VonMises.sufficient_statistics(col_data)
+            log_ml = log_ml + VonMises.log_marginal_likelihood(ss, hypers)
     return log_ml
 
 
@@ -248,6 +288,145 @@ def transition_column_assignments(
     )
 
 
+def transition_column_assignments_mh(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+) -> CrossCatState:
+    """Metropolis-Hastings column transition with birth-death proposals.
+
+    Maps to original State::transition_features() with CT_KERNEL=1.
+
+    For each column j:
+    - With probability 0.5, propose moving to a new singleton view (birth)
+    - With probability 0.5, propose moving to a random existing view (death/merge)
+    - Accept/reject based on likelihood ratio + proposal ratio
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: Current CrossCat state.
+        data: Observation matrix, shape (n_rows, n_cols).
+
+    Returns:
+        Updated CrossCatState with new column assignments.
+    """
+    n_rows, n_cols = data.shape
+    col_assignments = jnp.array(state.column_assignments)
+    alpha = state.column_crp_alpha
+
+    keys = jax.random.split(rng_key, n_cols * 3)
+
+    for j in range(n_cols):
+        col_type = state.column_types[j]
+        hypers = state.column_hypers[j]
+        old_view_idx = int(col_assignments[j])
+        n_views = int(jnp.max(col_assignments)) + 1
+
+        k_coin, k_prop, k_accept = keys[j * 3], keys[j * 3 + 1], keys[j * 3 + 2]
+
+        # Count columns per view excluding column j
+        temp_assignments = col_assignments.at[j].set(-1)
+        old_count = int(jnp.sum(temp_assignments == old_view_idx))
+
+        # Current log likelihood of column j in its view
+        old_view = state.views[old_view_idx]
+        n_old_clusters = int(jnp.max(old_view.row_assignments)) + 1
+        log_lik_old = _log_marginal_for_column_in_view(
+            data, j, col_type, hypers, old_view.row_assignments, n_old_clusters
+        )
+
+        # Propose: birth (new view) or death (existing view)
+        coin = jax.random.uniform(k_coin)
+        if coin < 0.5:
+            # Birth: propose new singleton view
+            new_row_assigns = _crp_sample(k_prop, float(old_view.row_crp_alpha), n_rows)
+            n_new_clusters = int(jnp.max(new_row_assigns)) + 1
+            log_lik_new = _log_marginal_for_column_in_view(
+                data, j, col_type, hypers, new_row_assigns, n_new_clusters
+            )
+
+            # Log acceptance ratio
+            log_prior_ratio = jnp.log(alpha) - jnp.log(jnp.maximum(float(old_count), 1e-30))
+            log_lik_ratio = log_lik_new - log_lik_old
+            log_accept = log_prior_ratio + log_lik_ratio
+
+            if jnp.log(jax.random.uniform(k_accept)) < log_accept:
+                # Accept: create new view
+                new_suffstats = _compute_suffstats_for_view(
+                    data, jnp.array([j]), state.column_types, new_row_assigns, n_new_clusters
+                )
+                new_view = ViewState(
+                    column_indices=jnp.array([j]),
+                    row_assignments=new_row_assigns,
+                    row_crp_alpha=jnp.array(float(old_view.row_crp_alpha)),
+                    suffstats=new_suffstats,
+                )
+                state.views.append(new_view)
+                col_assignments = col_assignments.at[j].set(n_views)
+        else:
+            # Death/merge: propose random existing view (different from current)
+            if n_views <= 1:
+                continue
+            # Pick a random different view
+            other_views = [v for v in range(n_views) if v != old_view_idx]
+            prop_idx = int(jax.random.randint(k_prop, (), 0, len(other_views)))
+            new_view_idx = other_views[prop_idx]
+            new_view = state.views[new_view_idx]
+
+            n_new_clusters = int(jnp.max(new_view.row_assignments)) + 1
+            log_lik_new = _log_marginal_for_column_in_view(
+                data, j, col_type, hypers, new_view.row_assignments, n_new_clusters
+            )
+
+            new_count = int(jnp.sum(temp_assignments == new_view_idx))
+            log_prior_ratio = jnp.log(jnp.maximum(float(new_count), 1e-30)) - jnp.log(
+                jnp.maximum(float(old_count), 1e-30)
+            )
+            log_lik_ratio = log_lik_new - log_lik_old
+            log_accept = log_prior_ratio + log_lik_ratio
+
+            if jnp.log(jax.random.uniform(k_accept)) < log_accept:
+                col_assignments = col_assignments.at[j].set(new_view_idx)
+
+    # Rebuild views with updated assignments (same logic as Gibbs version)
+    new_views = []
+    unique_views = sorted(set(col_assignments.tolist()))
+    remap = {old: new for new, old in enumerate(unique_views)}
+    new_assignments = jnp.array([remap[int(a)] for a in col_assignments.tolist()])
+
+    for new_v, old_v in enumerate(unique_views):
+        col_indices = jnp.arange(n_cols)[new_assignments == new_v]
+        if old_v < len(state.views):
+            row_assigns = state.views[old_v].row_assignments
+            row_alpha = state.views[old_v].row_crp_alpha
+        else:
+            row_assigns = jnp.zeros(n_rows, dtype=jnp.int32)
+            row_alpha = state.views[0].row_crp_alpha
+
+        n_clusters = int(jnp.max(row_assigns)) + 1
+        suffstats = _compute_suffstats_for_view(
+            data, col_indices, state.column_types, row_assigns, n_clusters
+        )
+        new_views.append(
+            ViewState(
+                column_indices=col_indices,
+                row_assignments=row_assigns,
+                row_crp_alpha=row_alpha,
+                suffstats=suffstats,
+            )
+        )
+
+    return CrossCatState(
+        column_assignments=new_assignments,
+        column_crp_alpha=state.column_crp_alpha,
+        column_hypers=state.column_hypers,
+        column_types=state.column_types,
+        views=new_views,
+        n_rows=n_rows,
+        n_cols=n_cols,
+    )
+
+
 def _posterior_predictive_logp_for_row(
     row_data: Array,
     col_indices: Array,
@@ -255,7 +434,13 @@ def _posterior_predictive_logp_for_row(
     column_hypers: list[ColumnHypers],
     cluster_suffstats: list[SufficientStats],
 ) -> Array:
-    """Log predictive probability of a row under a cluster's posterior."""
+    """Log predictive probability of a row under a cluster's posterior.
+
+    NaN values in row_data are skipped (contribute 0 to log prob),
+    matching original CrossCat behavior for missing data.
+    """
+    from crosscat.model import _get_component_class
+
     log_p = jnp.array(0.0)
     for local_idx in range(len(col_indices)):
         col_idx = int(col_indices[local_idx])
@@ -264,14 +449,12 @@ def _posterior_predictive_logp_for_row(
         ss = cluster_suffstats[local_idx]
         x = row_data[col_idx]
 
-        if col_type == ColumnType.CONTINUOUS:
-            log_p = log_p + NormalGamma.posterior_predictive_logp(x, ss, hypers)
-        elif col_type == ColumnType.CATEGORICAL:
-            log_p = log_p + DirichletCategorical.posterior_predictive_logp(x, ss, hypers)
-        elif col_type == ColumnType.BINARY:
-            log_p = log_p + BetaBernoulli.posterior_predictive_logp(x, ss, hypers)
-        elif col_type == ColumnType.ORDINAL:
-            log_p = log_p + OrderedLogistic.posterior_predictive_logp(x, ss, hypers)
+        # Skip NaN values (missing data)
+        if jnp.isnan(x):
+            continue
+
+        comp = _get_component_class(col_type)
+        log_p = log_p + comp.posterior_predictive_logp(x, ss, hypers)
     return log_p
 
 
@@ -342,13 +525,15 @@ def transition_row_assignments(
                     if col_type == ColumnType.CONTINUOUS:
                         ss = NormalGamma.sufficient_statistics(col_data)
                     elif col_type == ColumnType.CATEGORICAL:
-                        n_cats = int(jnp.max(data[:, col_idx])) + 1
+                        n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
                         ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
                     elif col_type == ColumnType.BINARY:
                         ss = BetaBernoulli.sufficient_statistics(col_data)
                     elif col_type == ColumnType.ORDINAL:
-                        n_levels = int(jnp.max(data[:, col_idx])) + 1
+                        n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
                         ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
+                    elif col_type == ColumnType.CYCLIC:
+                        ss = VonMises.sufficient_statistics(col_data)
                     else:
                         raise ValueError(f"Unknown column type: {col_type}")
                     cluster_stats.append(ss)
@@ -364,35 +549,7 @@ def transition_row_assignments(
             for local_idx in range(len(col_indices)):
                 col_idx = int(col_indices[local_idx])
                 col_type = state.column_types[col_idx]
-                if col_type == ColumnType.CONTINUOUS:
-                    ss = SufficientStats(
-                        column_type=col_type,
-                        count=jnp.array(0, dtype=jnp.int32),
-                        sum_x=jnp.array(0.0),
-                        sum_x_sq=jnp.array(0.0),
-                    )
-                elif col_type == ColumnType.CATEGORICAL:
-                    n_cats = int(jnp.max(data[:, col_idx])) + 1
-                    ss = SufficientStats(
-                        column_type=col_type,
-                        count=jnp.array(0, dtype=jnp.int32),
-                        category_counts=jnp.zeros(n_cats),
-                    )
-                elif col_type == ColumnType.BINARY:
-                    ss = SufficientStats(
-                        column_type=col_type,
-                        count=jnp.array(0, dtype=jnp.int32),
-                        sum_x=jnp.array(0.0),
-                    )
-                elif col_type == ColumnType.ORDINAL:
-                    n_levels = int(jnp.max(data[:, col_idx])) + 1
-                    ss = SufficientStats(
-                        column_type=col_type,
-                        count=jnp.array(0, dtype=jnp.int32),
-                        category_counts=jnp.zeros(n_levels),
-                    )
-                else:
-                    raise ValueError(f"Unknown column type: {col_type}")
+                ss = _empty_suffstats(col_type, data, col_idx)
                 empty_stats.append(ss)
 
             log_lik_new = _posterior_predictive_logp_for_row(
@@ -475,72 +632,71 @@ def transition_column_hypers(
         view = state.views[view_idx]
 
         if col_type == ColumnType.CONTINUOUS:
-            # Grid-based Gibbs for s (variance scale)
-            # Evaluate log marginal likelihood at grid points for s
+            # Grid-based Gibbs for s, mu, and nu
             col_data = data[:, j]
             data_var = jnp.var(col_data) + 1e-6
             s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
 
             k1, k2, k3 = jax.random.split(keys[j], 3)
 
-            # Sample s
-            log_scores_s = []
-            for s_val in s_grid:
-                test_hypers = ColumnHypers(
-                    column_type=col_type, mu=hypers.mu, r=hypers.r, s=s_val, nu=hypers.nu
-                )
-                n_clusters = len(view.suffstats)
+            # Find local index of column j in this view
+            local_idx_j = None
+            for li, ci in enumerate(view.column_indices.tolist()):
+                if int(ci) == j:
+                    local_idx_j = li
+                    break
+
+            def _score_hypers(test_hypers):
                 log_score = jnp.array(0.0)
+                n_clusters = len(view.suffstats)
                 for c in range(n_clusters):
-                    local_idx = None
-                    for li, ci in enumerate(view.column_indices.tolist()):
-                        if int(ci) == j:
-                            local_idx = li
-                            break
-                    if local_idx is not None:
-                        ss = view.suffstats[c][local_idx]
+                    if local_idx_j is not None:
+                        ss = view.suffstats[c][local_idx_j]
                         log_score = log_score + NormalGamma.log_marginal_likelihood(
                             ss, test_hypers
                         )
-                log_scores_s.append(log_score)
+                return log_score
 
-            log_scores_s = jnp.array(log_scores_s)
+            # Sample s
+            log_scores_s = jnp.array([
+                _score_hypers(
+                    ColumnHypers(column_type=col_type, mu=hypers.mu, r=hypers.r, s=sv, nu=hypers.nu)
+                )
+                for sv in s_grid
+            ])
             log_scores_s = log_scores_s - jnp.max(log_scores_s)
             s_idx = jax.random.categorical(k1, log_scores_s)
             new_s = s_grid[s_idx]
 
-            # Sample mu from posterior: grid around data mean
+            # Sample mu
             data_mean = jnp.mean(col_data)
             data_std = jnp.std(col_data) + 1e-6
             mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
 
-            log_scores_mu = []
-            for mu_val in mu_grid:
-                test_hypers = ColumnHypers(
-                    column_type=col_type, mu=mu_val, r=hypers.r, s=new_s, nu=hypers.nu
+            log_scores_mu = jnp.array([
+                _score_hypers(
+                    ColumnHypers(column_type=col_type, mu=mv, r=hypers.r, s=new_s, nu=hypers.nu)
                 )
-                log_score = jnp.array(0.0)
-                n_clusters = len(view.suffstats)
-                for c in range(n_clusters):
-                    local_idx = None
-                    for li, ci in enumerate(view.column_indices.tolist()):
-                        if int(ci) == j:
-                            local_idx = li
-                            break
-                    if local_idx is not None:
-                        ss = view.suffstats[c][local_idx]
-                        log_score = log_score + NormalGamma.log_marginal_likelihood(
-                            ss, test_hypers
-                        )
-                log_scores_mu.append(log_score)
-
-            log_scores_mu = jnp.array(log_scores_mu)
+                for mv in mu_grid
+            ])
             log_scores_mu = log_scores_mu - jnp.max(log_scores_mu)
             mu_idx = jax.random.categorical(k2, log_scores_mu)
             new_mu = mu_grid[mu_idx]
 
+            # Sample nu (degrees of freedom) — matching original N_GRID approach
+            nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
+            log_scores_nu = jnp.array([
+                _score_hypers(
+                    ColumnHypers(column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=nv)
+                )
+                for nv in nu_grid
+            ])
+            log_scores_nu = log_scores_nu - jnp.max(log_scores_nu)
+            nu_idx = jax.random.categorical(k3, log_scores_nu)
+            new_nu = nu_grid[nu_idx]
+
             new_hypers[j] = ColumnHypers(
-                column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=hypers.nu
+                column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=new_nu
             )
 
         elif col_type == ColumnType.CATEGORICAL:
@@ -597,6 +753,34 @@ def transition_column_hypers(
             a_idx, b_idx = divmod(idx, len(ab_grid))
             new_hypers[j] = ColumnHypers(
                 column_type=col_type, alpha=ab_grid[a_idx], beta=ab_grid[b_idx]
+            )
+
+        elif col_type == ColumnType.CYCLIC:
+            # Grid-based Gibbs for kappa (concentration)
+            kappa_grid = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+            log_scores = []
+            for kappa_val in kappa_grid:
+                test_hypers = ColumnHypers(
+                    column_type=col_type, kappa=kappa_val, vm_mu=hypers.vm_mu
+                )
+                log_score = jnp.array(0.0)
+                n_clusters = len(view.suffstats)
+                for c in range(n_clusters):
+                    local_idx = None
+                    for li, ci in enumerate(view.column_indices.tolist()):
+                        if int(ci) == j:
+                            local_idx = li
+                            break
+                    if local_idx is not None:
+                        ss = view.suffstats[c][local_idx]
+                        log_score = log_score + VonMises.log_marginal_likelihood(ss, test_hypers)
+                log_scores.append(log_score)
+
+            log_scores = jnp.array(log_scores)
+            log_scores = log_scores - jnp.max(log_scores)
+            idx = jax.random.categorical(keys[j], log_scores)
+            new_hypers[j] = ColumnHypers(
+                column_type=col_type, kappa=kappa_grid[idx], vm_mu=hypers.vm_mu
             )
 
         # Ordinal: keep hypers as-is (symmetric Dirichlet with alpha=1)
@@ -709,6 +893,7 @@ def gibbs_sweep(
     """
     kernel_map = {
         "column_assignments": transition_column_assignments,
+        "column_assignments_mh": transition_column_assignments_mh,
         "row_assignments": transition_row_assignments,
         "column_hypers": transition_column_hypers,
         "crp_alphas": transition_crp_alphas,

@@ -19,12 +19,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from crosscat.components import (
-    BetaBernoulli,
-    DirichletCategorical,
-    NormalGamma,
-    OrderedLogistic,
-)
+from crosscat.components import get_component
 from crosscat.types import ColumnType, CrossCatState
 
 
@@ -73,6 +68,10 @@ def _cluster_weights_conditioned(
         hypers = state.column_hypers[col]
         x = condition_vals[cond_idx]
 
+        # Skip NaN conditioning values
+        if jnp.isnan(x):
+            continue
+
         # Find local index of this column in the view
         local_idx = None
         for li, ci in enumerate(view.column_indices.tolist()):
@@ -82,24 +81,29 @@ def _cluster_weights_conditioned(
         if local_idx is None:
             continue
 
+        comp = get_component(col_type)
         for c in range(n_clusters):
             ss = view.suffstats[c][local_idx]
-            if col_type == ColumnType.CONTINUOUS:
-                log_lik = NormalGamma.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.CATEGORICAL:
-                log_lik = DirichletCategorical.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.BINARY:
-                log_lik = BetaBernoulli.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.ORDINAL:
-                log_lik = OrderedLogistic.posterior_predictive_logp(x, ss, hypers)
-            else:
-                continue
+            log_lik = comp.posterior_predictive_logp(x, ss, hypers)
             log_weights = log_weights.at[c].add(log_lik)
 
     # Normalize
     log_weights = log_weights - jnp.max(log_weights)
     weights = jnp.exp(log_weights)
     return weights / weights.sum()
+
+
+def _cluster_weights_for_observed_row(view, row_id: int) -> Array:
+    """Get cluster weights for an observed row based on its actual assignment.
+
+    For observed rows, the original CrossCat uses the actual cluster assignment
+    rather than marginalizing over clusters. This returns a one-hot weight
+    vector for the row's assigned cluster.
+    """
+    cluster = int(view.row_assignments[row_id])
+    n_clusters = int(jnp.max(view.row_assignments)) + 1
+    weights = jnp.zeros(n_clusters)
+    return weights.at[cluster].set(1.0)
 
 
 def predictive_probability(
@@ -110,18 +114,13 @@ def predictive_probability(
     *,
     condition_cols: list[int] | None = None,
     condition_vals: Array | None = None,
+    row_id: int | None = None,
 ) -> Array:
     """Compute conditional predictive probability.
 
     p(query_cols = query_vals | condition_cols = condition_vals, state)
 
     Maps to original sample_utils.simple_predictive_probability().
-
-    The computation follows the original CrossCat chain rule:
-    1. Identify which views contain the query and condition columns
-    2. For each view, determine cluster probabilities given conditions
-    3. Compute predictive probability as mixture over clusters
-    4. Multiply across views (columns in different views are independent given state)
 
     Args:
         state: CrossCat state (single posterior sample).
@@ -130,6 +129,8 @@ def predictive_probability(
         query_vals: Values to evaluate probability at.
         condition_cols: Column indices to condition on (optional).
         condition_vals: Conditioning values (optional).
+        row_id: If provided, use the observed row's actual cluster assignment
+            rather than marginalizing over clusters (observed row distinction).
 
     Returns:
         Log probability (scalar).
@@ -146,8 +147,10 @@ def predictive_probability(
         view = state.views[view_idx]
         n_clusters = int(jnp.max(view.row_assignments)) + 1
 
-        # Get cluster weights (conditioned if applicable)
-        if condition_cols:
+        # Get cluster weights
+        if row_id is not None:
+            weights = _cluster_weights_for_observed_row(view, row_id)
+        elif condition_cols:
             weights = _cluster_weights_conditioned(
                 state, view, view_idx, condition_cols, condition_vals, data
             )
@@ -167,19 +170,10 @@ def predictive_probability(
         x = query_vals[q_idx]
         log_mixture = -jnp.inf
 
+        comp = get_component(col_type)
         for c in range(n_clusters):
             ss = view.suffstats[c][local_idx]
-            if col_type == ColumnType.CONTINUOUS:
-                log_lik = NormalGamma.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.CATEGORICAL:
-                log_lik = DirichletCategorical.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.BINARY:
-                log_lik = BetaBernoulli.posterior_predictive_logp(x, ss, hypers)
-            elif col_type == ColumnType.ORDINAL:
-                log_lik = OrderedLogistic.posterior_predictive_logp(x, ss, hypers)
-            else:
-                continue
-
+            log_lik = comp.posterior_predictive_logp(x, ss, hypers)
             log_term = jnp.log(weights[c]) + log_lik
             log_mixture = jnp.logaddexp(log_mixture, log_term)
 
@@ -197,6 +191,7 @@ def predictive_sample(
     condition_cols: list[int] | None = None,
     condition_vals: Array | None = None,
     n_samples: int = 1000,
+    row_id: int | None = None,
 ) -> Array:
     """Draw samples from the posterior predictive distribution.
 
@@ -210,6 +205,7 @@ def predictive_sample(
         condition_cols: Column indices to condition on.
         condition_vals: Conditioning values.
         n_samples: Number of posterior predictive samples.
+        row_id: If provided, use observed row's cluster assignment.
 
     Returns:
         Array of shape (n_samples, len(query_cols)).
@@ -230,7 +226,9 @@ def predictive_sample(
             view = state.views[view_idx]
 
             # Get cluster weights
-            if condition_cols:
+            if row_id is not None:
+                weights = _cluster_weights_for_observed_row(view, row_id)
+            elif condition_cols:
                 weights = _cluster_weights_conditioned(
                     state, view, view_idx, condition_cols, condition_vals, data
                 )
@@ -254,16 +252,8 @@ def predictive_sample(
             hypers = state.column_hypers[col]
             ss = view.suffstats[cluster][local_idx]
 
-            if col_type == ColumnType.CONTINUOUS:
-                val = NormalGamma.sample_posterior_predictive(k2, ss, hypers, n=1)[0]
-            elif col_type == ColumnType.CATEGORICAL:
-                val = DirichletCategorical.sample_posterior_predictive(k2, ss, hypers, n=1)[0]
-            elif col_type == ColumnType.BINARY:
-                val = BetaBernoulli.sample_posterior_predictive(k2, ss, hypers, n=1)[0]
-            elif col_type == ColumnType.ORDINAL:
-                val = OrderedLogistic.sample_posterior_predictive(k2, ss, hypers, n=1)[0]
-            else:
-                val = jnp.array(0.0)
+            comp = get_component(col_type)
+            val = comp.sample_posterior_predictive(k2, ss, hypers, n=1)[0]
 
             samples = samples.at[s, q_idx].set(val)
 
@@ -485,3 +475,282 @@ def column_typicality(
     # Typicality: 1 - normalized entropy (high = consistent grouping = typical)
     typicality = 1.0 - entropy / jnp.maximum(max_entropy, 1e-30)
     return jnp.clip(typicality, 0.0, 1.0)
+
+
+def row_similarity(
+    states: list[CrossCatState],
+    row_a: int,
+    row_b: int,
+    *,
+    target_columns: list[int] | None = None,
+) -> Array:
+    """Compute similarity between two rows.
+
+    Maps to original LocalEngine.similarity().
+
+    Similarity is the probability that two rows are in the same cluster,
+    averaged over views and posterior samples. If target_columns is given,
+    only views containing those columns contribute.
+
+    Args:
+        states: List of CrossCat posterior states.
+        row_a: First row index.
+        row_b: Second row index.
+        target_columns: Restrict to views containing these columns (optional).
+
+    Returns:
+        Similarity score in [0, 1].
+    """
+    sim_scores = []
+
+    for state in states:
+        view_scores = []
+        for v_idx, view in enumerate(state.views):
+            # If target_columns specified, skip views not containing them
+            if target_columns is not None:
+                view_cols = set(view.column_indices.tolist())
+                if not any(c in view_cols for c in target_columns):
+                    continue
+
+            # Same cluster = similar
+            same_cluster = float(view.row_assignments[row_a] == view.row_assignments[row_b])
+            view_scores.append(same_cluster)
+
+        if view_scores:
+            sim_scores.append(sum(view_scores) / len(view_scores))
+
+    if not sim_scores:
+        return jnp.array(0.0)
+    return jnp.array(sum(sim_scores) / len(sim_scores))
+
+
+def impute_and_confidence(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+    query_col: int,
+    *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
+    row_id: int | None = None,
+    n_samples: int = 1000,
+) -> tuple[Array, Array]:
+    """Impute a value with confidence score.
+
+    Maps to original sample_utils.impute_and_confidence().
+
+    For continuous columns: returns median as point estimate, confidence from
+    mixture weight concentration.
+    For categorical/binary/ordinal: returns mode, confidence = mode probability.
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: CrossCat state.
+        data: Full observation matrix.
+        query_col: Column to impute.
+        condition_cols: Conditioning columns.
+        condition_vals: Conditioning values.
+        row_id: Observed row index (uses actual cluster assignment).
+        n_samples: Number of samples for estimation.
+
+    Returns:
+        Tuple of (point_estimate, confidence_score).
+    """
+    col_type = state.column_types[query_col]
+    samples = predictive_sample(
+        rng_key,
+        state,
+        data,
+        [query_col],
+        condition_cols=condition_cols,
+        condition_vals=condition_vals,
+        n_samples=n_samples,
+        row_id=row_id,
+    )
+    s = samples[:, 0]
+
+    if col_type == ColumnType.CONTINUOUS:
+        point_est = jnp.median(s)
+        # Confidence: inverse of normalized IQR
+        iqr = jnp.percentile(s, 75) - jnp.percentile(s, 25)
+        std = jnp.std(s) + 1e-30
+        confidence = jnp.exp(-iqr / std)
+    else:
+        # Categorical, ordinal, binary: mode and mode frequency
+        s_int = s.astype(jnp.int32)
+        max_val = int(jnp.max(s_int)) + 1
+        counts = jnp.bincount(s_int, length=max_val)
+        point_est = jnp.argmax(counts).astype(jnp.float32)
+        confidence = counts[jnp.argmax(counts)] / jnp.float32(n_samples)
+
+    return point_est, confidence
+
+
+def predictive_anomalousness(
+    rng_key: Array,
+    state: CrossCatState,
+    data: Array,
+    query_row: int,
+    *,
+    n_samples: int = 1000,
+) -> Array:
+    """Compute predictive anomalousness of a row.
+
+    Maps to original LocalEngine.predictive_anomalousness().
+
+    Measures how surprising each column value is under the posterior predictive,
+    then aggregates into an overall anomaly score.
+
+    Args:
+        rng_key: JAX PRNG key.
+        state: CrossCat state.
+        data: Full observation matrix.
+        query_row: Row index to score.
+        n_samples: Number of MC samples for scoring.
+
+    Returns:
+        Anomaly score in [0, 1] — higher = more anomalous.
+    """
+    log_p_total = jnp.array(0.0)
+    n_scored = 0
+
+    for col in range(state.n_cols):
+        x = data[query_row, col]
+        if jnp.isnan(x):
+            continue
+
+        log_p = predictive_probability(
+            state,
+            data,
+            [col],
+            jnp.array([x]),
+            row_id=query_row,
+        )
+        log_p_total = log_p_total + log_p
+        n_scored += 1
+
+    if n_scored == 0:
+        return jnp.array(0.5)
+
+    # Convert to anomaly score: compare against samples
+    avg_log_p = log_p_total / n_scored
+    # Use sigmoid-like transform: more negative log_p = more anomalous
+    anomaly = 1.0 / (1.0 + jnp.exp(avg_log_p + 2.0))
+    return jnp.clip(anomaly, 0.0, 1.0)
+
+
+def joint_predictive_probability(
+    state: CrossCatState,
+    data: Array,
+    query_cols: list[int],
+    query_vals: Array,
+    *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
+) -> Array:
+    """Compute joint predictive probability via chain rule.
+
+    Maps to original LocalEngine.predictive_probability() which uses
+    the chain rule to decompose joint probabilities.
+
+    p(q1, q2, ..., qn | conditions) = p(q1 | conditions) *
+        p(q2 | conditions, q1) * p(q3 | conditions, q1, q2) * ...
+
+    Args:
+        state: CrossCat state.
+        data: Full observation matrix.
+        query_cols: Column indices to query.
+        query_vals: Values to evaluate joint probability at.
+        condition_cols: Conditioning columns.
+        condition_vals: Conditioning values.
+
+    Returns:
+        Log joint probability (scalar).
+    """
+    if condition_cols is None:
+        condition_cols = []
+    if condition_vals is None:
+        condition_vals = jnp.array([])
+
+    log_p_joint = jnp.array(0.0)
+    running_cond_cols = list(condition_cols)
+    running_cond_vals = list(condition_vals.tolist()) if condition_vals.size > 0 else []
+
+    for q_idx, col in enumerate(query_cols):
+        # p(q_idx | conditions so far)
+        cond_vals_arr = jnp.array(running_cond_vals) if running_cond_vals else jnp.array([])
+        cond_cols_list = running_cond_cols if running_cond_cols else None
+        cond_vals_list = cond_vals_arr if running_cond_cols else None
+
+        log_p = predictive_probability(
+            state,
+            data,
+            [col],
+            jnp.array([query_vals[q_idx]]),
+            condition_cols=cond_cols_list,
+            condition_vals=cond_vals_list,
+        )
+        log_p_joint = log_p_joint + log_p
+
+        # Add this query to the running conditions
+        running_cond_cols.append(col)
+        running_cond_vals.append(float(query_vals[q_idx]))
+
+    return log_p_joint
+
+
+def conditional_entropy(
+    rng_key: Array,
+    states: list[CrossCatState],
+    data: Array,
+    target_col: int,
+    given_cols: list[int],
+    *,
+    n_samples: int = 500,
+) -> Array:
+    """Estimate conditional entropy H(target | given).
+
+    Maps to original LocalEngine.conditional_entropy().
+
+    Args:
+        rng_key: JAX PRNG key.
+        states: List of posterior states.
+        data: Observation matrix.
+        target_col: Column whose entropy to compute.
+        given_cols: Conditioning columns.
+        n_samples: Number of MC samples.
+
+    Returns:
+        Conditional entropy estimate (nats).
+    """
+    entropy_estimates = []
+    keys = jax.random.split(rng_key, len(states))
+
+    for s_idx, state in enumerate(states):
+        s_keys = jax.random.split(keys[s_idx], n_samples)
+        log_ps = []
+        for i in range(n_samples):
+            # Sample conditioning values from marginal
+            cond_samples = predictive_sample(
+                s_keys[i], state, data, given_cols, n_samples=1
+            )
+            cond_vals = cond_samples[0]
+
+            # Sample target given conditions
+            k1, k2 = jax.random.split(jax.random.fold_in(s_keys[i], 999))
+            target_samples = predictive_sample(
+                k1, state, data, [target_col],
+                condition_cols=given_cols, condition_vals=cond_vals, n_samples=1
+            )
+            target_val = target_samples[0, 0]
+
+            # Evaluate log prob
+            log_p = predictive_probability(
+                state, data, [target_col], jnp.array([target_val]),
+                condition_cols=given_cols, condition_vals=cond_vals
+            )
+            log_ps.append(float(log_p))
+
+        entropy_estimates.append(-jnp.mean(jnp.array(log_ps)))
+
+    return jnp.mean(jnp.array(entropy_estimates))
