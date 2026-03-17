@@ -566,3 +566,49 @@ def test_packed_anomaly_score_produces_valid_output(inference_packed_state):
     # Test another row
     score2 = packed_anomaly_score(key, packed, data, query_row=25)
     assert 0.0 <= float(score2) <= 1.0, f"Anomaly score out of range: {score2}"
+
+
+# ---------------------------------------------------------------------------
+# Task 11: Edge case tests
+# ---------------------------------------------------------------------------
+
+
+def test_cluster_budget_exhaustion():
+    """When n_clusters >= max_clusters - 1, new cluster option is excluded."""
+    key = jax.random.key(500)
+    from crosscat.synthetic import generate_crosscat_data
+
+    column_types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
+    result = generate_crosscat_data(key, 20, column_types, n_views=1, n_clusters=2)
+    k2 = jax.random.key(501)
+    state = initialize(k2, result["data"], column_types)
+    packed = pack_state(state, max_clusters=3, max_categories=4)
+    k3 = jax.random.key(502)
+    packed_new = packed_transition_row_assignments_v2(k3, packed, result["data"])
+    recovered = unpack_state(packed_new, column_types)
+    max_c = 3
+    for view in recovered.views:
+        assert int(jnp.max(view.row_assignments)) < max_c
+
+
+def test_mixed_column_types_full_sweep():
+    """Full sweep with all 5 column types produces valid state."""
+    key = jax.random.key(600)
+    from crosscat.synthetic import generate_crosscat_data
+
+    column_types = [
+        ColumnType.CONTINUOUS,
+        ColumnType.CATEGORICAL,
+        ColumnType.BINARY,
+        ColumnType.ORDINAL,
+        ColumnType.CYCLIC,
+    ]
+    result = generate_crosscat_data(key, 50, column_types, n_views=2, n_clusters=2)
+    k2 = jax.random.key(601)
+    state = initialize(k2, result["data"], column_types)
+    packed = pack_state(state)
+    k3 = jax.random.key(602)
+    packed_new = packed_gibbs_sweep_v2(k3, packed, result["data"], n_sweeps=2)
+    recovered = unpack_state(packed_new, column_types)
+    errors = validate_state(recovered, result["data"])
+    assert errors == [], f"Validation errors: {errors}"
