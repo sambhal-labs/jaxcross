@@ -645,12 +645,12 @@ def transition_column_hypers(
                     local_idx_j = li
                     break
 
-            def _score_hypers(test_hypers):
+            def _score_hypers(test_hypers, _view=view, _local_idx=local_idx_j):
                 log_score = jnp.array(0.0)
-                n_clusters = len(view.suffstats)
+                n_clusters = len(_view.suffstats)
                 for c in range(n_clusters):
-                    if local_idx_j is not None:
-                        ss = view.suffstats[c][local_idx_j]
+                    if _local_idx is not None:
+                        ss = _view.suffstats[c][_local_idx]
                         log_score = log_score + NormalGamma.log_marginal_likelihood(
                             ss, test_hypers
                         )
@@ -900,7 +900,7 @@ def gibbs_sweep(
         "crp_alphas": transition_crp_alphas,
     }
 
-    for sweep in range(n_sweeps):
+    for _sweep in range(n_sweeps):
         for kernel_name in kernels:
             rng_key, subkey = jax.random.split(rng_key)
             if kernel_name == "crp_alphas":

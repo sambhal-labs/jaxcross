@@ -84,7 +84,7 @@ def ensure_col_dep_constraints(
     Returns:
         State satisfying constraints, or None if not found.
     """
-    for attempt in range(max_rejections):
+    for _attempt in range(max_rejections):
         rng_key, subkey = jax.random.split(rng_key)
         state = gibbs_sweep(subkey, state, data, n_sweeps=n_sweeps_per_attempt)
 
@@ -152,7 +152,7 @@ def ensure_row_dep_constraint(
     Returns:
         State satisfying constraint, or None.
     """
-    for attempt in range(max_iterations):
+    for _attempt in range(max_iterations):
         rng_key, subkey = jax.random.split(rng_key)
         state = gibbs_sweep(
             subkey, state, data,
