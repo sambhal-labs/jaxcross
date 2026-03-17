@@ -16,6 +16,7 @@ from crosscat.packed_state import (
     _score_row_all_clusters,
     _score_row_all_clusters_v2,
     pack_state,
+    packed_gibbs_sweep_v2,
     packed_transition_column_hypers_v2,
     packed_transition_crp_alphas_v2,
     packed_transition_row_assignments_v2,
@@ -264,3 +265,60 @@ def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
     assert jnp.all(
         jnp.isfinite(packed_new.view_row_crp_alpha)
     ), "view CRP alphas not finite after JIT"
+
+
+# ---------------------------------------------------------------------------
+# Task 7: packed_gibbs_sweep_v2 tests
+# ---------------------------------------------------------------------------
+
+
+def test_full_packed_sweep_v2_valid(mixed_packed_state):
+    """packed_gibbs_sweep_v2 produces a valid unpacked state after 2 sweeps."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(501)
+    packed_new = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=2)
+
+    recovered = unpack_state(packed_new, column_types)
+    errors = validate_state(recovered, data)
+    assert errors == [], f"Validation errors after sweep: {errors}"
+    lj = float(log_joint(recovered, data))
+    assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after sweep: {lj}"
+
+
+def test_packed_sweep_v2_deterministic(mixed_packed_state):
+    """packed_gibbs_sweep_v2 with same key gives same result."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(502)
+
+    result1 = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=1)
+    result2 = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=1)
+
+    # Row assignments should be identical
+    assert jnp.array_equal(
+        result1.view_row_assignments, result2.view_row_assignments
+    ), "Row assignments differ between identical runs"
+    # Hyperparameters should be identical
+    assert jnp.allclose(result1.hyper_mu, result2.hyper_mu), "hyper_mu differs"
+    assert jnp.allclose(result1.hyper_s, result2.hyper_s), "hyper_s differs"
+    # CRP alphas should be identical
+    assert jnp.allclose(
+        result1.column_crp_alpha, result2.column_crp_alpha
+    ), "column_crp_alpha differs"
+    assert jnp.allclose(
+        result1.view_row_crp_alpha, result2.view_row_crp_alpha
+    ), "view_row_crp_alpha differs"
+
+
+def test_packed_sweep_v2_jit_compiles(mixed_packed_state):
+    """packed_gibbs_sweep_v2 works under jax.jit with n_sweeps=1."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(503)
+
+    jitted_fn = jax.jit(packed_gibbs_sweep_v2)
+    packed_new = jitted_fn(key, packed, data)
+
+    recovered = unpack_state(packed_new, column_types)
+    errors = validate_state(recovered, data)
+    assert errors == [], f"Validation errors after JIT sweep: {errors}"
+    lj = float(log_joint(recovered, data))
+    assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT sweep: {lj}"
