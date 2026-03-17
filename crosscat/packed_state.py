@@ -1972,3 +1972,44 @@ def packed_gibbs_sweep(
             packed = kernel_map[kernel_name](subkey, packed, data)
 
     return packed
+
+
+# ---------------------------------------------------------------------------
+# Packed Gibbs sweep v2 (JIT-compatible via lax.scan)
+# ---------------------------------------------------------------------------
+
+
+def packed_gibbs_sweep_v2(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    *,
+    n_sweeps: int = 1,
+) -> PackedCrossCatState:
+    """Run full Gibbs sweeps using v2 kernels, JIT-compatible via lax.scan.
+
+    Each sweep runs:
+      1. Row assignments (packed_transition_row_assignments_v2)
+      2. Column hyperparameters (packed_transition_column_hypers_v2)
+      3. CRP alphas (packed_transition_crp_alphas_v2)
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+        n_sweeps: Number of full Gibbs sweeps (static int for lax.scan).
+
+    Returns:
+        Updated PackedCrossCatState after n_sweeps sweeps.
+    """
+
+    def one_sweep(carry, _):
+        state, rng = carry
+        k1, k2, k3, rng = jax.random.split(rng, 4)
+        state = packed_transition_row_assignments_v2(k1, state, data)
+        state = packed_transition_column_hypers_v2(k2, state, data)
+        state = packed_transition_crp_alphas_v2(k3, state)
+        return (state, rng), None
+
+    (result, _), _ = jax.lax.scan(one_sweep, (packed, rng_key), jnp.arange(n_sweeps))
+    return result
