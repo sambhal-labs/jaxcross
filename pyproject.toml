@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jax-crosscat"
-version = "0.1.0"
+version = "0.2.0"
 description = "GPU-accelerated nonparametric cross-categorization in JAX"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = "Apache-2.0"
 authors = [{ name = "jax-crosscat contributors" }]
 keywords = ["bayesian", "crosscat", "dirichlet-process", "jax", "gpu", "gibbs-sampling"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
@@ -30,7 +30,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "pytest-timeout>=2",
     "ruff>=0.5",
+    "mypy>=1.10",
+]
+coverage = [
+    "pytest-cov>=5",
 ]
 
 [project.urls]
@@ -46,7 +51,14 @@ target-version = "py311"
 line-length = 99
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "UP"]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+ignore = ["B028"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
