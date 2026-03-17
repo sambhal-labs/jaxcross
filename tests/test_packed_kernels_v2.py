@@ -17,6 +17,7 @@ from crosscat.packed_state import (
     _score_row_all_clusters_v2,
     pack_state,
     packed_transition_column_hypers_v2,
+    packed_transition_crp_alphas_v2,
     packed_transition_row_assignments_v2,
     unpack_state,
 )
@@ -225,3 +226,41 @@ def test_vmap_column_hypers_jit_compiles(mixed_packed_state):
     assert jnp.all(jnp.isfinite(packed_new.hyper_s)), "hyper_s non-finite after JIT"
     assert jnp.all(jnp.isfinite(packed_new.hyper_nu)), "hyper_nu non-finite after JIT"
     assert jnp.all(jnp.isfinite(packed_new.hyper_kappa)), "hyper_kappa non-finite after JIT"
+
+
+# ---------------------------------------------------------------------------
+# Task 6: vmap CRP alpha kernel tests
+# ---------------------------------------------------------------------------
+
+
+def test_vmap_crp_alphas_produces_valid_values(mixed_packed_state):
+    """packed_transition_crp_alphas_v2 produces positive alpha values."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(401)
+    packed_new = packed_transition_crp_alphas_v2(key, packed)
+
+    # Column CRP alpha should be positive and finite
+    assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite"
+    assert packed_new.column_crp_alpha > 0, "column_crp_alpha should be positive"
+
+    # View CRP alphas should be positive and finite for active views
+    n_views = int(packed.n_views)
+    for v in range(n_views):
+        alpha_v = packed_new.view_row_crp_alpha[v]
+        assert jnp.isfinite(alpha_v), f"view {v} CRP alpha not finite"
+        assert alpha_v > 0, f"view {v} CRP alpha should be positive"
+
+
+def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
+    """packed_transition_crp_alphas_v2 works under jax.jit."""
+    packed, data, column_types = mixed_packed_state
+    key = jax.random.key(402)
+
+    jitted_fn = jax.jit(packed_transition_crp_alphas_v2)
+    packed_new = jitted_fn(key, packed)
+
+    assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite after JIT"
+    assert packed_new.column_crp_alpha > 0, "column_crp_alpha not positive after JIT"
+    assert jnp.all(
+        jnp.isfinite(packed_new.view_row_crp_alpha)
+    ), "view CRP alphas not finite after JIT"
