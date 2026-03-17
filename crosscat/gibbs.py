@@ -26,7 +26,6 @@ from crosscat.components import (
     NormalGamma,
     OrderedLogistic,
     VonMises,
-    _filter_nan,
 )
 from crosscat.model import _compute_suffstats_for_view, _crp_sample, _log_crp
 from crosscat.types import (
@@ -660,7 +659,9 @@ def transition_column_hypers(
             # Sample s
             log_scores_s = jnp.array([
                 _score_hypers(
-                    ColumnHypers(column_type=col_type, mu=hypers.mu, r=hypers.r, s=sv, nu=hypers.nu)
+                    ColumnHypers(
+                        column_type=col_type, mu=hypers.mu, r=hypers.r, s=sv, nu=hypers.nu
+                    )
                 )
                 for sv in s_grid
             ])

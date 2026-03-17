@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from crosscat.types import ColumnType, ColumnHypers, SufficientStats
+from crosscat.types import ColumnHypers, ColumnType
 
 
 @pytest.fixture
@@ -89,7 +89,9 @@ class TestVonMises:
 
         data = jnp.array([0.1, 0.2, 0.3, 0.15])
         ss = VonMises.sufficient_statistics(data)
-        hypers = ColumnHypers(column_type=ColumnType.CYCLIC, kappa=jnp.array(2.0), vm_mu=jnp.array(0.0))
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC, kappa=jnp.array(2.0), vm_mu=jnp.array(0.0)
+        )
         lml = VonMises.log_marginal_likelihood(ss, hypers)
         assert jnp.isfinite(lml)
 
@@ -98,7 +100,9 @@ class TestVonMises:
 
         data = jnp.array([0.1, 0.2, 0.3])
         ss = VonMises.sufficient_statistics(data)
-        hypers = ColumnHypers(column_type=ColumnType.CYCLIC, kappa=jnp.array(2.0), vm_mu=jnp.array(0.0))
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC, kappa=jnp.array(2.0), vm_mu=jnp.array(0.0)
+        )
         log_p = VonMises.posterior_predictive_logp(jnp.array(0.15), ss, hypers)
         assert jnp.isfinite(log_p)
 
@@ -107,7 +111,9 @@ class TestVonMises:
 
         data = jnp.array([0.1, 0.2, 0.3])
         ss = VonMises.sufficient_statistics(data)
-        hypers = ColumnHypers(column_type=ColumnType.CYCLIC, kappa=jnp.array(5.0), vm_mu=jnp.array(0.2))
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC, kappa=jnp.array(5.0), vm_mu=jnp.array(0.2)
+        )
         samples = VonMises.sample_posterior_predictive(rng_key, ss, hypers, n=100)
         assert samples.shape == (100,)
         # All samples should be in [0, 2*pi)
@@ -253,7 +259,7 @@ class TestRowInsertion:
 
 class TestJointPredictiveProb:
     def test_chain_rule(self, simple_state):
-        from crosscat.inference import joint_predictive_probability, predictive_probability
+        from crosscat.inference import joint_predictive_probability
 
         state, data, _ = simple_state
         # Joint probability of two query values

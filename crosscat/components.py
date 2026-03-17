@@ -594,7 +594,6 @@ class VonMises:
 
         Approximation using posterior mean direction and concentration.
         """
-        n = suffstats.count.astype(jnp.float32)
         kappa = hypers.kappa
 
         # Posterior mean direction
