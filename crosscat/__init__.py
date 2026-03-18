@@ -25,6 +25,14 @@ from crosscat.packed_inference import (
     packed_predictive_sample,
     packed_row_similarity,
 )
+from crosscat.serialization import (
+    load_latest_checkpoint,
+    load_packed_state,
+    load_state,
+    save_checkpoint,
+    save_packed_state,
+    save_state,
+)
 from crosscat.types import (
     ColumnHypers,
     ColumnType,
@@ -42,6 +50,9 @@ __all__ = [
     "ViewState",
     "gibbs_sweep",
     "initialize",
+    "load_latest_checkpoint",
+    "load_packed_state",
+    "load_state",
     "insert_rows",
     "log_joint",
     "mutual_information",
@@ -56,6 +67,9 @@ __all__ = [
     "packed_row_similarity",
     "packed_transition_column_assignments",
     "predictive_probability",
+    "save_checkpoint",
+    "save_packed_state",
+    "save_state",
     "predictive_sample",
     "unpack_state",
 ]

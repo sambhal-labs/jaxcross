@@ -37,6 +37,11 @@ dev = [
 coverage = [
     "pytest-cov>=5",
 ]
+dashboard = [
+    "streamlit>=1.30",
+    "plotly>=5.18",
+    "pandas>=2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/sambhal-labs/jaxcross"
