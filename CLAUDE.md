@@ -45,6 +45,14 @@ The package is `crosscat/` with these core modules:
 
 - **inference.py** — Posterior predictive queries: `predictive_probability()`, `predictive_sample()`, `predictive_cdf()`, `mutual_information()`, `impute_and_confidence()`, `anomaly_score()`, `row_similarity()`, `sample_and_insert()`.
 
+- **packed/** — JIT-compatible packed state sub-package:
+  - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`
+  - `components.py` — unified scoring (log marginal, posterior predictive) via `jnp.where` type dispatch
+  - `suffstats.py` — vectorized sufficient statistics (matrix ops, incremental add/remove)
+  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas) via `lax.scan`/`vmap`
+
+- **packed_inference.py** — Vectorized inference queries on packed state (predictive, MI, anomaly, similarity).
+
 - **constraints.py** — Enforces column/row dependency constraints during inference.
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, etc.).
 - **data_utils.py** — CSV I/O and column type detection.
