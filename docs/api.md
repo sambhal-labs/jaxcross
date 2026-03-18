@@ -257,6 +257,56 @@ Sample CRP concentration parameters (row and column) using `vmap` over a log-spa
 
 **Returns**: Updated `PackedCrossCatState`.
 
+### `packed_log_joint(packed, data)`
+
+JIT-compatible log-joint probability on packed state. Computes CRP priors + data log-marginal likelihoods + Exp(1) alpha priors.
+
+**Returns**: Scalar log probability.
+
+---
+
+## Multi-Chain Inference (`crosscat.packed`)
+
+Run multiple chains in parallel via `jax.vmap` for GPU-accelerated multi-chain inference.
+
+### `multi_chain_packed_gibbs_sweep(rng_key, packed_list, data, *, n_sweeps=1)`
+
+Run `packed_gibbs_sweep` across N chains in parallel. Batches the states, vmaps the sweep, and scores each chain.
+
+**Returns**: `(batched_result, log_joint_scores)` where scores is `(n_chains,)`.
+
+### `batch_packed_states(packed_list)`
+
+Stack N `PackedCrossCatState` objects into a single batched pytree with leading `(n_chains,)` dimension.
+
+### `unbatch_packed_states(batched, n_chains)`
+
+Reverse of `batch_packed_states` — extract N individual states.
+
+### `select_best_chain(batched, scores)`
+
+Pick the chain with the highest score from a batched state.
+
+**Example:**
+
+```python
+from crosscat import (
+    initialize, pack_state, multi_chain_packed_gibbs_sweep, select_best_chain
+)
+
+# Initialize 4 chains
+key = jax.random.key(42)
+states = initialize(key, data, column_types, n_chains=4)
+packed_list = [pack_state(s) for s in states]
+
+# Run 50 sweeps in parallel across all chains
+key, subkey = jax.random.split(key)
+batched, scores = multi_chain_packed_gibbs_sweep(subkey, packed_list, data, n_sweeps=50)
+
+# Select best chain
+best = select_best_chain(batched, scores)
+```
+
 ---
 
 ## Packed Inference Queries (`crosscat.packed_inference`)

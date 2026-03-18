@@ -1233,3 +1233,147 @@ def packed_gibbs_sweep(
 
     (result, _), _ = jax.lax.scan(one_sweep, (packed, rng_key), jnp.arange(n_sweeps))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Packed log-joint scoring
+# ---------------------------------------------------------------------------
+
+
+def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
+    """JIT-compatible log-joint probability on packed state.
+
+    Computes: log CRP(columns) + sum_v log CRP(rows_v)
+              + sum_v sum_c sum_col log p(data | suffstats, hypers)
+              - Exp(1) priors on CRP alphas
+    """
+    # --- Column CRP ---
+    col_assigns = packed.column_assignments
+    n_cols = packed.n_cols
+    n_views_val = packed.n_views
+    col_alpha = packed.column_crp_alpha
+
+    # Count columns per view
+    col_counts = jnp.bincount(col_assigns, length=packed.max_views).astype(jnp.float32)
+    # Only active views contribute
+    col_crp = (
+        n_views_val * jnp.log(col_alpha)
+        + jnp.sum(jnp.where(packed.view_mask, gammaln(col_counts), 0.0))
+        - gammaln(n_cols + col_alpha)
+        + gammaln(col_alpha)
+    )
+
+    # --- Row CRP per view (vectorized via vmap) ---
+    def _compute_row_crp(v_idx):
+        row_assigns = packed.view_row_assignments[v_idx]
+        alpha_v = packed.view_row_crp_alpha[v_idx]
+        n_clusters_v = packed.view_n_clusters[v_idx]
+
+        # Count rows per cluster using one-hot
+        one_hot = (jnp.arange(packed.max_clusters)[None, :] == row_assigns[:, None]).astype(
+            jnp.float32
+        )
+        row_counts = jnp.sum(one_hot, axis=0)
+
+        active_mask = jnp.arange(packed.max_clusters) < n_clusters_v
+        crp = (
+            n_clusters_v * jnp.log(alpha_v)
+            + jnp.sum(jnp.where(active_mask, gammaln(jnp.maximum(row_counts, 1.0)), 0.0))
+            - gammaln(packed.n_rows + alpha_v)
+            + gammaln(alpha_v)
+        )
+        return crp
+
+    row_crps = jax.vmap(_compute_row_crp)(jnp.arange(packed.max_views))
+    row_crp_total = jnp.sum(jnp.where(packed.view_mask, row_crps, 0.0))
+
+    # --- Data likelihood: sum over views, clusters, columns ---
+    def _score_one_view(v_idx):
+        n_cols_v = packed.view_n_columns[v_idx]
+        n_clusters_v = packed.view_n_clusters[v_idx]
+
+        def _score_one_cluster_col(c_idx, l_idx):
+            col_idx = packed.view_column_indices[v_idx, l_idx]
+            return unified_log_marginal(
+                packed.col_type_ids[col_idx],
+                packed.ss_counts[v_idx, c_idx, l_idx],
+                packed.ss_sum_x[v_idx, c_idx, l_idx],
+                packed.ss_sum_x_sq[v_idx, c_idx, l_idx],
+                packed.ss_cat_counts[v_idx, c_idx, l_idx],
+                packed.ss_sum_sin[v_idx, c_idx, l_idx],
+                packed.ss_sum_cos[v_idx, c_idx, l_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_mu[col_idx],
+            )
+
+        # vmap over clusters and columns
+        cluster_indices = jnp.arange(packed.max_clusters)
+        col_indices = jnp.arange(packed.max_cols_per_view)
+
+        # Score all (cluster, col) pairs
+        all_scores = jax.vmap(
+            lambda c: jax.vmap(lambda li: _score_one_cluster_col(c, li))(col_indices)
+        )(cluster_indices)  # (max_clusters, max_cols_per_view)
+
+        # Mask: only active clusters and columns
+        cluster_mask = jnp.arange(packed.max_clusters)[:, None] < n_clusters_v
+        col_mask = jnp.arange(packed.max_cols_per_view)[None, :] < n_cols_v
+        mask = cluster_mask & col_mask
+
+        return jnp.sum(jnp.where(mask, all_scores, 0.0))
+
+    view_scores = jax.vmap(_score_one_view)(jnp.arange(packed.max_views))
+    data_ll = jnp.sum(jnp.where(packed.view_mask, view_scores, 0.0))
+
+    # --- Exp(1) priors on CRP alphas ---
+    alpha_prior = -col_alpha - jnp.sum(jnp.where(packed.view_mask, packed.view_row_crp_alpha, 0.0))
+
+    return col_crp + row_crp_total + data_ll + alpha_prior
+
+
+# ---------------------------------------------------------------------------
+# Multi-chain parallel inference via vmap
+# ---------------------------------------------------------------------------
+
+
+def multi_chain_packed_gibbs_sweep(
+    rng_key: Array,
+    packed_list: list[PackedCrossCatState],
+    data: Array,
+    *,
+    n_sweeps: int = 1,
+) -> tuple[PackedCrossCatState, Array]:
+    """Run packed Gibbs sweeps across N chains in parallel via vmap.
+
+    Args:
+        rng_key: PRNG key (will be split into N subkeys).
+        packed_list: List of N PackedCrossCatState (one per chain).
+        data: Shared data matrix (n_rows, n_cols).
+        n_sweeps: Number of sweeps per chain.
+
+    Returns:
+        (batched_result, log_joint_scores) where batched_result has leading
+        (n_chains,) dimension on all arrays, and scores is (n_chains,).
+    """
+    from crosscat.packed.state import batch_packed_states
+
+    n_chains = len(packed_list)
+    batched = batch_packed_states(packed_list)
+    keys = jax.random.split(rng_key, n_chains)
+
+    # vmap sweep across chains (data is broadcast)
+    vmapped_sweep = jax.vmap(lambda k, p: packed_gibbs_sweep(k, p, data, n_sweeps=n_sweeps))
+    batched_result = vmapped_sweep(keys, batched)
+
+    # Score each chain
+    vmapped_score = jax.vmap(lambda p: packed_log_joint(p, data))
+    scores = vmapped_score(batched_result)
+
+    return batched_result, scores
