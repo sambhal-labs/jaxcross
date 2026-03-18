@@ -169,8 +169,9 @@ def pack_state(
     n_rows = state.n_rows
     n_cols = state.n_cols
     n_views = state.n_views
-    max_cols_per_view = max(len(v.column_indices) for v in state.views)
-    max_cols_per_view = max(max_cols_per_view, 1)
+    # Use n_cols as max_cols_per_view to handle worst case where all columns
+    # merge into a single view during column assignment transitions.
+    max_cols_per_view = n_cols
 
     # Column assignments and CRP alpha
     col_assignments = jnp.array(state.column_assignments, dtype=jnp.int32)
@@ -2298,6 +2299,347 @@ def packed_transition_crp_alphas_v2(
 
 
 # ---------------------------------------------------------------------------
+# Column assignment v2 helpers
+# ---------------------------------------------------------------------------
+
+
+def _crp_sample_bounded(
+    rng_key: Array, alpha: Array, n: int, max_clusters: int
+) -> tuple[Array, Array]:
+    """Sample row assignments from CRP, bounded to max_clusters tables.
+
+    Args:
+        rng_key: PRNG key.
+        alpha: CRP concentration (traced scalar).
+        n: Number of items (static int).
+        max_clusters: Maximum number of tables (static int).
+
+    Returns:
+        (assignments, n_tables) — assignments is (n,) int, n_tables is scalar int.
+    """
+
+    def _step(carry, key):
+        counts, n_tables = carry
+        table_probs = jnp.where(
+            jnp.arange(max_clusters) < n_tables, counts, 0.0
+        )
+        can_new = n_tables < max_clusters
+        table_probs = table_probs.at[n_tables].set(
+            jnp.where(can_new, alpha, 0.0)
+        )
+        log_probs = jnp.log(table_probs + 1e-30)
+        chosen = jax.random.categorical(key, log_probs)
+
+        is_new = (chosen == n_tables) & can_new
+        new_n_tables = jnp.where(is_new, n_tables + 1, n_tables)
+        new_counts = counts.at[chosen].add(1.0)
+        return (new_counts, new_n_tables), chosen
+
+    keys = jax.random.split(rng_key, n)
+    init = (
+        jnp.zeros(max_clusters, dtype=jnp.float32),
+        jnp.array(0, dtype=jnp.int32),
+    )
+    (_, n_tables), assignments = jax.lax.scan(_step, init, keys)
+    return assignments, n_tables
+
+
+def _score_column_in_view_v2(
+    data_col: Array,
+    row_assignments: Array,
+    type_id: Array,
+    mu: Array,
+    r: Array,
+    s: Array,
+    nu: Array,
+    dir_alpha: Array,
+    alpha: Array,
+    beta: Array,
+    kappa: Array,
+    vm_mu: Array,
+    max_clusters: int,
+    max_categories: int,
+) -> Array:
+    """Log marginal likelihood of one column's data under a view's clustering.
+
+    Computes per-cluster sufficient statistics via matrix ops, then vmaps
+    unified_log_marginal over clusters.
+
+    Args:
+        data_col: (n_rows,) column data (may contain NaN).
+        row_assignments: (n_rows,) int cluster assignments for this view.
+        type_id: scalar int column type.
+        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu: scalar hypers.
+        max_clusters: static int padding.
+        max_categories: static int padding.
+
+    Returns:
+        Scalar total log marginal likelihood.
+    """
+    valid = ~jnp.isnan(data_col)
+    clean = jnp.where(valid, data_col, 0.0)
+    valid_f = valid.astype(jnp.float32)
+
+    # Membership matrix: (n_rows, max_clusters)
+    membership = (
+        row_assignments[:, None] == jnp.arange(max_clusters)[None, :]
+    ).astype(jnp.float32)
+
+    # Per-cluster sufficient statistics for this single column
+    counts = (membership.T @ valid_f).astype(jnp.int32)  # (max_clusters,)
+    sum_x = membership.T @ (clean * valid_f)  # (max_clusters,)
+    sum_x_sq = membership.T @ (clean**2 * valid_f)  # (max_clusters,)
+    sum_sin = membership.T @ jnp.where(valid, jnp.sin(data_col), 0.0)
+    sum_cos = membership.T @ jnp.where(valid, jnp.cos(data_col), 0.0)
+
+    # Category counts: (max_clusters, max_categories)
+    int_data = jnp.where(valid, clean.astype(jnp.int32), 0)
+    one_hot = jax.nn.one_hot(int_data, max_categories)  # (n_rows, max_cats)
+    cat_counts = membership.T @ (one_hot * valid_f[:, None])  # (max_clusters, max_cats)
+
+    # vmap unified_log_marginal over clusters
+    def score_one_cluster(cnt, sx, sxsq, cc, ssin, scos):
+        return unified_log_marginal(
+            type_id, cnt, sx, sxsq, cc, ssin, scos,
+            mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu,
+        )
+
+    log_mls = jax.vmap(score_one_cluster)(
+        counts, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos
+    )  # (max_clusters,)
+
+    # Only sum contributions from clusters with data
+    return jnp.sum(jnp.where(counts > 0, log_mls, 0.0))
+
+
+# ---------------------------------------------------------------------------
+# Packed column assignment v2 kernel
+# ---------------------------------------------------------------------------
+
+
+def packed_transition_column_assignments_v2(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+) -> PackedCrossCatState:
+    """Gibbs sweep over column-to-view assignments (outer DP), JIT-compatible.
+
+    Uses lax.scan over columns. For each column j:
+      1. Remove j from its current view (decrement count).
+      2. Score each existing view: CRP prior + log marginal likelihood.
+      3. Propose a new singleton view with CRP-sampled row assignments.
+      4. Sample new assignment from categorical.
+      5. Update column_assignments and view metadata.
+
+    After the scan, rebuilds view_column_indices and recomputes all suffstats.
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+
+    Returns:
+        Updated PackedCrossCatState with new column assignments.
+    """
+    n_rows = packed.n_rows
+    n_cols = packed.n_cols
+    max_views = packed.max_views
+    max_clusters = packed.max_clusters
+    max_cats = packed.max_categories
+    max_cpv = packed.max_cols_per_view
+
+    def scan_one_col(carry, j):
+        (col_assigns, view_mask, view_n_cols, view_row_assigns,
+         view_n_clusters, view_row_crp_alpha, rng) = carry
+
+        k_crp, k_cat, rng = jax.random.split(rng, 3)
+
+        old_view = col_assigns[j]
+        data_col = data[:, j]
+        type_id = packed.col_type_ids[j]
+
+        # Hyperparameters for column j
+        h_mu = packed.hyper_mu[j]
+        h_r = packed.hyper_r[j]
+        h_s = packed.hyper_s[j]
+        h_nu = packed.hyper_nu[j]
+        h_dir = packed.hyper_dirichlet_alpha[j]
+        h_a = packed.hyper_alpha[j]
+        h_b = packed.hyper_beta[j]
+        h_k = packed.hyper_kappa[j]
+        h_vm = packed.hyper_vm_mu[j]
+
+        # Column counts per view, excluding column j
+        counts_excl = view_n_cols.at[old_view].add(-1)
+
+        # --- Score existing views ---
+        # CRP prior: log(count_v) for views with columns, -inf otherwise
+        log_prior = jnp.log(jnp.maximum(counts_excl.astype(jnp.float32), 1e-30))
+        log_prior = jnp.where((counts_excl > 0) & view_mask, log_prior, -jnp.inf)
+
+        # Likelihood: vmap _score_column_in_view_v2 over views
+        def score_in_view(row_assigns_v):
+            return _score_column_in_view_v2(
+                data_col, row_assigns_v, type_id,
+                h_mu, h_r, h_s, h_nu, h_dir, h_a, h_b, h_k, h_vm,
+                max_clusters, max_cats,
+            )
+
+        log_lik = jax.vmap(score_in_view)(view_row_assigns)  # (max_views,)
+        log_lik = jnp.where(view_mask & (counts_excl > 0), log_lik, -jnp.inf)
+
+        log_scores_existing = log_prior + log_lik  # (max_views,)
+
+        # --- Score new view proposal ---
+        log_prior_new = jnp.log(packed.column_crp_alpha)
+        # Sample CRP row assignments for the proposed new view
+        # Use the mean row CRP alpha from active views
+        mean_crp_alpha = jnp.where(
+            jnp.sum(view_mask) > 0,
+            jnp.sum(view_row_crp_alpha * view_mask) / jnp.maximum(jnp.sum(view_mask), 1.0),
+            jnp.array(1.0),
+        )
+        new_row_assigns, new_n_clusters = _crp_sample_bounded(
+            k_crp, mean_crp_alpha, n_rows, max_clusters,
+        )
+        log_lik_new = _score_column_in_view_v2(
+            data_col, new_row_assigns, type_id,
+            h_mu, h_r, h_s, h_nu, h_dir, h_a, h_b, h_k, h_vm,
+            max_clusters, max_cats,
+        )
+        log_score_new = log_prior_new + log_lik_new
+
+        # --- Sample assignment ---
+        all_scores = jnp.concatenate([log_scores_existing, log_score_new[None]])
+        all_scores = all_scores - jnp.max(all_scores)  # numerical stability
+        chosen = jax.random.categorical(k_cat, all_scores)
+
+        is_new_view = chosen == max_views
+
+        # Find first inactive slot for new view
+        # Use large index for active slots so argmin picks inactive
+        slot_priority = jnp.where(view_mask, max_views + 1, jnp.arange(max_views))
+        new_slot = jnp.argmin(slot_priority).astype(jnp.int32)
+
+        actual_view = jnp.where(is_new_view, new_slot, chosen)
+
+        # Update column assignments
+        new_col_assigns = col_assigns.at[j].set(actual_view)
+
+        # Update view_n_cols: excl already has old_view decremented, now add to actual_view
+        new_view_n_cols = counts_excl.at[actual_view].add(1)
+
+        # Update view_mask: activate new slot if needed
+        new_view_mask = jnp.where(
+            is_new_view,
+            view_mask.at[new_slot].set(True),
+            view_mask,
+        )
+        # Deactivate old view if it became empty
+        old_view_empty = counts_excl[old_view] == 0
+        new_view_mask = jnp.where(
+            old_view_empty,
+            new_view_mask.at[old_view].set(False),
+            new_view_mask,
+        )
+
+        # Store new view's row assignments if creating a new view
+        new_view_row_assigns = jnp.where(
+            is_new_view,
+            view_row_assigns.at[new_slot].set(new_row_assigns),
+            view_row_assigns,
+        )
+        new_view_n_clusters = jnp.where(
+            is_new_view,
+            view_n_clusters.at[new_slot].set(new_n_clusters),
+            view_n_clusters,
+        )
+        new_view_row_crp_alpha = jnp.where(
+            is_new_view,
+            view_row_crp_alpha.at[new_slot].set(mean_crp_alpha),
+            view_row_crp_alpha,
+        )
+
+        new_carry = (
+            new_col_assigns, new_view_mask, new_view_n_cols,
+            new_view_row_assigns, new_view_n_clusters,
+            new_view_row_crp_alpha, rng,
+        )
+        return new_carry, None
+
+    init_carry = (
+        packed.column_assignments,
+        packed.view_mask,
+        packed.view_n_columns,
+        packed.view_row_assignments,
+        packed.view_n_clusters,
+        packed.view_row_crp_alpha,
+        rng_key,
+    )
+
+    (col_assigns, view_mask, view_n_cols, view_row_assigns,
+     view_n_clusters, view_row_crp_alpha, _), _ = jax.lax.scan(
+        scan_one_col, init_carry, jnp.arange(n_cols),
+    )
+
+    n_views = jnp.sum(view_mask.astype(jnp.int32))
+
+    # --- Compact view indices to 0..n_views-1 ---
+    # Build a permutation that moves active views to the front.
+    # Active slots get low sort keys, inactive slots get high sort keys.
+    sort_key = jnp.where(view_mask, jnp.arange(max_views), max_views + jnp.arange(max_views))
+    perm = jnp.argsort(sort_key)  # old_idx -> position in sorted order
+    # Inverse: for each old view index, what's its new contiguous index?
+    inv_perm = jnp.zeros(max_views, dtype=jnp.int32)
+    inv_perm = inv_perm.at[perm].set(jnp.arange(max_views, dtype=jnp.int32))
+
+    # Remap column assignments
+    compact_col_assigns = inv_perm[col_assigns]
+
+    # Reorder view arrays using perm (gather active views to front)
+    compact_view_mask = view_mask[perm]
+    compact_view_n_cols = view_n_cols[perm]
+    compact_view_row_assigns = view_row_assigns[perm]
+    compact_view_n_clusters = view_n_clusters[perm]
+    compact_view_row_crp_alpha = view_row_crp_alpha[perm]
+
+    # Rebuild view_column_indices from compacted column_assignments
+    def build_view_col_indices(v):
+        is_in_view = compact_col_assigns == v  # (n_cols,)
+        indices = jnp.where(is_in_view, jnp.arange(n_cols), n_cols)
+        sorted_indices = jnp.sort(indices)
+        result = sorted_indices[:max_cpv]
+        return jnp.where(result < n_cols, result, -1).astype(jnp.int32)
+
+    new_view_col_indices = jax.vmap(build_view_col_indices)(
+        jnp.arange(max_views)
+    )  # (max_views, max_cpv)
+
+    # Build updated state (suffstats will be recomputed)
+    new_packed = PackedCrossCatState(
+        **{
+            name: (
+                compact_col_assigns if name == "column_assignments"
+                else packed.column_crp_alpha if name == "column_crp_alpha"
+                else n_views if name == "n_views"
+                else compact_view_mask if name == "view_mask"
+                else new_view_col_indices if name == "view_column_indices"
+                else compact_view_n_cols if name == "view_n_columns"
+                else compact_view_row_assigns if name == "view_row_assignments"
+                else compact_view_n_clusters if name == "view_n_clusters"
+                else compact_view_row_crp_alpha if name == "view_row_crp_alpha"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+
+    # Recompute all sufficient statistics from scratch
+    return recompute_all_suffstats(new_packed, data)
+
+
+# ---------------------------------------------------------------------------
 # Packed Gibbs sweep
 # ---------------------------------------------------------------------------
 
@@ -2310,10 +2652,9 @@ def packed_gibbs_sweep(
     n_sweeps: int = 1,
     kernels: tuple[str, ...] = ("row_assignments", "column_hypers", "crp_alphas"),
 ) -> PackedCrossCatState:
-    """Run Gibbs sweeps on packed state.
+    """Run Gibbs sweeps on packed state (v1, Python for-loops).
 
-    Note: column_assignments kernel is not yet packed — use the unpacked
-    path for that via the wrapper in gibbs.py.
+    For JIT-compatible sweeps with column assignments, use packed_gibbs_sweep_v2.
     """
     kernel_map = {
         "row_assignments": lambda k, p, d: packed_transition_row_assignments(k, p, d),
@@ -2347,8 +2688,9 @@ def packed_gibbs_sweep_v2(
 
     Each sweep runs:
       1. Row assignments (packed_transition_row_assignments_v2)
-      2. Column hyperparameters (packed_transition_column_hypers_v2)
-      3. CRP alphas (packed_transition_crp_alphas_v2)
+      2. Column assignments (packed_transition_column_assignments_v2)
+      3. Column hyperparameters (packed_transition_column_hypers_v2)
+      4. CRP alphas (packed_transition_crp_alphas_v2)
 
     Args:
         rng_key: PRNG key.
@@ -2362,10 +2704,11 @@ def packed_gibbs_sweep_v2(
 
     def one_sweep(carry, _):
         state, rng = carry
-        k1, k2, k3, rng = jax.random.split(rng, 4)
+        k1, k2, k3, k4, rng = jax.random.split(rng, 5)
         state = packed_transition_row_assignments_v2(k1, state, data)
-        state = packed_transition_column_hypers_v2(k2, state, data)
-        state = packed_transition_crp_alphas_v2(k3, state)
+        state = packed_transition_column_assignments_v2(k2, state, data)
+        state = packed_transition_column_hypers_v2(k3, state, data)
+        state = packed_transition_crp_alphas_v2(k4, state)
         return (state, rng), None
 
     (result, _), _ = jax.lax.scan(one_sweep, (packed, rng_key), jnp.arange(n_sweeps))
