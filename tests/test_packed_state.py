@@ -16,7 +16,7 @@ import pytest
 
 from crosscat.gibbs import gibbs_sweep
 from crosscat.model import _compute_suffstats_for_view, initialize, log_joint
-from crosscat.packed_state import (
+from crosscat.packed import (
     compute_suffstats_vectorized,
     pack_state,
     packed_gibbs_sweep,
