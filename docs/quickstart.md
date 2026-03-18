@@ -222,7 +222,8 @@ key, subkey = jax.random.split(key)
 packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=100)
 
 # Convert back to CrossCatState for queries
-state = unpack_state(packed, column_types)
+# Pass data= for exact suffstats fidelity (recommended)
+state = unpack_state(packed, column_types, data=data)
 ```
 
 You can also run packed inference queries directly without unpacking:
