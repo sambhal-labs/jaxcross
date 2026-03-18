@@ -362,7 +362,9 @@ pre-commit install
 - [x] `jax.vmap` over rows/columns in all packed kernels
 - [x] Column assignment kernel (outer DP Gibbs)
 - [x] GPU benchmark suite (`notebooks/gpu_benchmark.ipynb`)
-- [ ] Interactive visualization dashboard
+- [x] Interactive visualization dashboard (`dashboard/`)
+- [x] State serialization (save/load/checkpoint)
+- [x] Parallel multi-chain inference via `jax.vmap`
 - [ ] PyPI release
 
 ## References
