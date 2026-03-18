@@ -14,6 +14,7 @@ from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from crosscat.packed.state import (
     _ARRAY_FIELDS,
@@ -152,11 +153,13 @@ def save_state(state: CrossCatState, path: str | Path) -> Path:
     return result
 
 
-def load_state(path: str | Path) -> CrossCatState:
+def load_state(path: str | Path, data: Array | None = None) -> CrossCatState:
     """Load a CrossCatState from disk.
 
     Args:
         path: Directory path (with or without ``.jxc`` suffix).
+        data: Optional data matrix. When provided, sufficient statistics are
+            recomputed from data for exact fidelity (recommended).
 
     Returns:
         The reconstructed CrossCatState.
@@ -171,7 +174,7 @@ def load_state(path: str | Path) -> CrossCatState:
             "Cannot load CrossCatState: column_types not found in metadata. "
             "Use load_packed_state() instead and provide column_types manually."
         )
-    return unpack_state(packed, column_types)
+    return unpack_state(packed, column_types, data=data)
 
 
 # ---------------------------------------------------------------------------

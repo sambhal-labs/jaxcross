@@ -297,12 +297,17 @@ def pack_state(
 def unpack_state(
     packed: PackedCrossCatState,
     column_types: list[ColumnType],
+    data: Array | None = None,
 ) -> CrossCatState:
     """Convert a PackedCrossCatState back into a CrossCatState.
 
     Args:
         packed: Packed state.
         column_types: Column type list (not stored in packed state).
+        data: Optional data matrix. When provided, sufficient statistics are
+            recomputed from the data and row assignments instead of being
+            unpacked from the padded arrays. This eliminates floating-point
+            precision loss from the pack/unpack roundtrip.
 
     Returns:
         Standard CrossCatState with Python lists.
@@ -393,7 +398,7 @@ def unpack_state(
             )
         )
 
-    return CrossCatState(
+    state = CrossCatState(
         column_assignments=packed.column_assignments,
         column_crp_alpha=packed.column_crp_alpha,
         column_hypers=col_hypers,
@@ -402,3 +407,15 @@ def unpack_state(
         n_rows=n_rows,
         n_cols=n_cols,
     )
+
+    # Recompute suffstats from data if provided (eliminates precision loss)
+    if data is not None:
+        from crosscat.model import _compute_suffstats_for_view
+
+        for view in state.views:
+            n_clusters = len(view.suffstats)
+            view.suffstats = _compute_suffstats_for_view(
+                data, view.column_indices, column_types, view.row_assignments, n_clusters
+            )
+
+    return state
