@@ -180,7 +180,8 @@ flowchart LR
 | [`model.py`](crosscat/model.py) | `initialize()`, `log_joint()`, `insert_rows()` |
 | [`gibbs.py`](crosscat/gibbs.py) | MCMC kernels: row/column assignments, hyperparameters, CRP alphas, `gibbs_sweep()` |
 | [`inference.py`](crosscat/inference.py) | Queries: `predictive_probability()`, `predictive_sample()`, `mutual_information()`, `anomaly_score()`, `impute_and_confidence()`, `row_similarity()` |
-| [`packed_state.py`](crosscat/packed_state.py) | JIT-compatible padded state with vectorized kernels |
+| [`packed/`](crosscat/packed/) | JIT-compatible padded state with vectorized kernels (`state.py`, `components.py`, `suffstats.py`, `kernels.py`) |
+| [`packed_inference.py`](crosscat/packed_inference.py) | Vectorized inference queries on packed state |
 | [`constraints.py`](crosscat/constraints.py) | Column/row dependency constraint enforcement |
 | [`diagnostics.py`](crosscat/diagnostics.py) | ARI, convergence metrics, held-out likelihood |
 | [`synthetic.py`](crosscat/synthetic.py) | Synthetic data generation for testing |
@@ -282,19 +283,30 @@ metrics = collect_diagnostics(state, data)
 
 ## Performance
 
-The `packed_state` module provides a JIT-compatible representation using padded fixed-size arrays. All Python-level branching on column types is replaced with `jnp.where` dispatch, enabling full XLA compilation:
+The `crosscat.packed` sub-package provides a JIT-compatible representation using padded fixed-size arrays. All Python-level branching on column types is replaced with `jnp.where` dispatch, enabling full XLA compilation via `jax.lax.scan` and `jax.vmap`:
 
 ```python
-from crosscat.packed_state import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
 # Convert to packed representation
 packed = pack_state(state, max_views=16, max_clusters=32)
 
-# Run inference on packed state
+# Run JIT-compiled inference (all 4 kernels per sweep)
 packed = packed_gibbs_sweep(key, packed, data, n_sweeps=100)
 
 # Convert back
 state = unpack_state(packed, column_types)
+```
+
+Individual kernels are also available for fine-grained control:
+
+```python
+from crosscat.packed import (
+    packed_transition_row_assignments,
+    packed_transition_column_assignments,
+    packed_transition_column_hypers,
+    packed_transition_crp_alphas,
+)
 ```
 
 Run the benchmark to compare:
@@ -315,7 +327,7 @@ pytest
 pytest tests/test_packed_state.py -v
 ```
 
-**Test coverage**: 55 fast tests + 31 slow integration tests covering all 5 column types, missing data, convergence diagnostics, anomaly detection, mutual information, constraints, and row similarity.
+**Test coverage**: 79 fast tests + 31 slow integration tests covering all 5 column types, missing data, convergence diagnostics, anomaly detection, mutual information, constraints, row similarity, and packed kernel correctness.
 
 ## Development
 
@@ -345,10 +357,11 @@ pre-commit install
 - [x] Full feature parity with probcomp/crosscat
 - [x] Five conjugate component models
 - [x] Packed state with vectorized kernels
-- [x] Integration test suite (30 tests)
-- [ ] Full JIT compilation of Gibbs sweep via `jax.lax.scan`
-- [ ] `jax.vmap` over rows in row assignment kernel
-- [ ] GPU benchmark suite
+- [x] Integration test suite (30+ tests)
+- [x] Full JIT compilation of Gibbs sweep via `jax.lax.scan`
+- [x] `jax.vmap` over rows/columns in all packed kernels
+- [x] Column assignment kernel (outer DP Gibbs)
+- [x] GPU benchmark suite (`notebooks/gpu_benchmark.ipynb`)
 - [ ] Interactive visualization dashboard
 - [ ] PyPI release
 
