@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from crosscat.packed_state import (
+from crosscat.packed import (
     PackedCrossCatState,
     unified_posterior_predictive_logp,
     unified_sample_posterior_predictive,
@@ -409,7 +409,7 @@ def packed_impute_and_confidence(
     Returns:
         Tuple of (point_estimate, confidence_score).
     """
-    from crosscat.packed_state import CONTINUOUS_ID
+    from crosscat.packed import CONTINUOUS_ID
 
     samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
     s = samples[:, 0]
