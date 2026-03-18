@@ -22,6 +22,7 @@ from crosscat.packed_state import (
     PackedCrossCatState,
     pack_state,
     packed_gibbs_sweep_v2,
+    packed_transition_column_assignments_v2,
     unpack_state,
 )
 from crosscat.types import (
@@ -47,6 +48,7 @@ __all__ = [
     "pack_state",
     "packed_anomaly_score",
     "packed_gibbs_sweep_v2",
+    "packed_transition_column_assignments_v2",
     "packed_impute_and_confidence",
     "packed_mutual_information",
     "packed_predictive_cdf",
