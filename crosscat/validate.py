@@ -37,21 +37,15 @@ def validate_state(state: CrossCatState, data=None) -> list[str]:
         )
 
     if len(state.column_hypers) != state.n_cols:
-        errors.append(
-            f"column_hypers length {len(state.column_hypers)} != n_cols {state.n_cols}"
-        )
+        errors.append(f"column_hypers length {len(state.column_hypers)} != n_cols {state.n_cols}")
 
     if len(state.column_types) != state.n_cols:
-        errors.append(
-            f"column_types length {len(state.column_types)} != n_cols {state.n_cols}"
-        )
+        errors.append(f"column_types length {len(state.column_types)} != n_cols {state.n_cols}")
 
     # Check views
     n_views = int(jnp.max(state.column_assignments)) + 1
     if len(state.views) != n_views:
-        errors.append(
-            f"Number of views {len(state.views)} != max assignment + 1 = {n_views}"
-        )
+        errors.append(f"Number of views {len(state.views)} != max assignment + 1 = {n_views}")
 
     # Check each view
     all_cols_in_views = set()
@@ -65,8 +59,7 @@ def validate_state(state: CrossCatState, data=None) -> list[str]:
 
         # Column indices should match assignments
         expected_cols = set(
-            int(j) for j in range(state.n_cols)
-            if int(state.column_assignments[j]) == v_idx
+            int(j) for j in range(state.n_cols) if int(state.column_assignments[j]) == v_idx
         )
         actual_cols = set(int(c) for c in view.column_indices.tolist())
         if expected_cols != actual_cols:

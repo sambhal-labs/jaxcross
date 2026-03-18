@@ -316,8 +316,11 @@ def insert_rows(
         # Recompute suffstats with extended data
         n_clusters_final = int(jnp.max(new_row_assigns)) + 1
         suffstats = _compute_suffstats_for_view(
-            updated_data, view.column_indices, state.column_types,
-            new_row_assigns, n_clusters_final
+            updated_data,
+            view.column_indices,
+            state.column_types,
+            new_row_assigns,
+            n_clusters_final,
         )
 
         new_views.append(

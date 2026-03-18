@@ -81,9 +81,7 @@ def column_partition_ari(state: CrossCatState, true_assignments: Array) -> Array
     return adjusted_rand_index(true_assignments, state.column_assignments)
 
 
-def row_partition_ari(
-    state: CrossCatState, view_idx: int, true_assignments: Array
-) -> Array:
+def row_partition_ari(state: CrossCatState, view_idx: int, true_assignments: Array) -> Array:
     """Compute ARI of row partition in a view vs ground truth.
 
     Args:
@@ -153,9 +151,7 @@ def mean_test_log_likelihood(
             x = data[row_idx, col]
             if jnp.isnan(x):
                 continue
-            log_p = predictive_probability(
-                state, data, [col], jnp.array([x]), row_id=row_idx
-            )
+            log_p = predictive_probability(state, data, [col], jnp.array([x]), row_id=row_idx)
             total_ll = total_ll + log_p
             n_scored += 1
 
