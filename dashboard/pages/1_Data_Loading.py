@@ -191,4 +191,7 @@ with tab_synthetic:
             # Show ground truth
             with st.expander("Ground truth"):
                 st.write(f"True column assignments: {result['true_column_assignments']}")
-                st.write(f"True row assignments shape: {result['true_row_assignments'].shape}")
+                true_row = result["true_row_assignments"]
+                st.write(
+                    f"True row assignments: {len(true_row)} views, {[list(a) for a in true_row]}"
+                )
