@@ -57,7 +57,7 @@ The package is `crosscat/` with these core modules:
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, etc.).
 - **data_utils.py** — CSV I/O and column type detection.
 - **validate.py** — State consistency checking.
-- **fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific).
+- **../contrib/fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific, not part of core).
 
 ## Key Patterns
 
