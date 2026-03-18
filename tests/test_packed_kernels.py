@@ -1,4 +1,4 @@
-"""Tests for vectorized (v2) packed kernels and packed inference.
+"""Tests for vectorized packed kernels and packed inference.
 
 Validates correctness by comparing against unpacked reference implementation.
 """
@@ -10,20 +10,19 @@ import jax.numpy as jnp
 import pytest
 
 from crosscat.model import initialize, log_joint
-from crosscat.packed_state import (
+from crosscat.packed import (
     _add_row_to_suffstats,
     _remove_row_from_suffstats,
-    _score_row_all_clusters,
-    _score_row_all_clusters_v2,
     pack_state,
-    packed_gibbs_sweep_v2,
-    packed_transition_column_assignments_v2,
-    packed_transition_column_hypers_v2,
-    packed_transition_crp_alphas_v2,
-    packed_transition_row_assignments_v2,
+    packed_gibbs_sweep,
+    packed_transition_column_assignments,
+    packed_transition_column_hypers,
+    packed_transition_crp_alphas,
+    packed_transition_row_assignments,
     unified_sample_posterior_predictive,
     unpack_state,
 )
+from crosscat.packed.kernels import _score_row_all_clusters
 from crosscat.types import ColumnType
 from crosscat.validate import validate_state
 
@@ -94,54 +93,23 @@ def test_incremental_suffstats_correctness(mixed_packed_state):
     assert jnp.allclose(ss_cos2[:, :n_cols_v], packed.ss_sum_cos[v, :, :n_cols_v], atol=1e-5)
 
 
-def test_score_row_all_clusters_v2_matches_v1(mixed_packed_state):
-    """Vectorized row scoring matches original loop-based scoring."""
+def test_score_row_all_clusters_produces_valid_scores(mixed_packed_state):
+    """Row scoring produces finite scores for active clusters and -inf for empty."""
     packed, data, column_types = mixed_packed_state
     max_c = packed.max_clusters
 
-    # Test on each active view, for a couple of rows
     n_views = int(packed.n_views)
     for v in range(n_views):
-        n_cols_v = int(packed.view_n_columns[v])
-        col_indices_sliced = packed.view_column_indices[v, :n_cols_v]
         col_indices_full = packed.view_column_indices[v]
         alpha = packed.view_row_crp_alpha[v]
 
         for row_idx in [0, 5, 10]:
-            # Cluster counts excluding this row
             assigns_excl = packed.view_row_assignments[v].at[row_idx].set(-1)
             counts = jnp.array([jnp.sum(assigns_excl == c) for c in range(max_c)]).astype(
                 jnp.int32
             )
 
-            # v1 (Python loop)
-            log_probs_v1 = _score_row_all_clusters(
-                data[row_idx],
-                col_indices_sliced,
-                n_cols_v,
-                packed.col_type_ids,
-                counts,
-                packed.ss_counts[v],
-                packed.ss_sum_x[v],
-                packed.ss_sum_x_sq[v],
-                packed.ss_cat_counts[v],
-                packed.ss_sum_sin[v],
-                packed.ss_sum_cos[v],
-                packed.hyper_mu,
-                packed.hyper_r,
-                packed.hyper_s,
-                packed.hyper_nu,
-                packed.hyper_dirichlet_alpha,
-                packed.hyper_alpha,
-                packed.hyper_beta,
-                packed.hyper_kappa,
-                packed.hyper_vm_mu,
-                alpha,
-                max_c,
-            )
-
-            # v2 (lax.scan + vmap)
-            log_probs_v2 = _score_row_all_clusters_v2(
+            log_probs = _score_row_all_clusters(
                 data[row_idx],
                 col_indices_full,
                 packed.view_n_columns[v],
@@ -166,25 +134,21 @@ def test_score_row_all_clusters_v2_matches_v1(mixed_packed_state):
                 max_c,
             )
 
-            assert log_probs_v1.shape == log_probs_v2.shape == (max_c + 1,)
-
-            # Compare finite entries
-            both_finite = jnp.isfinite(log_probs_v1) & jnp.isfinite(log_probs_v2)
-            if jnp.any(both_finite):
-                assert jnp.allclose(
-                    jnp.where(both_finite, log_probs_v1, 0.0),
-                    jnp.where(both_finite, log_probs_v2, 0.0),
-                    atol=1e-4,
-                ), (
-                    f"v={v}, row={row_idx}: v1 vs v2 mismatch\n"
-                    f"  v1={log_probs_v1}\n  v2={log_probs_v2}"
-                )
-
-            # Non-finite entries should match (both -inf)
-            assert jnp.array_equal(jnp.isfinite(log_probs_v1), jnp.isfinite(log_probs_v2)), (
-                f"v={v}, row={row_idx}: finite/inf pattern mismatch\n"
-                f"  v1 finite={jnp.isfinite(log_probs_v1)}\n"
-                f"  v2 finite={jnp.isfinite(log_probs_v2)}"
+            assert log_probs.shape == (max_c + 1,)
+            # Clusters with count > 0 should have finite scores
+            active_mask = counts > 0
+            active_scores = log_probs[:max_c][active_mask]
+            assert jnp.all(jnp.isfinite(active_scores)), (
+                f"v={v}, row={row_idx}: non-finite active scores: {active_scores}"
+            )
+            # Empty clusters should have -inf
+            empty_scores = log_probs[:max_c][~active_mask]
+            assert jnp.all(~jnp.isfinite(empty_scores)), (
+                f"v={v}, row={row_idx}: empty clusters should be -inf"
+            )
+            # New cluster slot (last) should be finite
+            assert jnp.isfinite(log_probs[-1]), (
+                f"v={v}, row={row_idx}: new cluster score not finite"
             )
 
 
@@ -194,10 +158,10 @@ def test_score_row_all_clusters_v2_matches_v1(mixed_packed_state):
 
 
 def test_scan_row_assignments_produces_valid_state(mixed_packed_state):
-    """packed_transition_row_assignments_v2 produces a valid unpacked state."""
+    """packed_transition_row_assignments produces a valid unpacked state."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(101)
-    packed_new = packed_transition_row_assignments_v2(key, packed, data)
+    packed_new = packed_transition_row_assignments(key, packed, data)
     recovered = unpack_state(packed_new, column_types)
 
     errors = validate_state(recovered, data)
@@ -207,11 +171,11 @@ def test_scan_row_assignments_produces_valid_state(mixed_packed_state):
 
 
 def test_scan_row_assignments_jit_compiles(mixed_packed_state):
-    """packed_transition_row_assignments_v2 works under jax.jit."""
+    """packed_transition_row_assignments works under jax.jit."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(202)
 
-    jitted_fn = jax.jit(packed_transition_row_assignments_v2)
+    jitted_fn = jax.jit(packed_transition_row_assignments)
     packed_new = jitted_fn(key, packed, data)
 
     recovered = unpack_state(packed_new, column_types)
@@ -227,10 +191,10 @@ def test_scan_row_assignments_jit_compiles(mixed_packed_state):
 
 
 def test_vmap_column_hypers_produces_valid_state(mixed_packed_state):
-    """packed_transition_column_hypers_v2 produces finite and positive hypers."""
+    """packed_transition_column_hypers produces finite and positive hypers."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(301)
-    packed_new = packed_transition_column_hypers_v2(key, packed, data)
+    packed_new = packed_transition_column_hypers(key, packed, data)
 
     # All hypers should be finite
     assert jnp.all(jnp.isfinite(packed_new.hyper_mu)), "hyper_mu has non-finite values"
@@ -257,11 +221,11 @@ def test_vmap_column_hypers_produces_valid_state(mixed_packed_state):
 
 
 def test_vmap_column_hypers_jit_compiles(mixed_packed_state):
-    """packed_transition_column_hypers_v2 works under jax.jit."""
+    """packed_transition_column_hypers works under jax.jit."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(302)
 
-    jitted_fn = jax.jit(packed_transition_column_hypers_v2)
+    jitted_fn = jax.jit(packed_transition_column_hypers)
     packed_new = jitted_fn(key, packed, data)
 
     # Verify all hypers are finite after JIT
@@ -277,10 +241,10 @@ def test_vmap_column_hypers_jit_compiles(mixed_packed_state):
 
 
 def test_vmap_crp_alphas_produces_valid_values(mixed_packed_state):
-    """packed_transition_crp_alphas_v2 produces positive alpha values."""
+    """packed_transition_crp_alphas produces positive alpha values."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(401)
-    packed_new = packed_transition_crp_alphas_v2(key, packed)
+    packed_new = packed_transition_crp_alphas(key, packed)
 
     # Column CRP alpha should be positive and finite
     assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite"
@@ -295,11 +259,11 @@ def test_vmap_crp_alphas_produces_valid_values(mixed_packed_state):
 
 
 def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
-    """packed_transition_crp_alphas_v2 works under jax.jit."""
+    """packed_transition_crp_alphas works under jax.jit."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(402)
 
-    jitted_fn = jax.jit(packed_transition_crp_alphas_v2)
+    jitted_fn = jax.jit(packed_transition_crp_alphas)
     packed_new = jitted_fn(key, packed)
 
     assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite after JIT"
@@ -310,15 +274,15 @@ def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
 
 
 # ---------------------------------------------------------------------------
-# Task 7: packed_gibbs_sweep_v2 tests
+# Task 7: packed_gibbs_sweep tests
 # ---------------------------------------------------------------------------
 
 
-def test_full_packed_sweep_v2_valid(mixed_packed_state):
-    """packed_gibbs_sweep_v2 produces a valid unpacked state after 2 sweeps."""
+def test_full_packed_sweep_vectorized_valid(mixed_packed_state):
+    """packed_gibbs_sweep produces a valid unpacked state after 2 sweeps."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(501)
-    packed_new = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=2)
+    packed_new = packed_gibbs_sweep(key, packed, data, n_sweeps=2)
 
     recovered = unpack_state(packed_new, column_types)
     errors = validate_state(recovered, data)
@@ -327,13 +291,13 @@ def test_full_packed_sweep_v2_valid(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after sweep: {lj}"
 
 
-def test_packed_sweep_v2_deterministic(mixed_packed_state):
-    """packed_gibbs_sweep_v2 with same key gives same result."""
+def test_packed_sweep_vectorized_deterministic(mixed_packed_state):
+    """packed_gibbs_sweep with same key gives same result."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(502)
 
-    result1 = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=1)
-    result2 = packed_gibbs_sweep_v2(key, packed, data, n_sweeps=1)
+    result1 = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
+    result2 = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
 
     # Row assignments should be identical
     assert jnp.array_equal(result1.view_row_assignments, result2.view_row_assignments), (
@@ -351,12 +315,12 @@ def test_packed_sweep_v2_deterministic(mixed_packed_state):
     )
 
 
-def test_packed_sweep_v2_jit_compiles(mixed_packed_state):
-    """packed_gibbs_sweep_v2 works under jax.jit with n_sweeps=1."""
+def test_packed_sweep_vectorized_jit_compiles(mixed_packed_state):
+    """packed_gibbs_sweep works under jax.jit with n_sweeps=1."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(503)
 
-    jitted_fn = jax.jit(packed_gibbs_sweep_v2)
+    jitted_fn = jax.jit(packed_gibbs_sweep)
     packed_new = jitted_fn(key, packed, data)
 
     recovered = unpack_state(packed_new, column_types)
@@ -617,7 +581,7 @@ def test_cluster_budget_exhaustion():
     state = initialize(k2, result["data"], column_types)
     packed = pack_state(state, max_clusters=3, max_categories=4)
     k3 = jax.random.key(502)
-    packed_new = packed_transition_row_assignments_v2(k3, packed, result["data"])
+    packed_new = packed_transition_row_assignments(k3, packed, result["data"])
     recovered = unpack_state(packed_new, column_types)
     max_c = 3
     for view in recovered.views:
@@ -629,11 +593,11 @@ def test_cluster_budget_exhaustion():
 # ---------------------------------------------------------------------------
 
 
-def test_column_assignments_v2_produces_valid_state(mixed_packed_state):
-    """packed_transition_column_assignments_v2 produces a valid unpacked state."""
+def test_column_assignments_vectorized_produces_valid_state(mixed_packed_state):
+    """packed_transition_column_assignments produces a valid unpacked state."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(701)
-    packed_new = packed_transition_column_assignments_v2(key, packed, data)
+    packed_new = packed_transition_column_assignments(key, packed, data)
 
     recovered = unpack_state(packed_new, column_types)
     errors = validate_state(recovered, data)
@@ -642,12 +606,12 @@ def test_column_assignments_v2_produces_valid_state(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite: {lj}"
 
 
-def test_column_assignments_v2_jit_compiles(mixed_packed_state):
-    """packed_transition_column_assignments_v2 works under jax.jit."""
+def test_column_assignments_vectorized_jit_compiles(mixed_packed_state):
+    """packed_transition_column_assignments works under jax.jit."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(702)
 
-    jitted_fn = jax.jit(packed_transition_column_assignments_v2)
+    jitted_fn = jax.jit(packed_transition_column_assignments)
     packed_new = jitted_fn(key, packed, data)
 
     recovered = unpack_state(packed_new, column_types)
@@ -657,11 +621,11 @@ def test_column_assignments_v2_jit_compiles(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT: {lj}"
 
 
-def test_column_assignments_v2_preserves_column_count(mixed_packed_state):
+def test_column_assignments_vectorized_preserves_column_count(mixed_packed_state):
     """Every column must be assigned to exactly one view after reassignment."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(703)
-    packed_new = packed_transition_column_assignments_v2(key, packed, data)
+    packed_new = packed_transition_column_assignments(key, packed, data)
 
     # Every column must be assigned to an active view
     n_cols = packed.n_cols
@@ -675,11 +639,11 @@ def test_column_assignments_v2_preserves_column_count(mixed_packed_state):
     assert total == n_cols, f"Total columns {total} != n_cols {n_cols}"
 
 
-def test_column_assignments_v2_view_metadata_consistent(mixed_packed_state):
+def test_column_assignments_vectorized_view_metadata_consistent(mixed_packed_state):
     """view_column_indices and view_n_columns match column_assignments."""
     packed, data, column_types = mixed_packed_state
     key = jax.random.key(704)
-    packed_new = packed_transition_column_assignments_v2(key, packed, data)
+    packed_new = packed_transition_column_assignments(key, packed, data)
 
     n_cols = packed.n_cols
     for v in range(packed.max_views):
@@ -699,14 +663,14 @@ def test_column_assignments_v2_view_metadata_consistent(mixed_packed_state):
         )
 
 
-def test_column_assignments_v2_multiple_runs_differ(mixed_packed_state):
+def test_column_assignments_vectorized_multiple_runs_differ(mixed_packed_state):
     """Different RNG keys produce different column assignments."""
     packed, data, column_types = mixed_packed_state
     k1 = jax.random.key(705)
     k2 = jax.random.key(706)
 
-    packed1 = packed_transition_column_assignments_v2(k1, packed, data)
-    packed2 = packed_transition_column_assignments_v2(k2, packed, data)
+    packed1 = packed_transition_column_assignments(k1, packed, data)
+    packed2 = packed_transition_column_assignments(k2, packed, data)
 
     # At least one column should differ (probabilistically certain with different keys)
     # This is a soft check — if it fails, increase seed gap
@@ -736,7 +700,7 @@ def test_mixed_column_types_full_sweep():
     state = initialize(k2, result["data"], column_types)
     packed = pack_state(state)
     k3 = jax.random.key(602)
-    packed_new = packed_gibbs_sweep_v2(k3, packed, result["data"], n_sweeps=2)
+    packed_new = packed_gibbs_sweep(k3, packed, result["data"], n_sweeps=2)
     recovered = unpack_state(packed_new, column_types)
     errors = validate_state(recovered, result["data"])
     assert errors == [], f"Validation errors: {errors}"

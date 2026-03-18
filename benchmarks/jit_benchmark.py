@@ -20,7 +20,7 @@ from crosscat.gibbs import (
     transition_row_assignments,
 )
 from crosscat.model import initialize, log_joint
-from crosscat.packed_state import (
+from crosscat.packed import (
     pack_state,
     packed_gibbs_sweep,
     packed_transition_column_hypers,
@@ -129,7 +129,9 @@ def main():
         "row_assignments",
         transition_row_assignments,
         packed_transition_row_assignments,
-        state, packed, data,
+        state,
+        packed,
+        data,
     )
     total_orig += t_o
     total_packed += t_p
@@ -138,7 +140,9 @@ def main():
         "column_hypers",
         transition_column_hypers,
         packed_transition_column_hypers,
-        state, packed, data,
+        state,
+        packed,
+        data,
     )
     total_orig += t_o
     total_packed += t_p
@@ -147,14 +151,18 @@ def main():
         "crp_alphas",
         transition_crp_alphas,
         packed_transition_crp_alphas,
-        state, packed, data,
+        state,
+        packed,
+        data,
     )
     total_orig += t_o
     total_packed += t_p
 
     print("-" * 70)
-    print(f"  {'TOTAL':30s}  original: {total_orig:.4f}s  packed: {total_packed:.4f}s  "
-          f"speedup: {total_orig / max(total_packed, 1e-9):.1f}x")
+    print(
+        f"  {'TOTAL':30s}  original: {total_orig:.4f}s  packed: {total_packed:.4f}s  "
+        f"speedup: {total_orig / max(total_packed, 1e-9):.1f}x"
+    )
     print()
 
     # Full sweep benchmark
@@ -162,15 +170,25 @@ def main():
     print("-" * 70)
     key = jax.random.key(456)
     t_orig_sweep, _ = time_fn(
-        gibbs_sweep, key, state, data, n_sweeps=3,
+        gibbs_sweep,
+        key,
+        state,
+        data,
+        n_sweeps=3,
         kernels=("row_assignments", "column_hypers", "crp_alphas"),
     )
     t_packed_sweep, _ = time_fn(
-        packed_gibbs_sweep, key, packed, data, n_sweeps=3,
+        packed_gibbs_sweep,
+        key,
+        packed,
+        data,
+        n_sweeps=3,
     )
     speedup = t_orig_sweep / max(t_packed_sweep, 1e-9)
-    print(f"  {'full sweep (3 iters)':30s}  original: {t_orig_sweep:.4f}s  "
-          f"packed: {t_packed_sweep:.4f}s  speedup: {speedup:.1f}x")
+    print(
+        f"  {'full sweep (3 iters)':30s}  original: {t_orig_sweep:.4f}s  "
+        f"packed: {t_packed_sweep:.4f}s  speedup: {speedup:.1f}x"
+    )
 
     print()
     print("=" * 70)
