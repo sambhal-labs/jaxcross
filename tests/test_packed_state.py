@@ -112,6 +112,27 @@ def test_pack_unpack_preserves_log_joint(continuous_state_and_data):
     assert lj_recovered == pytest.approx(lj_original, rel=1e-4)
 
 
+def test_unpack_with_data_exact_log_joint(mixed_state_and_data):
+    """unpack_state(data=...) recomputes suffstats for exact log_joint."""
+    state, data, column_types = mixed_state_and_data
+    lj_original = float(log_joint(state, data))
+
+    packed = pack_state(state)
+
+    # Without data: may have precision loss
+    recovered_no_data = unpack_state(packed, column_types)
+    lj_no_data = float(log_joint(recovered_no_data, data))
+
+    # With data: suffstats recomputed from scratch
+    recovered_with_data = unpack_state(packed, column_types, data=data)
+    lj_with_data = float(log_joint(recovered_with_data, data))
+
+    # With data should be exact
+    assert lj_with_data == pytest.approx(lj_original, abs=1e-4)
+    # And closer than without data
+    assert abs(lj_with_data - lj_original) <= abs(lj_no_data - lj_original)
+
+
 def test_pack_unpack_validation(continuous_state_and_data):
     """Recovered state passes validation."""
     state, data, column_types = continuous_state_and_data
