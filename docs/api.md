@@ -217,9 +217,9 @@ JIT-compatible padded state representation. All arrays use fixed dimensions, ena
 
 Convert `CrossCatState` to JIT-compatible `PackedCrossCatState` with padded arrays.
 
-### `unpack_state(packed, column_types)`
+### `unpack_state(packed, column_types, data=None)`
 
-Convert back to `CrossCatState`.
+Convert back to `CrossCatState`. When `data` is provided, sufficient statistics are recomputed from the raw data for exact fidelity (recommended).
 
 ---
 

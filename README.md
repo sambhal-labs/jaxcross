@@ -294,8 +294,8 @@ packed = pack_state(state, max_views=16, max_clusters=32)
 # Run JIT-compiled inference (all 4 kernels per sweep)
 packed = packed_gibbs_sweep(key, packed, data, n_sweeps=100)
 
-# Convert back
-state = unpack_state(packed, column_types)
+# Convert back (pass data= for exact suffstats fidelity)
+state = unpack_state(packed, column_types, data=data)
 ```
 
 Individual kernels are also available for fine-grained control:
