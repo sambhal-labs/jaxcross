@@ -606,8 +606,8 @@ class VonMises:
         kappa_post = r_post
 
         # Von Mises log pdf
-        log_p = kappa_post * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(
-            kappa_post
+        log_p = (
+            kappa_post * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa_post)
         )
         return log_p
 

@@ -748,8 +748,7 @@ def predictive_cdf(
             weights = _cluster_weights_for_observed_row(view, row_id)
         elif condition_cols:
             weights = _cluster_weights_conditioned(
-                state, view, view_idx,
-                condition_cols or [], condition_vals, data
+                state, view, view_idx, condition_cols or [], condition_vals, data
             )
         else:
             weights = _cluster_weights(view, state.n_rows)
@@ -778,9 +777,7 @@ def predictive_cdf(
             log_p_k = jnp.array(-jnp.inf)
             for c in range(n_clusters):
                 ss = view.suffstats[c][local_idx]
-                log_lik = comp.posterior_predictive_logp(
-                    jnp.array(float(k)), ss, hypers
-                )
+                log_lik = comp.posterior_predictive_logp(jnp.array(float(k)), ss, hypers)
                 log_term = jnp.log(weights[c]) + log_lik
                 log_p_k = jnp.logaddexp(log_p_k, log_term)
             cdf_val = cdf_val + jnp.exp(log_p_k)
@@ -836,9 +833,7 @@ def sample_and_insert(
 
     if missing_cols:
         observed_vals = (
-            jnp.array([float(partial_row[c]) for c in observed_cols])
-            if observed_cols
-            else None
+            jnp.array([float(partial_row[c]) for c in observed_cols]) if observed_cols else None
         )
         cond_cols = observed_cols if observed_cols else None
 
@@ -895,23 +890,30 @@ def conditional_entropy(
         log_ps = []
         for i in range(n_samples):
             # Sample conditioning values from marginal
-            cond_samples = predictive_sample(
-                s_keys[i], state, data, given_cols, n_samples=1
-            )
+            cond_samples = predictive_sample(s_keys[i], state, data, given_cols, n_samples=1)
             cond_vals = cond_samples[0]
 
             # Sample target given conditions
             k1, k2 = jax.random.split(jax.random.fold_in(s_keys[i], 999))
             target_samples = predictive_sample(
-                k1, state, data, [target_col],
-                condition_cols=given_cols, condition_vals=cond_vals, n_samples=1
+                k1,
+                state,
+                data,
+                [target_col],
+                condition_cols=given_cols,
+                condition_vals=cond_vals,
+                n_samples=1,
             )
             target_val = target_samples[0, 0]
 
             # Evaluate log prob
             log_p = predictive_probability(
-                state, data, [target_col], jnp.array([target_val]),
-                condition_cols=given_cols, condition_vals=cond_vals
+                state,
+                data,
+                [target_col],
+                jnp.array([target_val]),
+                condition_cols=given_cols,
+                condition_vals=cond_vals,
             )
             log_ps.append(float(log_p))
 
