@@ -419,3 +419,57 @@ def unpack_state(
             )
 
     return state
+
+
+# ---------------------------------------------------------------------------
+# Batching / unbatching utilities for multi-chain inference
+# ---------------------------------------------------------------------------
+
+
+def batch_packed_states(packed_list: list[PackedCrossCatState]) -> PackedCrossCatState:
+    """Stack N packed states into a single batched pytree.
+
+    Each array field gets a leading (n_chains,) dimension.
+    All states must have identical static fields.
+    """
+    # Assert all static fields match
+    ref = packed_list[0]
+    for p in packed_list[1:]:
+        for name in _STATIC_FIELDS:
+            assert getattr(p, name) == getattr(ref, name), (
+                f"Static field {name} differs: {getattr(ref, name)} vs {getattr(p, name)}"
+            )
+
+    # Stack array fields
+    kwargs = {}
+    for name in _ARRAY_FIELDS:
+        kwargs[name] = jnp.stack([getattr(p, name) for p in packed_list])
+    for name in _STATIC_FIELDS:
+        kwargs[name] = getattr(ref, name)
+    return PackedCrossCatState(**kwargs)
+
+
+def unbatch_packed_states(
+    batched: PackedCrossCatState, n_chains: int
+) -> list[PackedCrossCatState]:
+    """Unstack a batched pytree into N individual packed states."""
+    result = []
+    for i in range(n_chains):
+        kwargs = {}
+        for name in _ARRAY_FIELDS:
+            kwargs[name] = getattr(batched, name)[i]
+        for name in _STATIC_FIELDS:
+            kwargs[name] = getattr(batched, name)
+        result.append(PackedCrossCatState(**kwargs))
+    return result
+
+
+def select_best_chain(batched: PackedCrossCatState, scores: Array) -> PackedCrossCatState:
+    """Select the chain with the highest score from a batched state."""
+    idx = jnp.argmax(scores)
+    kwargs = {}
+    for name in _ARRAY_FIELDS:
+        kwargs[name] = getattr(batched, name)[idx]
+    for name in _STATIC_FIELDS:
+        kwargs[name] = getattr(batched, name)
+    return PackedCrossCatState(**kwargs)

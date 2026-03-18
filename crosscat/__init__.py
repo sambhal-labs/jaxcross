@@ -11,9 +11,14 @@ from crosscat.inference import (
 from crosscat.model import initialize, insert_rows, log_joint
 from crosscat.packed import (
     PackedCrossCatState,
+    batch_packed_states,
+    multi_chain_packed_gibbs_sweep,
     pack_state,
     packed_gibbs_sweep,
+    packed_log_joint,
     packed_transition_column_assignments,
+    select_best_chain,
+    unbatch_packed_states,
     unpack_state,
 )
 from crosscat.packed_inference import (
@@ -48,6 +53,7 @@ __all__ = [
     "PackedCrossCatState",
     "SufficientStats",
     "ViewState",
+    "batch_packed_states",
     "gibbs_sweep",
     "initialize",
     "load_latest_checkpoint",
@@ -55,10 +61,12 @@ __all__ = [
     "load_state",
     "insert_rows",
     "log_joint",
+    "multi_chain_packed_gibbs_sweep",
     "mutual_information",
     "pack_state",
     "packed_anomaly_score",
     "packed_gibbs_sweep",
+    "packed_log_joint",
     "packed_impute_and_confidence",
     "packed_mutual_information",
     "packed_predictive_cdf",
@@ -67,9 +75,11 @@ __all__ = [
     "packed_row_similarity",
     "packed_transition_column_assignments",
     "predictive_probability",
+    "select_best_chain",
     "save_checkpoint",
     "save_packed_state",
     "save_state",
     "predictive_sample",
+    "unbatch_packed_states",
     "unpack_state",
 ]
