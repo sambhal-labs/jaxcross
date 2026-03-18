@@ -95,10 +95,10 @@ def plot_convergence(sweep_history: list[dict]) -> go.Figure:
     fig.update_layout(
         title="Convergence",
         xaxis_title="Sweep",
-        yaxis=dict(title="log p(state, data)", titlefont=dict(color="#1f77b4")),
+        yaxis=dict(title="log p(state, data)", title_font=dict(color="#1f77b4")),
         yaxis2=dict(
             title="Number of views",
-            titlefont=dict(color="#ff7f0e"),
+            title_font=dict(color="#ff7f0e"),
             overlaying="y",
             side="right",
         ),
