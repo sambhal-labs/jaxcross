@@ -209,7 +209,9 @@ Held-out log-likelihood on specified test rows.
 
 ---
 
-## Packed State (`crosscat.packed_state`)
+## Packed State (`crosscat.packed`)
+
+JIT-compatible padded state representation. All arrays use fixed dimensions, enabling `jax.jit`, `jax.vmap`, and `jax.lax.scan`.
 
 ### `pack_state(state, *, max_views=16, max_clusters=32, max_categories=16)`
 
@@ -219,9 +221,89 @@ Convert `CrossCatState` to JIT-compatible `PackedCrossCatState` with padded arra
 
 Convert back to `CrossCatState`.
 
-### `packed_gibbs_sweep(rng_key, packed, data, *, n_sweeps=1, kernels=("row_assignments", "column_hypers", "crp_alphas"))`
+---
 
-Run Gibbs sweeps on packed state.
+## Packed Gibbs Kernels (`crosscat.packed`)
+
+All kernels are fully JIT-compiled using `jax.lax.scan` and `jax.vmap`.
+
+### `packed_gibbs_sweep(rng_key, packed, data, *, n_sweeps=1)`
+
+Run full Gibbs sweeps on packed state. Each sweep runs all 4 kernels: row assignments, column assignments, column hypers, CRP alphas.
+
+**Returns**: Updated `PackedCrossCatState`.
+
+### `packed_transition_row_assignments(rng_key, packed, data)`
+
+Gibbs sweep over row assignments using nested `lax.scan` (outer over views, inner over rows) with `vmap` over clusters for scoring.
+
+**Returns**: Updated `PackedCrossCatState`.
+
+### `packed_transition_column_assignments(rng_key, packed, data)`
+
+Gibbs sweep over column-to-view assignments (outer DP). Uses `lax.scan` over columns, `vmap` over views for scoring, bounded CRP sampling for new-view proposals, and automatic view compaction.
+
+**Returns**: Updated `PackedCrossCatState`.
+
+### `packed_transition_column_hypers(rng_key, packed, data)`
+
+Grid-based Gibbs sampling for column hyperparameters, `vmap`-ed over all columns with unified type dispatch.
+
+**Returns**: Updated `PackedCrossCatState`.
+
+### `packed_transition_crp_alphas(rng_key, packed)`
+
+Sample CRP concentration parameters (row and column) using `vmap` over a log-spaced grid.
+
+**Returns**: Updated `PackedCrossCatState`.
+
+---
+
+## Packed Inference Queries (`crosscat.packed_inference`)
+
+Vectorized counterparts of `crosscat.inference` functions operating on `PackedCrossCatState`.
+
+### `packed_predictive_probability(packed, data, query_cols, query_vals, *, row_id=None)`
+
+Conditional predictive log-probability on packed state.
+
+**Returns**: Scalar log probability.
+
+### `packed_predictive_sample(rng_key, packed, data, query_cols, *, n_samples=1000, row_id=None)`
+
+Draw samples from the posterior predictive on packed state.
+
+**Returns**: `Array (n_samples, len(query_cols))`.
+
+### `packed_predictive_cdf(rng_key, packed, data, query_col, query_val, *, n_samples=10000)`
+
+Posterior predictive CDF on packed state.
+
+**Returns**: Scalar in [0, 1].
+
+### `packed_mutual_information(packed_states, column_types, col_i, col_j)`
+
+Estimate mutual information from a list of packed states.
+
+**Returns**: `(mi, linfoot_correlation)`.
+
+### `packed_row_similarity(packed_states, column_types, row_a, row_b, *, target_columns=None)`
+
+Row co-clustering probability on packed states.
+
+**Returns**: Scalar in [0, 1].
+
+### `packed_impute_and_confidence(rng_key, packed, data, query_col, *, n_samples=1000)`
+
+Impute a missing value with confidence on packed state.
+
+**Returns**: `(point_estimate, confidence_score)`.
+
+### `packed_anomaly_score(rng_key, packed, data, query_row)`
+
+Anomaly score for a row on packed state.
+
+**Returns**: Scalar in [0, 1].
 
 ---
 

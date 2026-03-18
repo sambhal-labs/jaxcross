@@ -207,6 +207,54 @@ constrained = ensure_col_dep_constraints(
 )
 ```
 
+## 8. GPU-Accelerated Workflow (Packed State)
+
+For large datasets or GPU execution, use the packed representation which enables full JIT compilation:
+
+```python
+from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+
+# Convert to packed state (fixed-size padded arrays)
+packed = pack_state(state, max_views=16, max_clusters=32)
+
+# JIT-compiled inference — all 4 kernels per sweep
+key, subkey = jax.random.split(key)
+packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=100)
+
+# Convert back to CrossCatState for queries
+state = unpack_state(packed, column_types)
+```
+
+You can also run packed inference queries directly without unpacking:
+
+```python
+from crosscat import (
+    packed_predictive_sample,
+    packed_anomaly_score,
+    packed_mutual_information,
+)
+
+# Sample on packed state
+key, subkey = jax.random.split(key)
+samples = packed_predictive_sample(
+    subkey, packed, data,
+    query_cols=[0],
+    n_samples=1000,
+)
+
+# Anomaly detection
+key, subkey = jax.random.split(key)
+score = packed_anomaly_score(subkey, packed, data, query_row=42)
+```
+
+**When to use packed state:**
+
+- Datasets with 500+ rows or 20+ columns
+- GPU/TPU execution (compile once, run many sweeps fast)
+- Batch inference across many PRNG keys
+
+**Tip**: The first call to `packed_gibbs_sweep` triggers JIT compilation (~30-60s). Subsequent calls with the same data shape are fast.
+
 ## Tips
 
 - **More sweeps = better**: 50-200 sweeps is typical. Watch `log_joint` for convergence.
