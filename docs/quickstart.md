@@ -156,6 +156,20 @@ print(f"Anomaly score: {score:.3f}")  # 0=normal, 1=anomalous
 "Which columns are related?"
 
 ```python
+from crosscat.inference import dependence_probability, dependence_matrix
+
+# Pairwise: probability that two columns share a view
+dp = dependence_probability(final_states, col_i=0, col_j=1)
+print(f"P(salary ~ experience): {dp:.3f}")  # likely ~1.0
+
+# Full Z-matrix: all pairwise dependency probabilities
+z = dependence_matrix(final_states)
+print(z)  # (n_cols, n_cols) matrix, diagonal = 1.0
+```
+
+For a continuous measure of dependency strength, use mutual information:
+
+```python
 from crosscat.inference import mutual_information
 
 mi, linfoot = mutual_information(final_states, col_i=0, col_j=1)
