@@ -99,7 +99,12 @@ def _bb_log_marginal(n, sum_x, alpha, beta):
 
 
 def _vm_log_marginal(n, sum_sin, sum_cos, kappa):
-    """Von Mises log marginal likelihood."""
+    """Von Mises log marginal likelihood (approximate).
+
+    NOTE: Uses kappa * R approximation without marginalizing over posterior
+    mean direction. See crosscat/components.py VonMises.log_marginal_likelihood
+    for details on the approximation.
+    """
     n = n.astype(jnp.float32)
     r_length = jnp.sqrt(sum_sin**2 + sum_cos**2)
     log_ml = -n * jnp.log(2.0 * jnp.pi) - n * _log_bessel_i0(kappa) + kappa * r_length

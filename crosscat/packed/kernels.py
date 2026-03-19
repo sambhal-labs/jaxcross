@@ -260,6 +260,8 @@ def packed_transition_row_assignments(
     rng_key: Array,
     packed: PackedCrossCatState,
     data: Array,
+    *,
+    recompute_suffstats: bool = True,
 ) -> PackedCrossCatState:
     """Gibbs sweep over row assignments using lax.scan (JIT-compatible).
 
@@ -271,6 +273,9 @@ def packed_transition_row_assignments(
         rng_key: PRNG key.
         packed: Current packed state.
         data: (n_rows, n_cols) data matrix.
+        recompute_suffstats: If True (default), recompute all sufficient
+            statistics from scratch after the sweep. Set to False if a
+            subsequent kernel (e.g., column assignments) will recompute anyway.
 
     Returns:
         Updated PackedCrossCatState with new row assignments and suffstats.
@@ -452,7 +457,9 @@ def packed_transition_row_assignments(
         },
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
-    return recompute_all_suffstats(updated, data)
+    if recompute_suffstats:
+        return recompute_all_suffstats(updated, data)
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -559,6 +566,28 @@ def packed_transition_column_hypers(
 
         return jax.vmap(score_one_grid_point)(nu_grid_vals)
 
+    def _score_grid_ng_r(v_idx, local_idx, mu_val, r_grid_vals, s_val, nu_val):
+        """Score a grid of r (precision scale) values for Normal-Gamma."""
+        nc = packed.view_n_clusters[v_idx]
+        counts_col = packed.ss_counts[v_idx, :, local_idx]
+        sum_x_col = packed.ss_sum_x[v_idx, :, local_idx]
+        sum_x_sq_col = packed.ss_sum_x_sq[v_idx, :, local_idx]
+
+        def score_one_grid_point(r_val):
+            per_cluster = _ng_log_marginal(
+                counts_col,
+                sum_x_col,
+                sum_x_sq_col,
+                mu_val,
+                r_val,
+                s_val,
+                nu_val,
+            )
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        return jax.vmap(score_one_grid_point)(r_grid_vals)
+
     def process_one_column(j):
         """Process column j: sample hypers based on type. Returns updated hyper values."""
         key = col_keys[j]
@@ -566,9 +595,9 @@ def packed_transition_column_hypers(
         v_idx = packed.column_assignments[j]
         local_idx = _find_local_index(v_idx, j)
 
-        k1, k2, k3, k4 = jax.random.split(key, 4)
+        k1, k2, k3, k4, k5 = jax.random.split(key, 5)
 
-        # --- Continuous: sample s, then mu, then nu ---
+        # --- Continuous: sample s, then mu, then nu, then r ---
         cur_mu = packed.hyper_mu[j]
         cur_r = packed.hyper_r[j]
         cur_nu = packed.hyper_nu[j]
@@ -600,6 +629,12 @@ def packed_transition_column_hypers(
         nu_scores = _score_grid_ng_nu(v_idx, local_idx, new_mu_val, cur_r, new_s_val, nu_grid)
         nu_scores = nu_scores - jnp.max(nu_scores)
         new_nu_val = nu_grid[jax.random.categorical(k3, nu_scores)]
+
+        # Sample r (precision scale) — paper requires all 4 NormalGamma hypers sampled
+        r_grid = jnp.array([0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+        r_scores = _score_grid_ng_r(v_idx, local_idx, new_mu_val, r_grid, new_s_val, new_nu_val)
+        r_scores = r_scores - jnp.max(r_scores)
+        new_r_val = r_grid[jax.random.categorical(k4, r_scores)]
 
         # --- Categorical: sample dirichlet_alpha ---
         nc = packed.view_n_clusters[v_idx]
@@ -652,6 +687,7 @@ def packed_transition_column_hypers(
 
         # --- Select results based on type_id ---
         out_mu = jnp.where(type_id == CONTINUOUS_ID, new_mu_val, packed.hyper_mu[j])
+        out_r = jnp.where(type_id == CONTINUOUS_ID, new_r_val, packed.hyper_r[j])
         out_s = jnp.where(type_id == CONTINUOUS_ID, new_s_val, packed.hyper_s[j])
         out_nu = jnp.where(type_id == CONTINUOUS_ID, new_nu_val, packed.hyper_nu[j])
         out_dir_alpha = jnp.where(
@@ -663,7 +699,7 @@ def packed_transition_column_hypers(
 
         return (
             out_mu,
-            packed.hyper_r[j],
+            out_r,
             out_s,
             out_nu,
             out_dir_alpha,
@@ -718,7 +754,7 @@ def packed_transition_crp_alphas(
     Scores a grid of alpha values for the outer (column) CRP and each inner
     (row) CRP. Includes Exp(1) prior: log_score -= alpha_val.
     """
-    alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
+    alpha_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(100.0), 50))
     max_views = packed.max_views
     n_cols = packed.n_cols
     max_c = packed.max_clusters
@@ -955,7 +991,7 @@ def packed_transition_column_assignments(
             rng,
         ) = carry
 
-        k_crp, k_cat, rng = jax.random.split(rng, 3)
+        k_crp, k_cat, k_alpha, rng = jax.random.split(rng, 4)
 
         old_view = col_assigns[j]
         data_col = data[:, j]
@@ -1005,20 +1041,27 @@ def packed_transition_column_assignments(
         log_scores_existing = log_prior + log_lik  # (max_views,)
 
         # --- Score new view proposal ---
+        # Paper (Algorithm 8, Neal 1998): if column j is a singleton (only column
+        # in its view), reuse the current view's row assignments as the auxiliary
+        # variable. Otherwise, sample fresh CRP assignments with alpha from Gamma(1,1).
         log_prior_new = jnp.log(packed.column_crp_alpha)
-        # Sample CRP row assignments for the proposed new view
-        # Use the mean row CRP alpha from active views
-        mean_crp_alpha = jnp.where(
-            jnp.sum(view_mask) > 0,
-            jnp.sum(view_row_crp_alpha * view_mask) / jnp.maximum(jnp.sum(view_mask), 1.0),
-            jnp.array(1.0),
-        )
-        new_row_assigns, new_n_clusters = _crp_sample_bounded(
+        is_singleton = counts_excl[old_view] == 0
+
+        # Always compute both paths (JIT-compatible), select via jnp.where
+        gamma_alpha = jax.random.gamma(k_alpha, 1.0)
+        fresh_row_assigns, fresh_n_clusters = _crp_sample_bounded(
             k_crp,
-            mean_crp_alpha,
+            gamma_alpha,
             n_rows,
             max_clusters,
         )
+        reused_row_assigns = view_row_assigns[old_view]
+        reused_n_clusters = view_n_clusters[old_view]
+        reused_alpha = view_row_crp_alpha[old_view]
+
+        new_row_assigns = jnp.where(is_singleton, reused_row_assigns, fresh_row_assigns)
+        new_n_clusters = jnp.where(is_singleton, reused_n_clusters, fresh_n_clusters)
+        new_view_alpha = jnp.where(is_singleton, reused_alpha, gamma_alpha)
         log_lik_new = _score_column_in_view(
             data_col,
             new_row_assigns,
@@ -1084,7 +1127,7 @@ def packed_transition_column_assignments(
         )
         new_view_row_crp_alpha = jnp.where(
             is_new_view,
-            view_row_crp_alpha.at[new_slot].set(mean_crp_alpha),
+            view_row_crp_alpha.at[new_slot].set(new_view_alpha),
             view_row_crp_alpha,
         )
 

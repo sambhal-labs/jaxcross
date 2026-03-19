@@ -332,6 +332,56 @@ def packed_mutual_information(
     return mi, linfoot
 
 
+def packed_dependence_probability(
+    packed_states: list[PackedCrossCatState],
+    col_i: int,
+    col_j: int,
+) -> Array:
+    """Posterior probability that two columns are dependent (packed version).
+
+    Z(i,j) = fraction of posterior samples where columns i and j are assigned
+    to the same view. This is the paper's primary exploratory statistic
+    (Mansinghka et al. 2016, Section 2.5.2).
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        col_i: First column index.
+        col_j: Second column index.
+
+    Returns:
+        Scalar probability in [0, 1].
+    """
+    same_count = sum(
+        1
+        for packed in packed_states
+        if int(packed.column_assignments[col_i]) == int(packed.column_assignments[col_j])
+    )
+    return jnp.array(same_count / len(packed_states))
+
+
+def packed_dependence_matrix(
+    packed_states: list[PackedCrossCatState],
+) -> Array:
+    """Full dependence probability matrix (Z-matrix) from packed states.
+
+    Z[i,j] = fraction of posterior samples where columns i and j share a view.
+    Diagonal is always 1.0. Symmetric.
+
+    Args:
+        packed_states: List of PackedCrossCatState.
+
+    Returns:
+        Array of shape (n_cols, n_cols) with values in [0, 1].
+    """
+    n_cols = int(packed_states[0].n_cols)
+    z = jnp.zeros((n_cols, n_cols))
+    for packed in packed_states:
+        assigns = packed.column_assignments[:n_cols]
+        same = (assigns[:, None] == assigns[None, :]).astype(jnp.float32)
+        z = z + same
+    return z / len(packed_states)
+
+
 def packed_row_similarity(
     packed_states: list[PackedCrossCatState],
     column_types: list,

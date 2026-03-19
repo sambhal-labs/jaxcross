@@ -210,10 +210,20 @@ def transition_column_assignments(
 
             log_probs.append(log_prior + log_lik)
 
-        # Score a new singleton view (sample row assignments from CRP prior)
+        # Score a new singleton view
+        # Paper (Algorithm 8, Neal 1998): if column j is a singleton (only column
+        # in its view), reuse the current view's row assignments as the auxiliary
+        # variable. Otherwise, sample fresh row assignments from CRP with alpha
+        # drawn from the Gamma(1,1) prior.
         log_prior_new = jnp.log(alpha)
-        k_crp, k_cat = jax.random.split(keys[j])
-        new_row_assigns = _crp_sample(k_crp, float(state.views[0].row_crp_alpha), n_rows)
+        k_crp, k_cat, k_alpha = jax.random.split(keys[j], 3)
+        is_singleton = int(jnp.sum(temp_assignments == old_view)) == 0
+        if is_singleton:
+            new_row_assigns = state.views[old_view].row_assignments
+            new_view_alpha = float(state.views[old_view].row_crp_alpha)
+        else:
+            new_view_alpha = float(jax.random.gamma(k_alpha, 1.0))
+            new_row_assigns = _crp_sample(k_crp, new_view_alpha, n_rows)
         n_new_clusters = int(jnp.max(new_row_assigns)) + 1
         log_lik_new = _log_marginal_for_column_in_view(
             data, j, col_type, hypers, new_row_assigns, n_new_clusters
@@ -239,7 +249,7 @@ def transition_column_assignments(
             new_view = ViewState(
                 column_indices=jnp.array([j]),
                 row_assignments=new_row_assigns,
-                row_crp_alpha=jnp.array(float(state.views[0].row_crp_alpha)),
+                row_crp_alpha=jnp.array(new_view_alpha),
                 suffstats=new_suffstats,
             )
             state.views.append(new_view)
@@ -636,7 +646,7 @@ def transition_column_hypers(
             data_var = jnp.var(col_data) + 1e-6
             s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
 
-            k1, k2, k3 = jax.random.split(keys[j], 3)
+            k1, k2, k3, k4 = jax.random.split(keys[j], 4)
 
             # Find local index of column j in this view
             local_idx_j = None
@@ -704,8 +714,22 @@ def transition_column_hypers(
             nu_idx = jax.random.categorical(k3, log_scores_nu)
             new_nu = nu_grid[nu_idx]
 
+            # Sample r (precision scale) — paper requires all 4 NormalGamma hypers sampled
+            r_grid = jnp.array([0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+            log_scores_r = jnp.array(
+                [
+                    _score_hypers(
+                        ColumnHypers(column_type=col_type, mu=new_mu, r=rv, s=new_s, nu=new_nu)
+                    )
+                    for rv in r_grid
+                ]
+            )
+            log_scores_r = log_scores_r - jnp.max(log_scores_r)
+            r_idx = jax.random.categorical(k4, log_scores_r)
+            new_r = r_grid[r_idx]
+
             new_hypers[j] = ColumnHypers(
-                column_type=col_type, mu=new_mu, r=hypers.r, s=new_s, nu=new_nu
+                column_type=col_type, mu=new_mu, r=new_r, s=new_s, nu=new_nu
             )
 
         elif col_type == ColumnType.CATEGORICAL:
@@ -822,7 +846,7 @@ def transition_crp_alphas(
     Returns:
         Updated CrossCatState with new CRP alpha values.
     """
-    alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0])
+    alpha_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(100.0), 50))
     keys = jax.random.split(rng_key, 1 + len(state.views))
 
     # Sample outer CRP alpha
