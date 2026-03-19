@@ -375,6 +375,56 @@ def mutual_information(
     return mi, linfoot
 
 
+def dependence_probability(
+    states: list[CrossCatState],
+    col_i: int,
+    col_j: int,
+) -> Array:
+    """Posterior probability that two columns are dependent (Z-matrix entry).
+
+    Z(i,j) = fraction of posterior samples where columns i and j are assigned
+    to the same view. This is the paper's primary exploratory statistic
+    (Mansinghka et al. 2016, Section 2.5.2).
+
+    Args:
+        states: List of CrossCat posterior states (MCMC samples).
+        col_i: First column index.
+        col_j: Second column index.
+
+    Returns:
+        Scalar probability in [0, 1].
+    """
+    same_count = sum(
+        1
+        for state in states
+        if int(state.column_assignments[col_i]) == int(state.column_assignments[col_j])
+    )
+    return jnp.array(same_count / len(states))
+
+
+def dependence_matrix(
+    states: list[CrossCatState],
+) -> Array:
+    """Full dependence probability matrix (Z-matrix).
+
+    Z[i,j] = fraction of posterior samples where columns i and j share a view.
+    Diagonal is always 1.0. Symmetric.
+
+    Args:
+        states: List of CrossCat posterior states.
+
+    Returns:
+        Array of shape (n_cols, n_cols) with values in [0, 1].
+    """
+    n_cols = states[0].n_cols
+    z = jnp.zeros((n_cols, n_cols))
+    for state in states:
+        assigns = jnp.array(state.column_assignments)
+        same = (assigns[:, None] == assigns[None, :]).astype(jnp.float32)
+        z = z + same
+    return z / len(states)
+
+
 def row_typicality(
     states: list[CrossCatState],
     row_id: int,
