@@ -108,28 +108,32 @@ samples = predictive_sample(
 
 ## Installation
 
+We recommend [uv](https://docs.astral.sh/uv/) for fast, reproducible installs.
+
+**CPU only:**
 ```bash
-pip install jax-crosscat
+uv pip install jax-crosscat
 ```
 
-**GPU support** (NVIDIA):
+**GPU support** (NVIDIA CUDA 13):
 ```bash
-pip install jax[cuda12]
-pip install jax-crosscat
+uv pip install "jax-crosscat[gpu]"
 ```
 
 **GPU support** (AMD ROCm):
 ```bash
-pip install jax[rocm] -f https://storage.googleapis.com/jax-releases/jax_rocm_releases.html
-pip install jax-crosscat
+uv pip install jax[rocm] -f https://storage.googleapis.com/jax-releases/jax_rocm_releases.html
+uv pip install jax-crosscat
 ```
 
 **From source** (development):
 ```bash
 git clone https://github.com/sambhal-labs/jaxcross.git
 cd jaxcross
-pip install -e ".[dev]"
+uv sync --extra dev
 ```
+
+> **pip** also works: `pip install jax-crosscat` or `pip install "jax-crosscat[gpu]"`.
 
 ## Architecture
 
@@ -318,13 +322,13 @@ python benchmarks/jit_benchmark.py
 
 ```bash
 # Fast tests (~10 min, includes packed state + unit tests)
-pytest -m "not slow"
+uv run pytest -m "not slow"
 
 # Full suite including recovery tests (~30 min)
-pytest
+uv run pytest
 
 # Single test file
-pytest tests/test_packed_state.py -v
+uv run pytest tests/test_packed_state.py -v
 ```
 
 **Test coverage**: 79 fast tests + 31 slow integration tests covering all 5 column types, missing data, convergence diagnostics, anomaly detection, mutual information, constraints, row similarity, and packed kernel correctness.
@@ -333,22 +337,22 @@ pytest tests/test_packed_state.py -v
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+uv sync --extra dev
 
 # Lint
-ruff check .
+uv run ruff check .
 
 # Format
-ruff format .
+uv run ruff format .
 
 # Type check
-mypy crosscat/ --ignore-missing-imports
+uv run mypy crosscat/ --ignore-missing-imports
 ```
 
 ### Pre-commit hooks
 
 ```bash
-pip install pre-commit
+uv tool install pre-commit
 pre-commit install
 ```
 
@@ -365,6 +369,7 @@ pre-commit install
 - [x] Interactive visualization dashboard (`dashboard/`)
 - [x] State serialization (save/load/checkpoint)
 - [x] Parallel multi-chain inference via `jax.vmap`
+- [x] GPU-validated test suite (104 fast + 31 slow tests)
 - [ ] PyPI release
 
 ## References

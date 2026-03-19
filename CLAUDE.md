@@ -9,26 +9,29 @@ JAX-CrossCat is a GPU-accelerated reimplementation of [probcomp/crosscat](https:
 ## Commands
 
 ```bash
-# Install with dev dependencies
-pip install -e ".[dev]"
+# Install with dev dependencies (using uv)
+uv sync --extra dev
+
+# Install with GPU support
+uv sync --extra dev --extra gpu
 
 # Run all tests
-pytest
+uv run pytest
 
 # Run a single test file
-pytest tests/test_synthetic_recovery.py
+uv run pytest tests/test_synthetic_recovery.py
 
 # Run a single test function
-pytest tests/test_new_features.py::test_function_name
+uv run pytest tests/test_new_features.py::test_function_name
 
 # Exclude slow tests
-pytest -m "not slow"
+uv run pytest -m "not slow"
 
 # Lint
-ruff check .
+uv run ruff check .
 
 # Format
-ruff format .
+uv run ruff format .
 ```
 
 ## Architecture
