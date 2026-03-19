@@ -5,7 +5,10 @@ This guide walks through a complete analysis using jax-crosscat: generating synt
 ## Setup
 
 ```bash
-pip install jax-crosscat
+uv pip install jax-crosscat
+
+# With GPU support (NVIDIA CUDA 13)
+uv pip install "jax-crosscat[gpu]"
 ```
 
 ```python

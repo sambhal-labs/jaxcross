@@ -1,6 +1,6 @@
 """jax-crosscat: GPU-accelerated nonparametric cross-categorization in JAX."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import (
