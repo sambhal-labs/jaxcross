@@ -572,12 +572,20 @@ class VonMises:
 
     @staticmethod
     def log_marginal_likelihood(suffstats: SufficientStats, hypers: ColumnHypers) -> Array:
-        """Log marginal likelihood for circular data.
+        """Log marginal likelihood for circular data (approximate).
 
         Uses the von Mises-Fisher conjugate model:
         log p(data | kappa) ≈ -n * log(2*pi) - n * log_I0(kappa) + kappa * R
 
         where R = sqrt(sum_sin^2 + sum_cos^2) is the resultant length.
+
+        NOTE: This is an approximation that uses kappa * R directly without
+        marginalizing over the posterior mean direction mu. A more accurate
+        conjugate treatment would integrate over the posterior von Mises
+        distribution of mu, yielding a marginal involving I_0(kappa_post) /
+        I_0(kappa_prior) ratios. See Mardia & Jupp (2000), Section 5.3.
+        The approximation is adequate for typical use cases but may be less
+        accurate for very small clusters.
         """
         n = suffstats.count.astype(jnp.float32)
         kappa = hypers.kappa
