@@ -572,26 +572,33 @@ class VonMises:
 
     @staticmethod
     def log_marginal_likelihood(suffstats: SufficientStats, hypers: ColumnHypers) -> Array:
-        """Log marginal likelihood for circular data (approximate).
+        """Log marginal likelihood for circular data.
 
-        Uses the von Mises-Fisher conjugate model:
-        log p(data | kappa) ≈ -n * log(2*pi) - n * log_I0(kappa) + kappa * R
+        Exact conjugate marginal obtained by integrating out the mean direction
+        mu from the von Mises likelihood × von Mises prior:
 
-        where R = sqrt(sum_sin^2 + sum_cos^2) is the resultant length.
+            p(data | kappa, vm_mu) = [1/(2*pi)]^n * [I_0(kappa_post) / I_0(kappa)]
+                                     / [I_0(kappa)]^n
 
-        NOTE: This is an approximation that uses kappa * R directly without
-        marginalizing over the posterior mean direction mu. A more accurate
-        conjugate treatment would integrate over the posterior von Mises
-        distribution of mu, yielding a marginal involving I_0(kappa_post) /
-        I_0(kappa_prior) ratios. See Mardia & Jupp (2000), Section 5.3.
-        The approximation is adequate for typical use cases but may be less
-        accurate for very small clusters.
+        where kappa_post = ||(sum_sin + kappa*sin(vm_mu), sum_cos + kappa*cos(vm_mu))||
+        is the posterior resultant length including the prior contribution.
+
+        See Mardia & Jupp (2000), Section 5.3.
         """
         n = suffstats.count.astype(jnp.float32)
         kappa = hypers.kappa
-        r_length = jnp.sqrt(suffstats.sum_sin**2 + suffstats.sum_cos**2)
 
-        log_ml = -n * jnp.log(2.0 * jnp.pi) - n * _log_bessel_i0(kappa) + kappa * r_length
+        # Posterior resultant length: combine data sufficient stats with prior
+        total_sin = suffstats.sum_sin + kappa * jnp.sin(hypers.vm_mu)
+        total_cos = suffstats.sum_cos + kappa * jnp.cos(hypers.vm_mu)
+        kappa_post = jnp.sqrt(total_sin**2 + total_cos**2)
+
+        # log p(data) = -n*log(2*pi) + log I_0(kappa_post) - (n+1)*log I_0(kappa)
+        log_ml = (
+            -n * jnp.log(2.0 * jnp.pi)
+            + _log_bessel_i0(kappa_post)
+            - (n + 1.0) * _log_bessel_i0(kappa)
+        )
         return log_ml
 
     @staticmethod

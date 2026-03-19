@@ -98,16 +98,20 @@ def _bb_log_marginal(n, sum_x, alpha, beta):
     return jnp.where(n > 0, log_ml, 0.0)
 
 
-def _vm_log_marginal(n, sum_sin, sum_cos, kappa):
-    """Von Mises log marginal likelihood (approximate).
+def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_mu):
+    """Von Mises log marginal likelihood (exact conjugate).
 
-    NOTE: Uses kappa * R approximation without marginalizing over posterior
-    mean direction. See crosscat/components.py VonMises.log_marginal_likelihood
-    for details on the approximation.
+    Integrates out mean direction mu via conjugate von Mises prior.
+    See Mardia & Jupp (2000), Section 5.3.
     """
     n = n.astype(jnp.float32)
-    r_length = jnp.sqrt(sum_sin**2 + sum_cos**2)
-    log_ml = -n * jnp.log(2.0 * jnp.pi) - n * _log_bessel_i0(kappa) + kappa * r_length
+    # Posterior resultant length: data + prior contribution
+    total_sin = sum_sin + kappa * jnp.sin(vm_mu)
+    total_cos = sum_cos + kappa * jnp.cos(vm_mu)
+    kappa_post = jnp.sqrt(total_sin**2 + total_cos**2)
+    log_ml = (
+        -n * jnp.log(2.0 * jnp.pi) + _log_bessel_i0(kappa_post) - (n + 1.0) * _log_bessel_i0(kappa)
+    )
     return jnp.where(n > 0, log_ml, 0.0)
 
 
@@ -138,7 +142,7 @@ def unified_log_marginal(
     cat_score = _dc_log_marginal(count, cat_counts, dir_alpha)
     binary_score = _bb_log_marginal(count, sum_x, alpha, beta)
     ordinal_score = _dc_log_marginal(count, cat_counts, jnp.ones_like(dir_alpha))
-    cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa)
+    cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa, vm_mu)
 
     return jnp.where(
         type_id == CONTINUOUS_ID,

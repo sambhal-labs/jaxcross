@@ -676,8 +676,12 @@ def packed_transition_column_hypers(
         sum_sin_col = packed.ss_sum_sin[v_idx, :, local_idx]  # (max_c,)
         sum_cos_col = packed.ss_sum_cos[v_idx, :, local_idx]  # (max_c,)
 
+        cur_vm_mu = packed.hyper_vm_mu[j]
+
         def score_vm_grid(kappa_val):
-            per_cluster = _vm_log_marginal(counts_col_cat, sum_sin_col, sum_cos_col, kappa_val)
+            per_cluster = _vm_log_marginal(
+                counts_col_cat, sum_sin_col, sum_cos_col, kappa_val, cur_vm_mu
+            )
             masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
             return jnp.sum(masked)
 

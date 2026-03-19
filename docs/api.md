@@ -111,6 +111,29 @@ Posterior predictive CDF: P(X <= value). Analytic for discrete types, MC for con
 
 **Returns**: Scalar in [0, 1].
 
+### `dependence_probability(states, col_i, col_j)`
+
+Posterior probability that two columns are dependent (Z-matrix entry). Fraction of posterior samples where columns share a view. This is the paper's primary exploratory statistic (Mansinghka et al. 2016, Section 2.5.2).
+
+**Returns**: Scalar in [0, 1].
+
+### `dependence_matrix(states)`
+
+Full dependence probability matrix (Z-matrix). `Z[i,j]` = fraction of posterior samples where columns i and j share a view. Diagonal is always 1.0. Symmetric.
+
+**Returns**: `Array (n_cols, n_cols)` with values in [0, 1].
+
+**Example:**
+
+```python
+from crosscat import dependence_matrix
+
+# After collecting posterior samples
+z = dependence_matrix(posterior_states)
+# z[i,j] ≈ 1.0 means columns i and j are almost always in the same view
+# z[i,j] ≈ 0.0 means columns i and j are almost always independent
+```
+
 ### `mutual_information(states, col_i, col_j, *, n_samples=1000)`
 
 Estimate mutual information between two columns, averaged over posterior samples.
@@ -330,6 +353,18 @@ Draw samples from the posterior predictive on packed state.
 Posterior predictive CDF on packed state.
 
 **Returns**: Scalar in [0, 1].
+
+### `packed_dependence_probability(packed_states, col_i, col_j)`
+
+Posterior probability that two columns are dependent (packed version).
+
+**Returns**: Scalar in [0, 1].
+
+### `packed_dependence_matrix(packed_states)`
+
+Full dependence probability matrix (Z-matrix) from packed states.
+
+**Returns**: `Array (n_cols, n_cols)` with values in [0, 1].
 
 ### `packed_mutual_information(packed_states, column_types, col_i, col_j)`
 
