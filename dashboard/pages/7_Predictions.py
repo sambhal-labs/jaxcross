@@ -40,6 +40,10 @@ tab_sample, tab_impute = st.tabs(["Sample", "Impute"])
 
 with tab_sample:
     st.subheader("Posterior Predictive Sampling")
+    st.caption(
+        "Draw samples from the posterior predictive distribution. "
+        "Optionally condition on an observed row to get conditional predictions."
+    )
 
     query_cols_names = st.multiselect(
         "Query columns (columns to sample)",
@@ -70,19 +74,27 @@ with tab_sample:
         if st.button("Sample", type="primary", key="btn_sample"):
             rng_key = jax.random.key(123)
 
-            with st.spinner("Drawing posterior predictive samples..."):
-                samples = packed_predictive_sample(
-                    rng_key,
-                    packed,
-                    data,
-                    query_col_indices,
-                    n_samples=n_samples,
-                    row_id=row_id,
-                )
+            try:
+                with st.spinner(
+                    f"Drawing {n_samples} posterior predictive samples "
+                    f"for {len(query_col_indices)} column(s)..."
+                ):
+                    samples = packed_predictive_sample(
+                        rng_key,
+                        packed,
+                        data,
+                        query_col_indices,
+                        n_samples=n_samples,
+                        row_id=row_id,
+                    )
 
-            samples_np = np.asarray(samples)
-            st.session_state["pred_samples"] = samples_np
-            st.session_state["pred_sample_cols"] = query_cols_names
+                samples_np = np.asarray(samples)
+                st.session_state["pred_samples"] = samples_np
+                st.session_state["pred_sample_cols"] = query_cols_names
+                st.toast("Samples drawn!", icon="✅")
+
+            except Exception as e:
+                st.error(f"Sampling failed: {e}")
 
     # Display samples if available
     if "pred_samples" in st.session_state:
@@ -158,6 +170,10 @@ with tab_sample:
 
 with tab_impute:
     st.subheader("Imputation with Confidence")
+    st.caption(
+        "Estimate missing values using the learned model. "
+        "The confidence score indicates how certain the model is about the imputation."
+    )
 
     impute_col_name = st.selectbox(
         "Column to impute",
@@ -169,22 +185,27 @@ with tab_impute:
     if st.button("Impute", type="primary", key="btn_impute"):
         rng_key = jax.random.key(456)
 
-        with st.spinner("Computing imputation..."):
-            point_est, confidence = packed_impute_and_confidence(
-                rng_key,
-                packed,
-                data,
-                impute_col_idx,
-            )
+        try:
+            with st.spinner(f"Computing imputation for **{impute_col_name}**..."):
+                point_est, confidence = packed_impute_and_confidence(
+                    rng_key,
+                    packed,
+                    data,
+                    impute_col_idx,
+                )
 
-        point_val = float(point_est)
-        conf_val = float(confidence)
+            point_val = float(point_est)
+            conf_val = float(confidence)
 
-        st.session_state["impute_result"] = {
-            "column": impute_col_name,
-            "point_estimate": point_val,
-            "confidence": conf_val,
-        }
+            st.session_state["impute_result"] = {
+                "column": impute_col_name,
+                "point_estimate": point_val,
+                "confidence": conf_val,
+            }
+            st.toast("Imputation complete!", icon="✅")
+
+        except Exception as e:
+            st.error(f"Imputation failed: {e}")
 
     # Display imputation result
     if "impute_result" in st.session_state:
@@ -197,9 +218,28 @@ with tab_impute:
                 f"{result['point_estimate']:.4f}",
             )
         with col2:
-            st.metric("Confidence", f"{result['confidence']:.4f}")
+            conf = result["confidence"]
+            st.metric("Confidence", f"{conf:.4f}")
 
-        st.caption(
-            "For continuous columns, confidence is exp(-IQR/std). "
-            "For discrete columns, confidence is the mode frequency."
-        )
+        # Confidence interpretation
+        if conf >= 0.8:
+            st.success("High confidence -- the model is fairly certain about this estimate.")
+        elif conf >= 0.4:
+            st.info("Moderate confidence -- the estimate is reasonable but uncertain.")
+        else:
+            st.warning("Low confidence -- the model is quite uncertain. Use with caution.")
+
+        with st.expander("About confidence scores"):
+            st.write(
+                "**Continuous columns:** confidence = `exp(-IQR / std)`. "
+                "A tight posterior (small IQR relative to std) yields high confidence."
+            )
+            st.write(
+                "**Discrete columns:** confidence = mode frequency. "
+                "If one category dominates the posterior, confidence is high."
+            )
+            st.write(
+                "- **> 0.8**: High confidence\n"
+                "- **0.4 - 0.8**: Moderate confidence\n"
+                "- **< 0.4**: Low confidence"
+            )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -21,6 +22,10 @@ st.header("Inference")
 if st.session_state.get("data") is None:
     st.warning("No data loaded. Go to the **Data Loading** page first.")
     st.stop()
+
+data = st.session_state["data"]
+n_rows, n_cols = data.shape
+st.caption(f"Dataset: **{n_rows}** rows x **{n_cols}** columns")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -44,49 +49,74 @@ with col2:
 st.divider()
 
 if st.button("Run Inference", type="primary"):
-    data = st.session_state["data"]
     column_types = st.session_state["column_types"]
 
-    st.info(
-        "The first sweep includes JAX JIT compilation and will be significantly "
-        "slower than subsequent sweeps. This is expected."
-    )
+    try:
+        # Phase 1: Initialization
+        with st.status("Initializing model...", expanded=True) as status:
+            st.write("Creating CrossCat state from the prior...")
+            engine = InferenceEngine(
+                data,
+                column_types,
+                max_views=max_views,
+                max_clusters=max_clusters,
+            )
+            status.update(label="Model initialized", state="complete")
 
-    # Create engine
-    with st.spinner("Initializing model..."):
-        engine = InferenceEngine(
-            data,
-            column_types,
-            max_views=max_views,
-            max_clusters=max_clusters,
-        )
+        # Phase 2: Gibbs sweeps
+        sweep_history: list[dict] = []
+        progress_bar = st.progress(0, text="Preparing Gibbs sweeps...")
 
-    # Run sweeps
-    sweep_history: list[dict] = []
-    progress_bar = st.progress(0, text="Running Gibbs sweeps...")
-    status_text = st.empty()
+        rng_key = jax.random.key(int(seed))
 
-    rng_key = jax.random.key(int(seed))
+        for i in range(n_sweeps):
+            rng_key, sweep_key = jax.random.split(rng_key)
 
-    for i in range(n_sweeps):
-        rng_key, sweep_key = jax.random.split(rng_key)
-        result = engine.run_sweep(sweep_key)
+            # Special message for first sweep (JIT compilation)
+            if i == 0:
+                progress_bar.progress(
+                    0,
+                    text=f"Sweep 1/{n_sweeps} -- JIT compiling (this sweep will be slower)...",
+                )
 
-        sweep_history.append(result)
+            t0 = time.time()
+            result = engine.run_sweep(sweep_key)
+            elapsed = time.time() - t0
 
-        progress = (i + 1) / n_sweeps
-        progress_bar.progress(progress, text=f"Sweep {i + 1}/{n_sweeps}")
-        status_text.text(f"log_joint: {result['log_joint']:.2f} | views: {result['n_views']}")
+            sweep_history.append(result)
 
-    progress_bar.progress(1.0, text="Done!")
+            progress = (i + 1) / n_sweeps
+            if i == 0:
+                progress_bar.progress(
+                    progress,
+                    text=(
+                        f"Sweep 1/{n_sweeps} done (JIT compile: {elapsed:.1f}s) | "
+                        f"log_joint: {result['log_joint']:.2f} | views: {result['n_views']}"
+                    ),
+                )
+            else:
+                progress_bar.progress(
+                    progress,
+                    text=(
+                        f"Sweep {i + 1}/{n_sweeps} ({elapsed:.2f}s) | "
+                        f"log_joint: {result['log_joint']:.2f} | views: {result['n_views']}"
+                    ),
+                )
 
-    # Store results in session state
-    st.session_state["engine"] = engine
-    st.session_state["packed_state"] = engine.get_packed_state()
-    st.session_state["sweep_history"] = sweep_history
-    st.session_state["inference_done"] = True
+        progress_bar.progress(1.0, text="Inference complete!")
 
-    st.success(f"Inference complete: {n_sweeps} sweeps finished.")
+        # Store results in session state
+        st.session_state["engine"] = engine
+        st.session_state["packed_state"] = engine.get_packed_state()
+        st.session_state["sweep_history"] = sweep_history
+        st.session_state["inference_done"] = True
+
+        st.success(f"Inference complete: **{n_sweeps}** sweeps finished.")
+        st.toast("Inference complete!", icon="✅")
+
+    except Exception as e:
+        st.error(f"Inference failed: {e}")
+        st.caption("Try adjusting max views/clusters or check that data is valid.")
 
 # ---------------------------------------------------------------------------
 # Summary (shown when inference has been run)
@@ -110,3 +140,5 @@ if st.session_state.get("inference_done"):
     if len(history) > 1:
         improvement = latest["log_joint"] - history[0]["log_joint"]
         st.write(f"log_joint improvement: **{improvement:+.2f}**")
+
+    st.info("Navigate to **Structure**, **Dependencies**, or other pages to explore results.")
