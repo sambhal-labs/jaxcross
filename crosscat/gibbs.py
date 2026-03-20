@@ -800,34 +800,71 @@ def transition_column_hypers(
             )
 
         elif col_type == ColumnType.CYCLIC:
-            # kappa grid: log-spaced, 31 points — data-dependent range
-            # Original uses [kappa_ml, num_rows * kappa_ml] but we approximate
-            # with [0.01, num_rows] since kappa_ml requires Newton iteration
+            # Sample kappa, vm_a, vm_mu via grid-based Gibbs (3 hypers, matching original)
             num_rows = max(state.n_rows, 1)
-            kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(float(num_rows)), 31))
-            log_scores = []
-            for kappa_val in kappa_grid:
-                test_hypers = ColumnHypers(
-                    column_type=col_type, kappa=kappa_val, vm_mu=hypers.vm_mu
-                )
-                log_score = jnp.array(0.0)
-                n_clusters = len(view.suffstats)
-                for c in range(n_clusters):
-                    local_idx = None
-                    for li, ci in enumerate(view.column_indices.tolist()):
-                        if int(ci) == j:
-                            local_idx = li
-                            break
-                    if local_idx is not None:
-                        ss = view.suffstats[c][local_idx]
-                        log_score = log_score + VonMises.log_marginal_likelihood(ss, test_hypers)
-                log_scores.append(log_score)
+            k1, k2, k3 = jax.random.split(keys[j], 3)
 
-            log_scores = jnp.array(log_scores)
-            log_scores = log_scores - jnp.max(log_scores)
-            idx = jax.random.categorical(keys[j], log_scores)
+            # Find local index of column j in this view
+            local_idx_j = None
+            for li, ci in enumerate(view.column_indices.tolist()):
+                if int(ci) == j:
+                    local_idx_j = li
+                    break
+
+            def _score_vm_hypers(test_hypers, _view=view, _local_idx=local_idx_j):
+                log_score = jnp.array(0.0)
+                n_clusters = len(_view.suffstats)
+                for c in range(n_clusters):
+                    if _local_idx is not None:
+                        ss = _view.suffstats[c][_local_idx]
+                        log_score = log_score + VonMises.log_marginal_likelihood(ss, test_hypers)
+                return log_score
+
+            # Sample kappa: log-spaced [0.01, num_rows], 31 points
+            kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(float(num_rows)), 31))
+            log_scores_k = jnp.array(
+                [
+                    _score_vm_hypers(
+                        ColumnHypers(
+                            column_type=col_type, kappa=kv, vm_a=hypers.vm_a, vm_mu=hypers.vm_mu
+                        )
+                    )
+                    for kv in kappa_grid
+                ]
+            )
+            log_scores_k = log_scores_k - jnp.max(log_scores_k)
+            new_kappa = kappa_grid[jax.random.categorical(k1, log_scores_k)]
+
+            # Sample vm_a: log-spaced [1/N, N], 31 points (original: log_linspace)
+            a_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / num_rows), jnp.log(float(num_rows)), 31))
+            log_scores_a = jnp.array(
+                [
+                    _score_vm_hypers(
+                        ColumnHypers(
+                            column_type=col_type, kappa=new_kappa, vm_a=av, vm_mu=hypers.vm_mu
+                        )
+                    )
+                    for av in a_grid
+                ]
+            )
+            log_scores_a = log_scores_a - jnp.max(log_scores_a)
+            new_a = a_grid[jax.random.categorical(k2, log_scores_a)]
+
+            # Sample vm_mu (b): linear [0, 2*pi], 31 points (original: linspace)
+            b_grid = jnp.linspace(0.0, 2.0 * jnp.pi, 31)
+            log_scores_b = jnp.array(
+                [
+                    _score_vm_hypers(
+                        ColumnHypers(column_type=col_type, kappa=new_kappa, vm_a=new_a, vm_mu=bv)
+                    )
+                    for bv in b_grid
+                ]
+            )
+            log_scores_b = log_scores_b - jnp.max(log_scores_b)
+            new_mu = b_grid[jax.random.categorical(k3, log_scores_b)]
+
             new_hypers[j] = ColumnHypers(
-                column_type=col_type, kappa=kappa_grid[idx], vm_mu=hypers.vm_mu
+                column_type=col_type, kappa=new_kappa, vm_a=new_a, vm_mu=new_mu
             )
 
         # Ordinal: keep hypers as-is (symmetric Dirichlet with alpha=1)

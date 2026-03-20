@@ -98,19 +98,23 @@ def _bb_log_marginal(n, sum_x, alpha, beta):
     return jnp.where(n > 0, log_ml, 0.0)
 
 
-def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_mu):
+def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """Von Mises log marginal likelihood (exact conjugate).
 
     Integrates out mean direction mu via conjugate von Mises prior.
+    kappa = likelihood concentration, vm_a = prior concentration, vm_mu = prior mean (b).
     See Mardia & Jupp (2000), Section 5.3.
     """
     n = n.astype(jnp.float32)
-    # Posterior resultant length: data + prior contribution
-    total_sin = sum_sin + kappa * jnp.sin(vm_mu)
-    total_cos = sum_cos + kappa * jnp.cos(vm_mu)
-    kappa_post = jnp.sqrt(total_sin**2 + total_cos**2)
+    # Posterior resultant length: data + prior(a, b) contribution
+    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
+    R = jnp.sqrt(total_sin**2 + total_cos**2)
     log_ml = (
-        -n * jnp.log(2.0 * jnp.pi) + _log_bessel_i0(kappa_post) - (n + 1.0) * _log_bessel_i0(kappa)
+        -n * jnp.log(2.0 * jnp.pi)
+        + _log_bessel_i0(R)
+        - n * _log_bessel_i0(kappa)
+        - _log_bessel_i0(vm_a)
     )
     return jnp.where(n > 0, log_ml, 0.0)
 
@@ -131,6 +135,7 @@ def unified_log_marginal(
     alpha,
     beta,
     kappa,
+    vm_a,
     vm_mu,
 ):
     """Compute log marginal likelihood for any column type without Python branching.
@@ -142,7 +147,7 @@ def unified_log_marginal(
     cat_score = _dc_log_marginal(count, cat_counts, dir_alpha)
     binary_score = _bb_log_marginal(count, sum_x, alpha, beta)
     ordinal_score = _dc_log_marginal(count, cat_counts, jnp.ones_like(dir_alpha))
-    cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa, vm_mu)
+    cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
         type_id == CONTINUOUS_ID,
@@ -220,14 +225,12 @@ def _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta):
     return jnp.where(x > 0.5, log_p1, log_p0)
 
 
-def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_mu):
+def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """Von Mises posterior predictive log p(x | suffstats, hypers)."""
-    total_sin = sum_sin + kappa * jnp.sin(vm_mu)
-    total_cos = sum_cos + kappa * jnp.cos(vm_mu)
-    r_post = jnp.sqrt(total_sin**2 + total_cos**2)
+    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
-    kappa_post = r_post
-    return kappa_post * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa_post)
+    return kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
 
 
 def unified_posterior_predictive_logp(
@@ -247,6 +250,7 @@ def unified_posterior_predictive_logp(
     alpha,
     beta,
     kappa,
+    vm_a,
     vm_mu,
 ):
     """Compute posterior predictive logp for any column type without Python branching."""
@@ -254,7 +258,7 @@ def unified_posterior_predictive_logp(
     cat = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
     binary = _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta)
     ordinal = _dc_posterior_predictive_logp(x, count, cat_counts, jnp.ones_like(dir_alpha))
-    cyclic = _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_mu)
+    cyclic = _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
         type_id == CONTINUOUS_ID,
@@ -324,16 +328,14 @@ def _bb_sample(rng_key, count, sum_x, alpha, beta):
     return jax.random.bernoulli(rng_key, p1).astype(jnp.float32)
 
 
-def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_mu):
+def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """Sample from von Mises posterior predictive (wrapped normal approximation)."""
-    total_sin = sum_sin + kappa * jnp.sin(vm_mu)
-    total_cos = sum_cos + kappa * jnp.cos(vm_mu)
-    r_post = jnp.sqrt(total_sin**2 + total_cos**2)
+    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
-    kappa_post = r_post
 
     # Wrapped normal approximation: sigma = 1/sqrt(kappa)
-    sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa_post, 1e-30))
+    sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa, 1e-30))
     z = jax.random.normal(rng_key)
     # Wrap to [0, 2*pi)
     sample = mu_post + sigma * z
@@ -357,6 +359,7 @@ def unified_sample_posterior_predictive(
     alpha,
     beta,
     kappa,
+    vm_a,
     vm_mu,
 ):
     """Sample from posterior predictive for any column type without Python branching.
@@ -368,7 +371,7 @@ def unified_sample_posterior_predictive(
         rng_key: PRNG key for sampling.
         type_id: Integer column type ID.
         count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos: Sufficient statistics.
-        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu: Hyperparameters.
+        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_a, vm_mu: Hyperparameters.
 
     Returns:
         Scalar sample from the posterior predictive distribution.
@@ -378,7 +381,7 @@ def unified_sample_posterior_predictive(
     cont_sample = _ng_sample(k1, count, sum_x, sum_x_sq, mu, r, s, nu)
     cat_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
     binary_sample = _bb_sample(k3, count, sum_x, alpha, beta)
-    cyclic_sample = _vm_sample(k4, count, sum_sin, sum_cos, kappa, vm_mu)
+    cyclic_sample = _vm_sample(k4, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
     ordinal_sample = _dc_sample(k2, count, cat_counts, jnp.ones_like(dir_alpha))
 
     return jnp.where(

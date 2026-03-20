@@ -97,8 +97,9 @@ class ColumnHypers:
     # Ordinal
     cutpoints: Array | None = None
     # Cyclic (Von Mises)
-    kappa: Array | None = None  # concentration
-    vm_mu: Array | None = None  # prior mean direction
+    kappa: Array | None = None  # likelihood concentration
+    vm_a: Array | None = None  # prior concentration on mean direction
+    vm_mu: Array | None = None  # prior mean direction (b in original)
 
 
 @dataclass
