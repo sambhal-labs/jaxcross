@@ -42,3 +42,6 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Benchmark results
+results/
