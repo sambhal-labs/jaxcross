@@ -54,6 +54,7 @@ _ARRAY_FIELDS = (
     "hyper_alpha",
     "hyper_beta",
     "hyper_kappa",
+    "hyper_vm_a",
     "hyper_vm_mu",
     "view_column_indices",
     "view_n_columns",
@@ -105,7 +106,8 @@ class PackedCrossCatState:
     hyper_alpha: Array  # (n_cols,)
     hyper_beta: Array  # (n_cols,)
     hyper_kappa: Array  # (n_cols,)
-    hyper_vm_mu: Array  # (n_cols,)
+    hyper_vm_a: Array  # (n_cols,) — prior concentration on mean direction
+    hyper_vm_mu: Array  # (n_cols,) — prior mean direction (b)
 
     # View data — leading (max_views,) dimension
     view_column_indices: Array  # (max_views, max_cols_per_view) int, -1=invalid
@@ -192,6 +194,7 @@ def pack_state(
     hyper_alpha = jnp.ones(n_cols)
     hyper_beta = jnp.ones(n_cols)
     hyper_kappa = jnp.ones(n_cols)
+    hyper_vm_a = jnp.ones(n_cols)
     hyper_vm_mu = jnp.ones(n_cols) * jnp.pi
 
     for j, h in enumerate(state.column_hypers):
@@ -211,6 +214,8 @@ def pack_state(
             hyper_beta = hyper_beta.at[j].set(float(h.beta))
         if h.kappa is not None:
             hyper_kappa = hyper_kappa.at[j].set(float(h.kappa))
+        if h.vm_a is not None:
+            hyper_vm_a = hyper_vm_a.at[j].set(float(h.vm_a))
         if h.vm_mu is not None:
             hyper_vm_mu = hyper_vm_mu.at[j].set(float(h.vm_mu))
 
@@ -273,6 +278,7 @@ def pack_state(
         hyper_alpha=hyper_alpha,
         hyper_beta=hyper_beta,
         hyper_kappa=hyper_kappa,
+        hyper_vm_a=hyper_vm_a,
         hyper_vm_mu=hyper_vm_mu,
         view_column_indices=view_column_indices,
         view_n_columns=view_n_columns,
@@ -338,7 +344,10 @@ def unpack_state(
             h = ColumnHypers(column_type=ct, cutpoints=None)
         elif ct == ColumnType.CYCLIC:
             h = ColumnHypers(
-                column_type=ct, kappa=packed.hyper_kappa[j], vm_mu=packed.hyper_vm_mu[j]
+                column_type=ct,
+                kappa=packed.hyper_kappa[j],
+                vm_a=packed.hyper_vm_a[j],
+                vm_mu=packed.hyper_vm_mu[j],
             )
         else:
             raise ValueError(f"Unknown column type: {ct}")

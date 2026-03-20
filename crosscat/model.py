@@ -104,8 +104,9 @@ def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
     elif column_type == ColumnType.CYCLIC:
         return ColumnHypers(
             column_type=column_type,
-            kappa=jnp.array(1.0),
-            vm_mu=jnp.array(jnp.pi),  # prior mean at pi
+            kappa=jnp.array(1.0),  # likelihood concentration
+            vm_a=jnp.array(1.0),  # prior concentration on mean direction
+            vm_mu=jnp.array(jnp.pi),  # prior mean direction (b)
         )
     else:
         raise ValueError(f"Unknown column type: {column_type}")

@@ -89,6 +89,7 @@ def _logp_one_column_mixture(
             packed.hyper_alpha[col_idx],
             packed.hyper_beta[col_idx],
             packed.hyper_kappa[col_idx],
+            packed.hyper_vm_a[col_idx],
             packed.hyper_vm_mu[col_idx],
         )
 
@@ -266,6 +267,7 @@ def packed_predictive_sample(
                 packed.hyper_alpha[c],
                 packed.hyper_beta[c],
                 packed.hyper_kappa[c],
+                packed.hyper_vm_a[c],
                 packed.hyper_vm_mu[c],
             )
 
