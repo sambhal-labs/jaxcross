@@ -890,6 +890,12 @@ def transition_crp_alphas(
     This follows the original CrossCat approach rather than BlackJAX NUTS
     for simplicity and stability.
 
+    NOTE: The original probcomp/crosscat uses a flat (improper) prior on CRP
+    alpha (calc_crp_alpha_hyperprior returns 0). We follow the paper's
+    specification of Gamma(1,1) = Exp(1), i.e. log_prior = -alpha. This is
+    a deliberate divergence from the reference implementation, consistent with
+    Mansinghka et al. (2016) Section 3.
+
     Args:
         rng_key: JAX PRNG key.
         state: Current CrossCat state.
