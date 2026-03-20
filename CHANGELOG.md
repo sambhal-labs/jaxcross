@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-20
+
+### Changed
+- VonMises sampling: rejection sampling (uniform proposal on [0, 2π), accept/reject
+  against predictive logp) matching original `CyclicComponentModel::get_draw_constrained()`
+- Mutual information estimation: Monte Carlo sampling matching original
+  `inference_utils.estimate_MI_sample()` — draws (x,y) from joint predictive,
+  computes MI = E[log p(x,y) - log p(x) - log p(y)] with importance weighting
+- Von Mises kappa grid: `linspace(kappa_est, N*kappa_est, 31)` anchored at MLE
+  estimate, matching original `construct_cyclic_specific_hyper_grid()`
+- Benchmarks (synthetic + MNIST) switched to packed JIT kernels for ~10x speedup
+
+### Fixed
+- `packed/kernels.py`: missing `hyper_vm_a` argument in `_score_row_one_cluster`
+  and `_score_column_in_view` calls for new-cluster scoring
+- `tests/test_new_features.py`: VonMises tests missing `vm_a` hyperparameter
+
 ## [0.7.0] - 2026-03-20
 
 ### Added
