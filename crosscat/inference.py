@@ -314,15 +314,21 @@ def mutual_information(
     col_j: int,
     *,
     n_samples: int = 1000,
+    rng_key: Array | None = None,
 ) -> tuple[Array, Array]:
-    """Estimate mutual information between two columns.
+    """Estimate mutual information between two columns via Monte Carlo sampling.
 
-    Maps to original inference_utils.mutual_information() and
+    Maps to original inference_utils.estimate_MI_sample() and
     inference_utils.mutual_information_to_linfoot().
 
-    Uses the CrossCat structure: if two columns are in the same view,
-    they share row clustering and thus have nonzero MI. If in different
-    views, they are independent (MI = 0).
+    Algorithm (matching original):
+      1. For each posterior state, check if cols share a view (MI=0 if not).
+      2. Draw (x, y) pairs from the joint predictive by sampling a cluster
+         from CRP weights, then sampling x from col_i and y from col_j in
+         that cluster's component model.
+      3. Compute log p(x,y), log p(x), log p(y) across all clusters.
+      4. MI_sample = log p(x,y) - log p(x) - log p(y).
+      5. Return weighted average with softmax(log p(x,y)) weights.
 
     Averaged over multiple posterior states (ensemble inference).
 
@@ -331,48 +337,129 @@ def mutual_information(
         col_i: First column index.
         col_j: Second column index.
         n_samples: MC samples for MI estimation.
+        rng_key: JAX PRNG key (uses key(0) if not provided).
 
     Returns:
         Tuple of (mutual_information, linfoot_correlation).
     """
+    if rng_key is None:
+        rng_key = jax.random.key(0)
+
     mi_estimates = []
 
-    for state in states:
+    for s_idx, state in enumerate(states):
         view_i = int(state.column_assignments[col_i])
         view_j = int(state.column_assignments[col_j])
 
         if view_i != view_j:
-            # Different views => independent => MI = 0
             mi_estimates.append(0.0)
             continue
 
-        # Same view — estimate MI from cluster structure
         view = state.views[view_i]
-        n_clusters = int(jnp.max(view.row_assignments)) + 1
-
-        # MI from clustering: H(X) + H(Y) - H(X,Y)
-        # Here we use the approximation based on cluster assignment entropy
-        cluster_counts = jnp.array(
-            [jnp.sum(view.row_assignments == c) for c in range(n_clusters)]
-        ).astype(jnp.float32)
-        cluster_probs = cluster_counts / cluster_counts.sum()
-
-        # Since both columns share the same row clustering,
-        # MI is bounded by the entropy of the clustering
-        entropy_clustering = -jnp.sum(
-            jnp.where(cluster_probs > 0, cluster_probs * jnp.log(cluster_probs + 1e-30), 0.0)
+        mi_est = _estimate_mi_sample(
+            jax.random.fold_in(rng_key, s_idx),
+            state,
+            view,
+            view_i,
+            col_i,
+            col_j,
+            n_samples,
         )
-
-        # Scale by number of clusters relative to max possible
-        # More clusters with columns co-assigned = higher dependency signal
-        mi_est = entropy_clustering * (1.0 - 1.0 / jnp.maximum(n_clusters, 1.0))
         mi_estimates.append(float(mi_est))
 
     mi = jnp.array(mi_estimates).mean()
-    # Linfoot correlation: sqrt(1 - exp(-2*MI))
+    mi = jnp.maximum(mi, 0.0)
     linfoot = jnp.sqrt(1.0 - jnp.exp(-2.0 * mi))
 
     return mi, linfoot
+
+
+def _estimate_mi_sample(
+    rng_key: Array,
+    state: CrossCatState,
+    view,
+    view_idx: int,
+    col_i: int,
+    col_j: int,
+    n_samples: int,
+) -> float:
+    """MC MI estimation for two columns in the same view.
+
+    Maps to original inference_utils.estimate_MI_sample().
+    Draws (x, y) from joint predictive, computes MI = E[log p(x,y) - log p(x) - log p(y)]
+    with importance weighting by p(x, y).
+    """
+    n_clusters = int(jnp.max(view.row_assignments)) + 1
+    cluster_weights = _cluster_weights(view, state.n_rows)
+    log_cluster_weights = jnp.log(cluster_weights + 1e-30)
+
+    # Find local column indices in the view
+    local_i = _local_col_index(view, col_i)
+    local_j = _local_col_index(view, col_j)
+
+    comp_i = get_component(state.column_types[col_i])
+    comp_j = get_component(state.column_types[col_j])
+    hypers_i = state.column_hypers[col_i]
+    hypers_j = state.column_hypers[col_j]
+
+    mi_samples = []
+    log_weights = []
+
+    keys = jax.random.split(rng_key, n_samples)
+
+    for s in range(n_samples):
+        k1, k2, k3 = jax.random.split(keys[s], 3)
+
+        # Draw cluster from CRP weights
+        cluster = int(jax.random.categorical(k1, log_cluster_weights))
+
+        # Sample x from col_i's component in this cluster
+        ss_i = view.suffstats[cluster][local_i]
+        x = comp_i.sample_posterior_predictive(k2, ss_i, hypers_i, n=1)[0]
+
+        # Sample y from col_j's component in this cluster
+        ss_j = view.suffstats[cluster][local_j]
+        y = comp_j.sample_posterior_predictive(k3, ss_j, hypers_j, n=1)[0]
+
+        # Compute log p(x), log p(y), log p(x,y) across all clusters
+        log_px = -jnp.inf
+        log_py = -jnp.inf
+        log_pxy = -jnp.inf
+
+        for c in range(n_clusters):
+            ss_ic = view.suffstats[c][local_i]
+            ss_jc = view.suffstats[c][local_j]
+
+            lp_x_c = comp_i.posterior_predictive_logp(x, ss_ic, hypers_i)
+            lp_y_c = comp_j.posterior_predictive_logp(y, ss_jc, hypers_j)
+            lw = log_cluster_weights[c]
+
+            log_px = jnp.logaddexp(log_px, lw + lp_x_c)
+            log_py = jnp.logaddexp(log_py, lw + lp_y_c)
+            # Joint: p(x,y|c) = p(x|c) * p(y|c) (conditional independence within cluster)
+            # p(x,y) = sum_c p(c) * p(x|c) * p(y|c)
+            log_pxy = jnp.logaddexp(log_pxy, lw + lp_x_c + lp_y_c)
+
+        mi_sample = float(log_pxy - log_px - log_py)
+        mi_samples.append(mi_sample)
+        log_weights.append(float(log_pxy))
+
+    # Weighted average with softmax(log_pxy) weights (matching original)
+    mi_arr = jnp.array(mi_samples)
+    lw_arr = jnp.array(log_weights)
+    weights = jax.nn.softmax(lw_arr)
+    mi_est = float(jnp.sum(weights * mi_arr))
+
+    return max(mi_est, 0.0)
+
+
+def _local_col_index(view, col: int) -> int:
+    """Find the local index of a column within a view."""
+    for li, ci in enumerate(view.column_indices.tolist()):
+        if int(ci) == col:
+            return li
+    msg = f"Column {col} not found in view"
+    raise ValueError(msg)
 
 
 def dependence_probability(

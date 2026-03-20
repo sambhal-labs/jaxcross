@@ -30,9 +30,10 @@ from crosscat.diagnostics import (
     evaluate_imputation,
     random_holdout_mask,
 )
-from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import dependence_matrix
 from crosscat.model import initialize
+from crosscat.packed.kernels import packed_gibbs_sweep
+from crosscat.packed.state import pack_state, unpack_state
 from crosscat.types import ColumnType
 
 
@@ -140,26 +141,33 @@ def run_benchmark(
     states = []
     all_chain_metrics: list[list[dict]] = []
 
+    diag_interval = 10  # Unpack for diagnostics every N sweeps
+
     for chain_idx in range(n_chains):
         print(f"\n--- Chain {chain_idx + 1}/{n_chains} ---")
         k_i, k_sweep = jax.random.split(init_keys[chain_idx])
         state = initialize(k_i, data_masked, col_types)
+        packed = pack_state(state)
 
         chain_metrics: list[dict] = []
         t0 = time.time()
         for sweep in range(n_sweeps):
             k_sweep, subkey = jax.random.split(k_sweep)
-            state = gibbs_sweep(subkey, state, data_masked, n_sweeps=1)
+            packed = packed_gibbs_sweep(subkey, packed, data_masked, n_sweeps=1)
 
-            diag = collect_diagnostics(state, data_masked)
-            chain_metrics.append({"sweep": sweep + 1, **diag})
+            # Collect metrics periodically (unpacking is expensive)
+            if (sweep + 1) % diag_interval == 0 or sweep == n_sweeps - 1:
+                state = unpack_state(packed, col_types, data=data_masked)
+                diag = collect_diagnostics(state, data_masked)
+                chain_metrics.append({"sweep": sweep + 1, **diag})
 
-            if (sweep + 1) % 10 == 0:
-                print(
-                    f"  Sweep {sweep + 1:3d}/{n_sweeps}: "
-                    f"n_views={state.n_views}, log_joint={diag['log_joint']:.0f}"
-                )
+                if (sweep + 1) % 10 == 0:
+                    print(
+                        f"  Sweep {sweep + 1:3d}/{n_sweeps}: "
+                        f"n_views={state.n_views}, log_joint={diag['log_joint']:.0f}"
+                    )
 
+        state = unpack_state(packed, col_types, data=data_masked)
         elapsed = time.time() - t0
         print(f"  Time: {elapsed:.1f}s ({elapsed / n_sweeps:.2f}s/sweep)")
         states.append(state)

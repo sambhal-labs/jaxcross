@@ -283,55 +283,151 @@ def packed_mutual_information(
     column_types: list,
     col_i: int,
     col_j: int,
+    *,
+    n_samples: int = 1000,
+    rng_key: Array | None = None,
 ) -> tuple[Array, Array]:
-    """Estimate mutual information between two columns from packed states.
+    """Estimate mutual information between two columns via Monte Carlo sampling.
 
-    Uses CrossCat structure: columns in the same view share clustering and
-    have nonzero MI; columns in different views are independent (MI=0).
+    Maps to original inference_utils.estimate_MI_sample().
+    Draws (x, y) pairs from joint predictive, computes MI = E[log p(x,y) - log p(x) - log p(y)]
+    with importance weighting by p(x, y).
 
     Averaged over multiple packed states (ensemble inference).
-    Python loop over the (small) list of states is acceptable.
 
     Args:
         packed_states: List of PackedCrossCatState (4-8 chains typically).
         column_types: Column type list.
         col_i: First column index.
         col_j: Second column index.
+        n_samples: MC samples for MI estimation.
+        rng_key: JAX PRNG key (uses key(0) if not provided).
 
     Returns:
         Tuple of (mutual_information, linfoot_correlation).
     """
+    if rng_key is None:
+        rng_key = jax.random.key(0)
+
     mi_estimates = []
 
-    for packed in packed_states:
-        view_i = packed.column_assignments[col_i]
-        view_j = packed.column_assignments[col_j]
+    for s_idx, packed in enumerate(packed_states):
+        view_i = int(packed.column_assignments[col_i])
+        view_j = int(packed.column_assignments[col_j])
 
-        same_view = view_i == view_j
-
-        # If different views, MI = 0
-        if not same_view:
+        if view_i != view_j:
             mi_estimates.append(0.0)
             continue
 
-        # Same view: estimate MI from clustering entropy
-        v = int(view_i)
-        assigns = packed.view_row_assignments[v]
-        max_k = packed.max_clusters
-        one_hot = jax.nn.one_hot(assigns, max_k)
-        counts = one_hot.sum(axis=0).astype(jnp.float32)
-        total = counts.sum()
-        probs = counts / jnp.maximum(total, 1e-30)
-
-        entropy_clustering = -jnp.sum(jnp.where(probs > 0, probs * jnp.log(probs + 1e-30), 0.0))
-
-        n_clusters = int(packed.view_n_clusters[v])
-        mi_est = entropy_clustering * (1.0 - 1.0 / jnp.maximum(float(n_clusters), 1.0))
+        mi_est = _packed_estimate_mi_sample(
+            jax.random.fold_in(rng_key, s_idx),
+            packed,
+            view_i,
+            col_i,
+            col_j,
+            n_samples,
+        )
         mi_estimates.append(float(mi_est))
 
     mi = jnp.array(mi_estimates).mean()
+    mi = jnp.maximum(mi, 0.0)
     linfoot = jnp.sqrt(1.0 - jnp.exp(-2.0 * mi))
     return mi, linfoot
+
+
+def _packed_estimate_mi_sample(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    view_idx: int,
+    col_i: int,
+    col_j: int,
+    n_samples: int,
+) -> float:
+    """MC MI estimation for two columns in the same view (packed version).
+
+    Maps to original inference_utils.estimate_MI_sample().
+    """
+    cluster_weights = _cluster_weights_packed(packed, view_idx)
+    log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, 1e-30))
+    n_clusters = int(packed.view_n_clusters[view_idx])
+
+    local_i = int(_find_local_col_index(packed, view_idx, col_i))
+    local_j = int(_find_local_col_index(packed, view_idx, col_j))
+
+    type_id_i = packed.col_type_ids[col_i]
+    type_id_j = packed.col_type_ids[col_j]
+
+    def _get_hypers(col: int):
+        return (
+            packed.hyper_mu[col],
+            packed.hyper_r[col],
+            packed.hyper_s[col],
+            packed.hyper_nu[col],
+            packed.hyper_dirichlet_alpha[col],
+            packed.hyper_alpha[col],
+            packed.hyper_beta[col],
+            packed.hyper_kappa[col],
+            packed.hyper_vm_a[col],
+            packed.hyper_vm_mu[col],
+        )
+
+    hypers_i = _get_hypers(col_i)
+    hypers_j = _get_hypers(col_j)
+
+    def _get_ss(local_col: int, cluster: int):
+        return (
+            packed.ss_counts[view_idx, cluster, local_col].astype(jnp.float32),
+            packed.ss_sum_x[view_idx, cluster, local_col],
+            packed.ss_sum_x_sq[view_idx, cluster, local_col],
+            packed.ss_cat_counts[view_idx, cluster, local_col],
+            packed.ss_sum_sin[view_idx, cluster, local_col],
+            packed.ss_sum_cos[view_idx, cluster, local_col],
+        )
+
+    mi_samples = []
+    log_weights = []
+    keys = jax.random.split(rng_key, n_samples)
+
+    for s in range(n_samples):
+        k1, k2, k3 = jax.random.split(keys[s], 3)
+
+        # Draw cluster
+        cluster = int(jax.random.categorical(k1, log_cluster_weights))
+
+        # Sample x from col_i, y from col_j in this cluster
+        ss_i = _get_ss(local_i, cluster)
+        x = unified_sample_posterior_predictive(k2, type_id_i, *ss_i, *hypers_i)
+
+        ss_j = _get_ss(local_j, cluster)
+        y = unified_sample_posterior_predictive(k3, type_id_j, *ss_j, *hypers_j)
+
+        # Compute log p(x), log p(y), log p(x,y) across all clusters
+        log_px = -jnp.inf
+        log_py = -jnp.inf
+        log_pxy = -jnp.inf
+
+        for c in range(n_clusters):
+            ss_ic = _get_ss(local_i, c)
+            ss_jc = _get_ss(local_j, c)
+            lw = log_cluster_weights[c]
+
+            lp_x_c = unified_posterior_predictive_logp(x, type_id_i, *ss_ic, *hypers_i)
+            lp_y_c = unified_posterior_predictive_logp(y, type_id_j, *ss_jc, *hypers_j)
+
+            log_px = jnp.logaddexp(log_px, lw + lp_x_c)
+            log_py = jnp.logaddexp(log_py, lw + lp_y_c)
+            log_pxy = jnp.logaddexp(log_pxy, lw + lp_x_c + lp_y_c)
+
+        mi_samples.append(float(log_pxy - log_px - log_py))
+        log_weights.append(float(log_pxy))
+
+    # Weighted average with softmax weights
+    mi_arr = jnp.array(mi_samples)
+    lw_arr = jnp.array(log_weights)
+    weights = jax.nn.softmax(lw_arr)
+    mi_est = float(jnp.sum(weights * mi_arr))
+
+    return max(mi_est, 0.0)
 
 
 def packed_dependence_probability(
