@@ -7,11 +7,12 @@ Maps to original CrossCat:
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
 from crosscat.model import log_joint
-from crosscat.types import CrossCatState
+from crosscat.types import ColumnType, CrossCatState
 
 
 def adjusted_rand_index(assignments_true: Array, assignments_pred: Array) -> Array:
@@ -156,3 +157,132 @@ def mean_test_log_likelihood(
             n_scored += 1
 
     return total_ll / jnp.maximum(jnp.float32(n_scored), 1.0)
+
+
+def random_holdout_mask(
+    rng_key: Array,
+    n_rows: int,
+    n_cols: int,
+    holdout_fraction: float = 0.1,
+) -> Array:
+    """Generate random boolean mask for held-out evaluation.
+
+    Args:
+        rng_key: JAX PRNG key.
+        n_rows: Number of rows.
+        n_cols: Number of columns.
+        holdout_fraction: Fraction of cells to hold out.
+
+    Returns:
+        Boolean array of shape (n_rows, n_cols). True = held-out.
+    """
+    return jax.random.bernoulli(rng_key, holdout_fraction, shape=(n_rows, n_cols))
+
+
+def evaluate_imputation(
+    state: CrossCatState,
+    data: Array,
+    mask: Array,
+    col_types: list[ColumnType],
+    *,
+    rng_key: Array | None = None,
+) -> dict:
+    """Evaluate imputation accuracy on held-out cells.
+
+    For each held-out cell (mask == True), computes:
+    - Predictive log-likelihood of the true value
+    - Point estimate error (MAE for continuous, accuracy for discrete)
+
+    Args:
+        state: CrossCat state (single posterior sample).
+        data: Full observation matrix, shape (n_rows, n_cols).
+        mask: Boolean mask, shape (n_rows, n_cols). True = held-out.
+        col_types: Column type per column.
+        rng_key: JAX PRNG key (needed for imputation sampling).
+
+    Returns:
+        Dictionary with:
+            'mae': mean absolute error (continuous columns only)
+            'accuracy': fraction correct (categorical/binary/ordinal columns only)
+            'mean_log_lik': mean predictive log-likelihood across all held-out cells
+            'n_held_out': total number of held-out cells evaluated
+            'per_column': dict mapping column index to per-column metrics
+    """
+    from crosscat.inference import impute_and_confidence, predictive_probability
+
+    if rng_key is None:
+        rng_key = jax.random.key(0)
+
+    total_ll = 0.0
+    n_scored = 0
+    continuous_errors = []
+    discrete_correct = 0
+    discrete_total = 0
+    per_column: dict[int, dict] = {}
+
+    held_out_rows, held_out_cols = jnp.where(mask)
+
+    for idx in range(len(held_out_rows)):
+        row_idx = int(held_out_rows[idx])
+        col_idx = int(held_out_cols[idx])
+        true_val = data[row_idx, col_idx]
+
+        if jnp.isnan(true_val):
+            continue
+
+        # Predictive log-likelihood
+        log_p = predictive_probability(
+            state, data, [col_idx], jnp.array([true_val]), row_id=row_idx
+        )
+        total_ll += float(log_p)
+        n_scored += 1
+
+        # Point estimate via imputation
+        rng_key, subkey = jax.random.split(rng_key)
+        point_est, _conf = impute_and_confidence(
+            subkey, state, data, col_idx, row_id=row_idx, n_samples=200
+        )
+
+        col_type = col_types[col_idx]
+        if col_idx not in per_column:
+            per_column[col_idx] = {"errors": [], "correct": 0, "total": 0, "log_liks": []}
+
+        per_column[col_idx]["log_liks"].append(float(log_p))
+
+        if col_type == ColumnType.CONTINUOUS or col_type == ColumnType.CYCLIC:
+            error = float(jnp.abs(true_val - point_est))
+            continuous_errors.append(error)
+            per_column[col_idx]["errors"].append(error)
+        else:
+            correct = int(true_val) == int(point_est)
+            if correct:
+                discrete_correct += 1
+                per_column[col_idx]["correct"] += 1
+            discrete_total += 1
+            per_column[col_idx]["total"] += 1
+
+    # Aggregate
+    mae = sum(continuous_errors) / max(len(continuous_errors), 1)
+    accuracy = discrete_correct / max(discrete_total, 1)
+    mean_ll = total_ll / max(n_scored, 1)
+
+    # Summarize per-column
+    per_column_summary = {}
+    for col_idx, metrics in per_column.items():
+        col_summary: dict = {
+            "mean_log_lik": sum(metrics["log_liks"]) / max(len(metrics["log_liks"]), 1),
+            "n_held_out": len(metrics["log_liks"]),
+        }
+        if metrics["errors"]:
+            col_summary["mae"] = sum(metrics["errors"]) / len(metrics["errors"])
+        if metrics["total"] > 0:
+            col_summary["accuracy"] = metrics["correct"] / metrics["total"]
+        per_column_summary[col_idx] = col_summary
+
+    return {
+        "mae": mae,
+        "accuracy": accuracy,
+        "mean_log_lik": mean_ll,
+        "n_held_out": n_scored,
+        "per_column": per_column_summary,
+    }
