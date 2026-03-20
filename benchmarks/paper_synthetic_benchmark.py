@@ -28,9 +28,10 @@ from crosscat.diagnostics import (
     collect_diagnostics,
     column_partition_ari,
 )
-from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import dependence_matrix
 from crosscat.model import initialize
+from crosscat.packed.kernels import packed_gibbs_sweep
+from crosscat.packed.state import pack_state, unpack_state
 from crosscat.types import ColumnType
 
 
@@ -106,37 +107,43 @@ def run_benchmark(
     states = []
     all_chain_metrics: list[list[dict]] = []
 
+    diag_interval = 5  # Unpack for diagnostics every N sweeps
+
     for chain_idx in range(n_chains):
         print(f"\n--- Chain {chain_idx + 1}/{n_chains} ---")
         k_i, k_sweep = jax.random.split(init_keys[chain_idx])
         state = initialize(k_i, data, col_types)
+        packed = pack_state(state)
 
         chain_metrics: list[dict] = []
         t0 = time.time()
         for sweep in range(n_sweeps):
             k_sweep, subkey = jax.random.split(k_sweep)
-            state = gibbs_sweep(subkey, state, data, n_sweeps=1)
+            packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=1)
 
-            # Collect metrics every sweep
-            diag = collect_diagnostics(state, data)
-            col_ari = float(column_partition_ari(state, true_col_assign))
-            row_ari_v0, row_ari_v1 = _best_view_match(state, true_row_assign)
-            chain_metrics.append(
-                {
-                    "sweep": sweep + 1,
-                    "col_ari": col_ari,
-                    "row_ari_v0": row_ari_v0,
-                    "row_ari_v1": row_ari_v1,
-                    **diag,
-                }
-            )
-
-            if (sweep + 1) % 10 == 0:
-                print(
-                    f"  Sweep {sweep + 1:3d}/{n_sweeps}: "
-                    f"n_views={state.n_views}, col_ARI={col_ari:.3f}"
+            # Collect metrics periodically (unpacking is expensive)
+            if (sweep + 1) % diag_interval == 0 or sweep == n_sweeps - 1:
+                state = unpack_state(packed, col_types, data=data)
+                diag = collect_diagnostics(state, data)
+                col_ari = float(column_partition_ari(state, true_col_assign))
+                row_ari_v0, row_ari_v1 = _best_view_match(state, true_row_assign)
+                chain_metrics.append(
+                    {
+                        "sweep": sweep + 1,
+                        "col_ari": col_ari,
+                        "row_ari_v0": row_ari_v0,
+                        "row_ari_v1": row_ari_v1,
+                        **diag,
+                    }
                 )
 
+                if (sweep + 1) % 10 == 0:
+                    print(
+                        f"  Sweep {sweep + 1:3d}/{n_sweeps}: "
+                        f"n_views={state.n_views}, col_ARI={col_ari:.3f}"
+                    )
+
+        state = unpack_state(packed, col_types, data=data)
         elapsed = time.time() - t0
         print(f"  Time: {elapsed:.1f}s ({elapsed / n_sweeps:.2f}s/sweep)")
         states.append(state)
