@@ -556,7 +556,10 @@ class VonMises:
     conjugate prior on the mean direction.
 
     Sufficient statistics: count, sum_sin, sum_cos
-    Hyperparameters: kappa (concentration), vm_mu (prior mean direction)
+    Hyperparameters:
+        kappa — likelihood concentration
+        vm_a  — prior concentration on mean direction (a in original)
+        vm_mu — prior mean direction (b in original)
     """
 
     @staticmethod
@@ -577,27 +580,35 @@ class VonMises:
         Exact conjugate marginal obtained by integrating out the mean direction
         mu from the von Mises likelihood × von Mises prior:
 
-            p(data | kappa, vm_mu) = [1/(2*pi)]^n * [I_0(kappa_post) / I_0(kappa)]
-                                     / [I_0(kappa)]^n
+            p(data | kappa, a, b) = [1/(2*pi)]^n * I_0(R) / [I_0(kappa)^n * I_0(a)]
 
-        where kappa_post = ||(sum_sin + kappa*sin(vm_mu), sum_cos + kappa*cos(vm_mu))||
-        is the posterior resultant length including the prior contribution.
+        where R = ||(sum_sin + a*sin(b), sum_cos + a*cos(b))|| is the posterior
+        resultant length combining data with the prior contribution.
+
+        Hyperparameters:
+            kappa — likelihood concentration
+            vm_a  — prior concentration on mean direction
+            vm_mu — prior mean direction (b)
 
         See Mardia & Jupp (2000), Section 5.3.
+        Maps to original calc_marginal_logp in CyclicComponentModel.
         """
         n = suffstats.count.astype(jnp.float32)
         kappa = hypers.kappa
+        a = hypers.vm_a
+        b = hypers.vm_mu
 
-        # Posterior resultant length: combine data sufficient stats with prior
-        total_sin = suffstats.sum_sin + kappa * jnp.sin(hypers.vm_mu)
-        total_cos = suffstats.sum_cos + kappa * jnp.cos(hypers.vm_mu)
-        kappa_post = jnp.sqrt(total_sin**2 + total_cos**2)
+        # Posterior resultant length: data + prior(a, b)
+        total_sin = suffstats.sum_sin + a * jnp.sin(b)
+        total_cos = suffstats.sum_cos + a * jnp.cos(b)
+        R = jnp.sqrt(total_sin**2 + total_cos**2)
 
-        # log p(data) = -n*log(2*pi) + log I_0(kappa_post) - (n+1)*log I_0(kappa)
+        # log p(data) = -n*log(2*pi) + log I_0(R) - n*log I_0(kappa) - log I_0(a)
         log_ml = (
             -n * jnp.log(2.0 * jnp.pi)
-            + _log_bessel_i0(kappa_post)
-            - (n + 1.0) * _log_bessel_i0(kappa)
+            + _log_bessel_i0(R)
+            - n * _log_bessel_i0(kappa)
+            - _log_bessel_i0(a)
         )
         return log_ml
 
@@ -607,23 +618,19 @@ class VonMises:
     ) -> Array:
         """Log posterior predictive density for a circular observation.
 
-        Approximation using posterior mean direction and concentration.
+        Approximation: posterior von Mises with concentration = kappa and
+        mean direction from the posterior resultant vector.
         """
         kappa = hypers.kappa
+        a = hypers.vm_a
 
-        # Posterior mean direction
-        total_sin = suffstats.sum_sin + kappa * jnp.sin(hypers.vm_mu)
-        total_cos = suffstats.sum_cos + kappa * jnp.cos(hypers.vm_mu)
-        r_post = jnp.sqrt(total_sin**2 + total_cos**2)
+        # Posterior mean direction from resultant of data + prior(a, b)
+        total_sin = suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
+        total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
 
-        # Posterior concentration (approximate)
-        kappa_post = r_post
-
-        # Von Mises log pdf
-        log_p = (
-            kappa_post * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa_post)
-        )
+        # Von Mises log pdf with likelihood concentration kappa
+        log_p = kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
         return log_p
 
     @staticmethod
@@ -632,20 +639,15 @@ class VonMises:
     ) -> Array:
         """Draw samples from posterior predictive von Mises distribution."""
         kappa = hypers.kappa
+        a = hypers.vm_a
 
-        total_sin = suffstats.sum_sin + kappa * jnp.sin(hypers.vm_mu)
-        total_cos = suffstats.sum_cos + kappa * jnp.cos(hypers.vm_mu)
-        r_post = jnp.sqrt(total_sin**2 + total_cos**2)
+        total_sin = suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
+        total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
-        kappa_post = r_post
 
-        # Sample using rejection sampling (Best-Fisher algorithm)
-        # For simplicity, use uniform + accept/reject with von Mises envelope
-        k1, k2 = jax.random.split(rng_key)
-        # Use JAX's built-in von Mises sampling if available, else approximate
-        # via wrapped normal: von Mises(mu, kappa) ≈ Normal(mu, 1/sqrt(kappa)) mod 2pi
-        sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa_post, 0.01))
-        samples = mu_post + sigma * jax.random.normal(k1, shape=(n,))
+        # Approximate via wrapped normal: von Mises(mu, kappa) ≈ Normal(mu, 1/sqrt(kappa))
+        sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa, 0.01))
+        samples = mu_post + sigma * jax.random.normal(rng_key, shape=(n,))
         # Wrap to [0, 2*pi)
         samples = samples % (2.0 * jnp.pi)
         return samples
