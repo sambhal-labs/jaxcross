@@ -41,47 +41,76 @@ with tab_upload:
     )
 
     if uploaded_file is not None:
-        # Parse the file
-        data, column_names, column_types = load_csv_data(uploaded_file)
+        # Immediate feedback on file selection
+        st.info(f"File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
 
-        st.write(f"Parsed **{data.shape[0]}** rows and **{data.shape[1]}** columns.")
+        try:
+            with st.spinner("Parsing CSV and detecting column types..."):
+                data, column_names, column_types = load_csv_data(uploaded_file)
 
-        # Preview
-        preview_df = pd.DataFrame(np.asarray(data), columns=column_names)
-        st.dataframe(preview_df.head(50), use_container_width=True)
+            st.success(
+                f"Parsed **{data.shape[0]}** rows and **{data.shape[1]}** columns "
+                f"from `{uploaded_file.name}`."
+            )
 
-        # Let user override column types
-        st.subheader("Column Types")
-        st.info("Auto-detected types are shown below. Override any column type before confirming.")
+            # Check for NaN prevalence
+            nan_count = int(np.isnan(np.asarray(data)).sum())
+            total_cells = data.shape[0] * data.shape[1]
+            if nan_count > 0:
+                pct = nan_count / total_cells * 100
+                st.warning(
+                    f"**{nan_count}** missing values detected ({pct:.1f}% of cells). "
+                    "Non-numeric values were converted to NaN."
+                )
 
-        overridden_types: list[ColumnType] = []
-        cols_per_row = 4
-        for i in range(0, len(column_names), cols_per_row):
-            row_cols = st.columns(min(cols_per_row, len(column_names) - i))
-            for j, col_widget in enumerate(row_cols):
-                idx = i + j
-                with col_widget:
-                    default_idx = _COLUMN_TYPE_OPTIONS.index(column_types[idx].value)
-                    selected = st.selectbox(
-                        column_names[idx],
-                        _COLUMN_TYPE_OPTIONS,
-                        index=default_idx,
-                        key=f"col_type_{idx}",
-                    )
-                    overridden_types.append(ColumnType(selected))
+            # Preview
+            st.subheader("Data Preview")
+            preview_df = pd.DataFrame(np.asarray(data), columns=column_names)
+            n_preview = st.slider(
+                "Preview rows", 10, min(200, data.shape[0]), 50, step=10, key="csv_preview_rows"
+            )
+            st.dataframe(preview_df.head(n_preview), use_container_width=True)
+            if data.shape[0] > n_preview:
+                st.caption(f"Showing {n_preview} of {data.shape[0]} rows.")
 
-        # Confirm button
-        if st.button("Confirm & Load", key="confirm_csv", type="primary"):
-            st.session_state["data"] = data
-            st.session_state["column_names"] = column_names
-            st.session_state["column_types"] = overridden_types
-            st.session_state["packed_state"] = None
-            st.session_state["sweep_history"] = []
-            st.session_state["inference_done"] = False
-            st.success("Data loaded successfully!")
-            st.rerun()
+            # Let user override column types
+            st.subheader("Column Types")
+            st.caption(
+                "Auto-detected types are shown below. Override any column type before confirming."
+            )
+
+            overridden_types: list[ColumnType] = []
+            cols_per_row = 4
+            for i in range(0, len(column_names), cols_per_row):
+                row_cols = st.columns(min(cols_per_row, len(column_names) - i))
+                for j, col_widget in enumerate(row_cols):
+                    idx = i + j
+                    with col_widget:
+                        default_idx = _COLUMN_TYPE_OPTIONS.index(column_types[idx].value)
+                        selected = st.selectbox(
+                            column_names[idx],
+                            _COLUMN_TYPE_OPTIONS,
+                            index=default_idx,
+                            key=f"col_type_{idx}",
+                        )
+                        overridden_types.append(ColumnType(selected))
+
+            # Confirm button
+            if st.button("Confirm & Load", key="confirm_csv", type="primary"):
+                st.session_state["data"] = data
+                st.session_state["column_names"] = column_names
+                st.session_state["column_types"] = overridden_types
+                st.session_state["packed_state"] = None
+                st.session_state["sweep_history"] = []
+                st.session_state["inference_done"] = False
+                st.toast("Data loaded successfully!", icon="✅")
+                st.rerun()
+
+        except Exception as e:
+            st.error(f"Failed to parse CSV: {e}")
+            st.caption("Ensure the file is a valid CSV with numeric or coercible columns.")
     else:
-        st.info("Upload a CSV file to get started.")
+        st.caption("Drag and drop a CSV file above, or click Browse to select one.")
 
 # ---- Synthetic Data -------------------------------------------------------
 
@@ -117,6 +146,7 @@ with tab_synthetic:
 
     # Display current column list
     cols_to_remove: list[int] = []
+    n_syn_cols = len(st.session_state["syn_col_types"])
     for i, ct_val in enumerate(st.session_state["syn_col_types"]):
         c1, c2, c3 = st.columns([3, 4, 2])
         with c1:
@@ -132,7 +162,8 @@ with tab_synthetic:
             )
             st.session_state["syn_col_types"][i] = new_val
         with c3:
-            if st.button("Remove", key=f"syn_rm_{i}"):
+            # Disable remove when only 1 column left
+            if st.button("Remove", key=f"syn_rm_{i}", disabled=(n_syn_cols <= 1)):
                 cols_to_remove.append(i)
 
     # Process removals
@@ -158,40 +189,50 @@ with tab_synthetic:
             col_types = [ColumnType(v) for v in st.session_state["syn_col_types"]]
             key = jax.random.key(int(seed))
 
-            with st.spinner("Generating synthetic data..."):
-                result = generate_synthetic(
-                    key,
-                    n_rows=n_rows,
-                    column_types=col_types,
-                    n_views=n_views,
-                    n_clusters=n_clusters,
-                    cluster_separation=float(cluster_separation),
+            try:
+                with st.spinner(
+                    f"Generating {n_rows} rows x {len(col_types)} columns "
+                    f"({n_views} views, {n_clusters} clusters)..."
+                ):
+                    result = generate_synthetic(
+                        key,
+                        n_rows=n_rows,
+                        column_types=col_types,
+                        n_views=n_views,
+                        n_clusters=n_clusters,
+                        cluster_separation=float(cluster_separation),
+                    )
+
+                data = result["data"]
+                n_cols = data.shape[1]
+                column_names = [f"col_{j}" for j in range(n_cols)]
+
+                st.session_state["data"] = data
+                st.session_state["column_names"] = column_names
+                st.session_state["column_types"] = col_types
+                st.session_state["packed_state"] = None
+                st.session_state["sweep_history"] = []
+                st.session_state["inference_done"] = False
+
+                st.success(
+                    f"Generated **{data.shape[0]}** rows x **{data.shape[1]}** columns "
+                    f"({n_views} views, {n_clusters} clusters)."
                 )
+                st.toast("Synthetic data generated!", icon="✅")
 
-            data = result["data"]
-            n_cols = data.shape[1]
-            column_names = [f"col_{j}" for j in range(n_cols)]
+                # Show preview
+                st.subheader("Data Preview")
+                preview_df = pd.DataFrame(np.asarray(data), columns=column_names)
+                st.dataframe(preview_df.head(50), use_container_width=True)
 
-            st.session_state["data"] = data
-            st.session_state["column_names"] = column_names
-            st.session_state["column_types"] = col_types
-            st.session_state["packed_state"] = None
-            st.session_state["sweep_history"] = []
-            st.session_state["inference_done"] = False
+                # Show ground truth
+                with st.expander("Ground truth"):
+                    st.write(f"True column assignments: {result['true_column_assignments']}")
+                    true_row = result["true_row_assignments"]
+                    st.write(
+                        f"True row assignments: {len(true_row)} views, "
+                        f"{[list(a) for a in true_row]}"
+                    )
 
-            st.success(
-                f"Generated {data.shape[0]} rows x {data.shape[1]} columns "
-                f"({n_views} views, {n_clusters} clusters)."
-            )
-
-            # Show preview
-            preview_df = pd.DataFrame(np.asarray(data), columns=column_names)
-            st.dataframe(preview_df.head(50), use_container_width=True)
-
-            # Show ground truth
-            with st.expander("Ground truth"):
-                st.write(f"True column assignments: {result['true_column_assignments']}")
-                true_row = result["true_row_assignments"]
-                st.write(
-                    f"True row assignments: {len(true_row)} views, {[list(a) for a in true_row]}"
-                )
+            except Exception as e:
+                st.error(f"Failed to generate synthetic data: {e}")
