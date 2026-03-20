@@ -3,6 +3,9 @@
 Generates data with known structure (2 views, 3 clusters each), runs CrossCat
 inference, and measures recovery quality via ARI and dependence-matrix metrics.
 
+Outputs convergence plots, Z-matrix heatmaps, cluster recovery scatters, and
+JSON metrics to results/synthetic/<timestamp>/.
+
 Reference: Mansinghka et al. (2016) "CrossCat: A Fully Bayesian Nonparametric
 Method for Analyzing Heterogeneous, High Dimensional Data", JMLR 17(138):1-49.
 
@@ -13,11 +16,18 @@ Usage:
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
-from crosscat.diagnostics import adjusted_rand_index, column_partition_ari
+from benchmarks.utils import create_results_dir, plot_convergence, plot_z_matrix, save_metrics
+from crosscat.diagnostics import (
+    adjusted_rand_index,
+    collect_diagnostics,
+    column_partition_ari,
+)
 from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import dependence_matrix
 from crosscat.model import initialize
@@ -91,21 +101,37 @@ def run_benchmark(
     print(f"Generating synthetic data ({n_rows} rows, 8 columns, 2 views, 3 clusters each)...")
     data, col_types, true_col_assign, true_row_assign = generate_synthetic_data(k_data, n_rows)
 
-    # Initialize and run chains
+    # Initialize and run chains, collecting per-sweep metrics
     init_keys = jax.random.split(k_init, n_chains)
     states = []
+    all_chain_metrics: list[list[dict]] = []
 
     for chain_idx in range(n_chains):
         print(f"\n--- Chain {chain_idx + 1}/{n_chains} ---")
         k_i, k_sweep = jax.random.split(init_keys[chain_idx])
         state = initialize(k_i, data, col_types)
 
+        chain_metrics: list[dict] = []
         t0 = time.time()
         for sweep in range(n_sweeps):
             k_sweep, subkey = jax.random.split(k_sweep)
             state = gibbs_sweep(subkey, state, data, n_sweeps=1)
+
+            # Collect metrics every sweep
+            diag = collect_diagnostics(state, data)
+            col_ari = float(column_partition_ari(state, true_col_assign))
+            row_ari_v0, row_ari_v1 = _best_view_match(state, true_row_assign)
+            chain_metrics.append(
+                {
+                    "sweep": sweep + 1,
+                    "col_ari": col_ari,
+                    "row_ari_v0": row_ari_v0,
+                    "row_ari_v1": row_ari_v1,
+                    **diag,
+                }
+            )
+
             if (sweep + 1) % 10 == 0:
-                col_ari = float(column_partition_ari(state, true_col_assign))
                 print(
                     f"  Sweep {sweep + 1:3d}/{n_sweeps}: "
                     f"n_views={state.n_views}, col_ARI={col_ari:.3f}"
@@ -114,13 +140,14 @@ def run_benchmark(
         elapsed = time.time() - t0
         print(f"  Time: {elapsed:.1f}s ({elapsed / n_sweeps:.2f}s/sweep)")
         states.append(state)
+        all_chain_metrics.append(chain_metrics)
 
     # Evaluate recovery
     print("\n" + "=" * 60)
     print("RECOVERY METRICS")
     print("=" * 60)
 
-    results = {}
+    results: dict = {}
 
     # 1. Column partition ARI
     col_aris = [float(column_partition_ari(s, true_col_assign)) for s in states]
@@ -132,7 +159,6 @@ def run_benchmark(
     row_aris_v0 = []
     row_aris_v1 = []
     for s in states:
-        # Find which inferred view best matches each true view
         best_v0, best_v1 = _best_view_match(s, true_row_assign)
         row_aris_v0.append(best_v0)
         row_aris_v1.append(best_v1)
@@ -144,10 +170,8 @@ def run_benchmark(
 
     # 3. Dependence matrix (Z-matrix)
     z_matrix = dependence_matrix(states)
-    # Within-view pairs should be ~1.0, between-view pairs should be ~0.0
     within_view_prob = float(
-        (z_matrix[:4, :4].sum() + z_matrix[4:, 4:].sum() - 8.0)  # subtract diagonal
-        / (2 * (4 * 3))  # number of off-diagonal within-view pairs (two blocks)
+        (z_matrix[:4, :4].sum() + z_matrix[4:, 4:].sum() - 8.0) / (2 * (4 * 3))
     )
     between_view_prob = float(z_matrix[:4, 4:].mean())
     results["within_view_dep_prob"] = within_view_prob
@@ -180,17 +204,69 @@ def run_benchmark(
     else:
         print("SOME CHECKS FAILED — review results above")
 
+    # Generate charts and save results
+    print("\n--- Saving results ---")
+    results_dir = create_results_dir("synthetic")
+
+    avg_metrics = _average_chain_metrics(all_chain_metrics)
+
+    plot_convergence(
+        avg_metrics,
+        results_dir,
+        ari_keys=["col_ari", "row_ari_v0", "row_ari_v1"],
+    )
+    plot_z_matrix(
+        z_matrix,
+        results_dir,
+        col_labels=[f"col_{i}" for i in range(8)],
+    )
+    _plot_cluster_recovery(data, states[-1], true_row_assign, results_dir)
+
+    save_metrics(
+        {
+            **results,
+            "config": {
+                "n_rows": n_rows,
+                "n_sweeps": n_sweeps,
+                "n_chains": n_chains,
+                "seed": seed,
+            },
+            "per_sweep": avg_metrics,
+        },
+        results_dir,
+    )
+
+    print(f"\nResults saved to {results_dir}/")
+    results["results_dir"] = str(results_dir)
     return results
+
+
+def _average_chain_metrics(all_chain_metrics: list[list[dict]]) -> list[dict]:
+    """Average per-sweep metrics across chains."""
+    n_sweeps = len(all_chain_metrics[0])
+    avg = []
+    for sweep_idx in range(n_sweeps):
+        combined: dict = {"sweep": sweep_idx + 1}
+        keys = [k for k in all_chain_metrics[0][sweep_idx] if k != "sweep"]
+        for key in keys:
+            vals = []
+            for chain in all_chain_metrics:
+                v = chain[sweep_idx].get(key)
+                if isinstance(v, (int, float, list)):
+                    vals.append(v)
+            if vals and isinstance(vals[0], (int, float)):
+                combined[key] = sum(vals) / len(vals)
+            elif vals:
+                combined[key] = vals[0]  # keep first chain's list values
+        avg.append(combined)
+    return avg
 
 
 def _best_view_match(
     state,
     true_row_assignments: list[jax.Array],
 ) -> tuple[float, float]:
-    """Find best ARI match between inferred and true views.
-
-    For each true view, finds the inferred view with the highest row ARI.
-    """
+    """Find best ARI match between inferred and true views."""
     best_aris = []
     for true_assign in true_row_assignments:
         best_ari = -1.0
@@ -200,6 +276,87 @@ def _best_view_match(
                 best_ari = ari
         best_aris.append(best_ari)
     return best_aris[0], best_aris[1]
+
+
+def _plot_cluster_recovery(
+    data: jax.Array,
+    state,
+    true_row_assignments: list[jax.Array],
+    results_dir: Path,
+) -> Path:
+    """2x2 scatter: (true vs inferred) x (view 0 vs view 1).
+
+    Uses first 2 columns of each view for x/y axes.
+    Top row: colored by true cluster. Bottom row: colored by inferred cluster.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    data_np = np.array(data)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    colors_map = ["#2196F3", "#4CAF50", "#FF9800", "#9C27B0", "#F44336"]
+
+    # Find best-matching views
+    best_view_idx = []
+    for true_assign in true_row_assignments:
+        best_ari = -1.0
+        best_idx = 0
+        for v_idx, view in enumerate(state.views):
+            ari = float(adjusted_rand_index(true_assign, view.row_assignments))
+            if ari > best_ari:
+                best_ari = ari
+                best_idx = v_idx
+        best_view_idx.append(best_idx)
+
+    view_col_pairs = [(0, 1), (4, 5)]  # columns to plot for each view
+    view_labels = ["View 0 (cols 0-3)", "View 1 (cols 4-7)"]
+
+    for v, (cx, cy) in enumerate(view_col_pairs):
+        true_assign = np.array(true_row_assignments[v])
+        inferred_assign = np.array(state.views[best_view_idx[v]].row_assignments)
+
+        for cluster_id in range(int(true_assign.max()) + 1):
+            mask = true_assign == cluster_id
+            color = colors_map[cluster_id % len(colors_map)]
+            axes[0, v].scatter(
+                data_np[mask, cx],
+                data_np[mask, cy],
+                c=color,
+                s=15,
+                alpha=0.6,
+                label=f"Cluster {cluster_id}",
+            )
+
+        for cluster_id in range(int(inferred_assign.max()) + 1):
+            mask = inferred_assign == cluster_id
+            color = colors_map[cluster_id % len(colors_map)]
+            axes[1, v].scatter(
+                data_np[mask, cx],
+                data_np[mask, cy],
+                c=color,
+                s=15,
+                alpha=0.6,
+                label=f"Cluster {cluster_id}",
+            )
+
+        axes[0, v].set_title(f"True — {view_labels[v]}", fontsize=12)
+        axes[1, v].set_title(f"Inferred — {view_labels[v]}", fontsize=12)
+        for row in range(2):
+            axes[row, v].set_xlabel(f"Column {cx}")
+            axes[row, v].set_ylabel(f"Column {cy}")
+            axes[row, v].legend(fontsize=8, markerscale=2)
+
+    fig.suptitle("Cluster Recovery: True vs Inferred", fontsize=14, y=1.02)
+    plt.tight_layout()
+
+    path = results_dir / "cluster_recovery.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved cluster recovery plot to {path}")
+    return path
 
 
 if __name__ == "__main__":
