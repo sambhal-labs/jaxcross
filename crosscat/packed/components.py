@@ -329,16 +329,31 @@ def _bb_sample(rng_key, count, sum_x, alpha, beta):
 
 
 def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
-    """Sample from von Mises posterior predictive (wrapped normal approximation)."""
+    """Sample from von Mises posterior predictive via rejection sampling.
+
+    Matches original CyclicComponentModel::get_draw_constrained():
+    uniform proposal on [0, 2*pi), accept/reject against predictive logp.
+    """
     total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
     total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
 
-    # Wrapped normal approximation: sigma = 1/sqrt(kappa)
-    sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa, 1e-30))
-    z = jax.random.normal(rng_key)
-    # Wrap to [0, 2*pi)
-    sample = mu_post + sigma * z
+    # Mode logp (envelope for rejection sampling)
+    log_M = kappa - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
+
+    def _cond(state):
+        return state[0]  # rejected flag
+
+    def _body(state):
+        _, _, key_loop = state
+        k1, k2, k3 = jax.random.split(key_loop, 3)
+        x = jax.random.uniform(k1) * 2.0 * jnp.pi
+        log_u = jnp.log(jax.random.uniform(k2)) + log_M
+        log_target = kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
+        accepted = log_u < log_target
+        return (~accepted, jnp.where(accepted, x, 0.0), k3)
+
+    _, sample, _ = jax.lax.while_loop(_cond, _body, (True, 0.0, rng_key))
     return sample % (2.0 * jnp.pi)
 
 

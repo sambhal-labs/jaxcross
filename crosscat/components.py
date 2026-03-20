@@ -643,7 +643,11 @@ class VonMises:
     def sample_posterior_predictive(
         rng_key: Array, suffstats: SufficientStats, hypers: ColumnHypers, n: int = 1
     ) -> Array:
-        """Draw samples from posterior predictive von Mises distribution."""
+        """Draw samples from posterior predictive von Mises via rejection sampling.
+
+        Matches original CyclicComponentModel::get_draw_constrained():
+        uniform proposal on [0, 2*pi), accept/reject against predictive logp.
+        """
         kappa = hypers.kappa
         a = hypers.vm_a
 
@@ -651,11 +655,30 @@ class VonMises:
         total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
 
-        # Approximate via wrapped normal: von Mises(mu, kappa) ≈ Normal(mu, 1/sqrt(kappa))
-        sigma = 1.0 / jnp.sqrt(jnp.maximum(kappa, 0.01))
-        samples = mu_post + sigma * jax.random.normal(rng_key, shape=(n,))
-        # Wrap to [0, 2*pi)
-        samples = samples % (2.0 * jnp.pi)
+        # Mode logp (envelope for rejection sampling)
+        log_M = kappa * jnp.cos(0.0) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
+
+        def _logp_at(x):
+            return kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
+
+        def _sample_one(key):
+            def _cond(state):
+                return state[0]  # rejected flag
+
+            def _body(state):
+                _, itr, key_loop = state
+                k1, k2, k3 = jax.random.split(key_loop, 3)
+                x = jax.random.uniform(k1) * 2.0 * jnp.pi
+                log_u = jnp.log(jax.random.uniform(k2)) + log_M
+                log_target = _logp_at(x)
+                accepted = log_u < log_target
+                return (~accepted, jnp.where(accepted, x, itr), k3)
+
+            _, sample, _ = jax.lax.while_loop(_cond, _body, (True, 0.0, key))
+            return sample % (2.0 * jnp.pi)
+
+        keys = jax.random.split(rng_key, n)
+        samples = jax.vmap(_sample_one)(keys)
         return samples
 
 
