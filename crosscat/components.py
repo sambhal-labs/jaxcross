@@ -16,6 +16,12 @@ New component models for LaborLens use cases:
 
 All sufficient_statistics methods filter NaN values, matching the original
 CrossCat behavior where missing data is transparently skipped.
+
+NOTE: All component models use collapsed (conjugate) inference — cluster
+parameters are integrated out analytically, and only assignments and
+hyperparameters are sampled. Uncollapsed inference (Neal Algorithm 8 with
+explicit per-cluster parameters) is not implemented. This is sufficient for
+all current conjugate models.
 """
 
 from __future__ import annotations

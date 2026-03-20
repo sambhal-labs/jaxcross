@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-03-20
+
+### Added
+- Synthetic recovery benchmark (`benchmarks/paper_synthetic_benchmark.py`) reproducing
+  the paper's Figure 7 experiment — measures column ARI, row ARI, and Z-matrix recovery
+- Held-out evaluation pipeline: `evaluate_imputation()` and `random_holdout_mask()` in
+  `crosscat/diagnostics.py` for cell-level imputation accuracy (MAE, accuracy, log-lik)
+
+### Documentation
+- CRP alpha prior: documented Exp(1) vs flat prior divergence from probcomp/crosscat
+- Components: added note clarifying collapsed-only inference (no Neal Algorithm 8)
+
 ## [0.5.0] - 2026-03-20
 
 ### Changed
