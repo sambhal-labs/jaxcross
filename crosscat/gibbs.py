@@ -641,10 +641,19 @@ def transition_column_hypers(
         view = state.views[view_idx]
 
         if col_type == ColumnType.CONTINUOUS:
-            # Grid-based Gibbs for s, mu, and nu
+            # Grid-based Gibbs for s, mu, nu, r — data-dependent grids with N_GRID=31
+            # Matches original probcomp/crosscat grid construction
             col_data = data[:, j]
-            data_var = jnp.var(col_data) + 1e-6
-            s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
+            valid = col_data[~jnp.isnan(col_data)]
+            num_rows = max(len(valid), 1)
+            data_mean = jnp.mean(valid)
+            data_min = jnp.min(valid)
+            data_max = jnp.max(valid)
+            ssd = jnp.sum((valid - data_mean) ** 2)
+            ssd = jnp.maximum(ssd, 1e-6)
+
+            # s_grid: log-spaced [SSD/100, SSD], 31 points (original: log_linspace)
+            s_grid = jnp.exp(jnp.linspace(jnp.log(ssd / 100.0), jnp.log(ssd), 31))
 
             k1, k2, k3, k4 = jax.random.split(keys[j], 4)
 
@@ -681,10 +690,8 @@ def transition_column_hypers(
             s_idx = jax.random.categorical(k1, log_scores_s)
             new_s = s_grid[s_idx]
 
-            # Sample mu
-            data_mean = jnp.mean(col_data)
-            data_std = jnp.std(col_data) + 1e-6
-            mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
+            # mu_grid: linear [min(data), max(data)], 31 points (original: linspace)
+            mu_grid = jnp.linspace(data_min, data_max, 31)
 
             log_scores_mu = jnp.array(
                 [
@@ -700,8 +707,8 @@ def transition_column_hypers(
             mu_idx = jax.random.categorical(k2, log_scores_mu)
             new_mu = mu_grid[mu_idx]
 
-            # Sample nu (degrees of freedom) — matching original N_GRID approach
-            nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
+            # nu_grid: log-spaced [1, num_rows], 31 points (original: log_linspace)
+            nu_grid = jnp.exp(jnp.linspace(jnp.log(1.0), jnp.log(float(num_rows)), 31))
             log_scores_nu = jnp.array(
                 [
                     _score_hypers(
@@ -714,8 +721,8 @@ def transition_column_hypers(
             nu_idx = jax.random.categorical(k3, log_scores_nu)
             new_nu = nu_grid[nu_idx]
 
-            # Sample r (precision scale) — paper requires all 4 NormalGamma hypers sampled
-            r_grid = jnp.array([0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+            # r_grid: log-spaced [1/num_rows, num_rows], 31 points (original: log_linspace)
+            r_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / num_rows), jnp.log(float(num_rows)), 31))
             log_scores_r = jnp.array(
                 [
                     _score_hypers(
@@ -733,8 +740,11 @@ def transition_column_hypers(
             )
 
         elif col_type == ColumnType.CATEGORICAL:
-            # Grid-based Gibbs for dirichlet_alpha
-            alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0])
+            # dirichlet_alpha grid: log-spaced [1/num_rows, num_rows], 31 points
+            num_rows = max(state.n_rows, 1)
+            alpha_grid = jnp.exp(
+                jnp.linspace(jnp.log(1.0 / num_rows), jnp.log(float(num_rows)), 31)
+            )
             log_scores = []
             for alpha_val in alpha_grid:
                 test_hypers = ColumnHypers(column_type=col_type, dirichlet_alpha=alpha_val)
@@ -759,8 +769,9 @@ def transition_column_hypers(
             new_hypers[j] = ColumnHypers(column_type=col_type, dirichlet_alpha=alpha_grid[idx])
 
         elif col_type == ColumnType.BINARY:
-            # Grid-based Gibbs for alpha and beta
-            ab_grid = jnp.array([0.5, 1.0, 2.0, 5.0, 10.0])
+            # Grid-based Gibbs for alpha and beta — 8x8 grid (64 combinations)
+            num_rows = max(state.n_rows, 1)
+            ab_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / num_rows), jnp.log(float(num_rows)), 8))
             log_scores = []
             for a_val in ab_grid:
                 for b_val in ab_grid:
@@ -789,8 +800,11 @@ def transition_column_hypers(
             )
 
         elif col_type == ColumnType.CYCLIC:
-            # Grid-based Gibbs for kappa (concentration)
-            kappa_grid = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+            # kappa grid: log-spaced, 31 points — data-dependent range
+            # Original uses [kappa_ml, num_rows * kappa_ml] but we approximate
+            # with [0.01, num_rows] since kappa_ml requires Newton iteration
+            num_rows = max(state.n_rows, 1)
+            kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(float(num_rows)), 31))
             log_scores = []
             for kappa_val in kappa_grid:
                 test_hypers = ColumnHypers(
@@ -846,7 +860,9 @@ def transition_crp_alphas(
     Returns:
         Updated CrossCatState with new CRP alpha values.
     """
-    alpha_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(100.0), 50))
+    # CRP alpha grid: log-spaced [1/N, N], 31 points (matching original probcomp)
+    n_items = max(state.n_cols, 1)
+    alpha_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / n_items), jnp.log(float(n_items)), 31))
     keys = jax.random.split(rng_key, 1 + len(state.views))
 
     # Sample outer CRP alpha
@@ -862,11 +878,15 @@ def transition_crp_alphas(
     idx = jax.random.categorical(keys[0], log_scores)
     new_col_alpha = alpha_grid[idx]
 
+    # Inner CRP alpha grid: log-spaced [1/N_rows, N_rows], 31 points
+    n_rows = max(state.n_rows, 1)
+    row_alpha_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / n_rows), jnp.log(float(n_rows)), 31))
+
     # Sample inner CRP alphas (one per view)
     new_views = []
     for v_idx, view in enumerate(state.views):
         log_scores = []
-        for alpha_val in alpha_grid:
+        for alpha_val in row_alpha_grid:
             log_crp_val = _log_crp(view.row_assignments, alpha_val)
             log_prior = -alpha_val
             log_scores.append(log_crp_val + log_prior)
@@ -874,7 +894,7 @@ def transition_crp_alphas(
         log_scores = jnp.array(log_scores)
         log_scores = log_scores - jnp.max(log_scores)
         idx = jax.random.categorical(keys[v_idx + 1], log_scores)
-        new_row_alpha = alpha_grid[idx]
+        new_row_alpha = row_alpha_grid[idx]
 
         new_views.append(
             ViewState(
