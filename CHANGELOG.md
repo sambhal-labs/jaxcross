@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-20
+
+### Changed
+- **BREAKING**: Von Mises component model now uses separate `vm_a` (prior concentration)
+  and `kappa` (likelihood concentration). Previously `kappa` was incorrectly used for both.
+  Existing serialized states with Von Mises columns will need `vm_a` added.
+- All hyperparameter grids switched to data-dependent ranges with N_GRID=31,
+  matching the original probcomp/crosscat grid construction:
+  - `s`: log-spaced [SSD/100, SSD] (was 7 fixed multipliers)
+  - `mu`: linear [min(data), max(data)] (was 11 pts around mean)
+  - `nu`: log-spaced [1, N] (was 7 fixed powers of 2)
+  - `r`: log-spaced [1/N, N] (was 10 fixed values)
+  - CRP alpha: log-spaced [1/N, N] with separate col/row grids (was 50 fixed pts)
+  - `dirichlet_alpha`: log-spaced [1/N, N] (was 7 fixed values)
+  - Von Mises `kappa`: log-spaced [0.01, N] (was 7 fixed values)
+  - Binary `a`, `b`: 8×8 log-spaced [1/N, N] (was 5×5 fixed)
+
+### Added
+- Von Mises `vm_a` hyperparameter (prior concentration on mean direction)
+  in `ColumnHypers`, `PackedCrossCatState`, and all scoring functions
+- Grid-based Gibbs sampling for all 3 Von Mises hyperparameters:
+  `kappa` (31 pts), `vm_a` (31 pts), `vm_mu` (31 pts)
+- Separate inner/outer CRP alpha grids scaled to row/column count
+
+### Fixed
+- Von Mises log marginal likelihood formula: correctly uses `vm_a` for prior
+  and `kappa` for likelihood (was conflating both as `kappa`)
+
+## [0.4.0] - 2026-03-19
+
+### Added
+- Interactive Streamlit dashboard for CrossCat analysis (`dashboard/`)
+
 ## [0.3.0] - 2026-03-18
 
 ### Added

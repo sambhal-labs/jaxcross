@@ -57,6 +57,7 @@ def _score_row_one_cluster(
     hyper_alpha: Array,
     hyper_beta: Array,
     hyper_kappa: Array,
+    hyper_vm_a: Array,
     hyper_vm_mu: Array,
     n_columns: Array,
 ) -> Array:
@@ -104,6 +105,7 @@ def _score_row_one_cluster(
             hyper_alpha[safe_col_idx],
             hyper_beta[safe_col_idx],
             hyper_kappa[safe_col_idx],
+            hyper_vm_a[safe_col_idx],
             hyper_vm_mu[safe_col_idx],
         )
         log_lik = log_lik + jnp.where(is_valid, logp, 0.0)
@@ -134,6 +136,7 @@ def _score_row_all_clusters(
     hyper_alpha: Array,
     hyper_beta: Array,
     hyper_kappa: Array,
+    hyper_vm_a: Array,
     hyper_vm_mu: Array,
     crp_alpha: Array,
     max_clusters: int,
@@ -183,6 +186,7 @@ def _score_row_all_clusters(
             hyper_alpha,
             hyper_beta,
             hyper_kappa,
+            hyper_vm_a,
             hyper_vm_mu,
             n_columns,
         )
@@ -361,6 +365,7 @@ def packed_transition_row_assignments(
                 packed.hyper_alpha,
                 packed.hyper_beta,
                 packed.hyper_kappa,
+                packed.hyper_vm_a,
                 packed.hyper_vm_mu,
                 alpha,
                 max_c,
@@ -602,43 +607,46 @@ def packed_transition_column_hypers(
         cur_r = packed.hyper_r[j]
         cur_nu = packed.hyper_nu[j]
 
-        # Data statistics for grid construction
+        # Data statistics for data-dependent grid construction
         col_data = data[:, j]
         valid_mask = ~jnp.isnan(col_data)
         n_valid = jnp.sum(valid_mask).astype(jnp.float32)
         safe_n = jnp.maximum(n_valid, 1.0)
         data_mean = jnp.sum(jnp.where(valid_mask, col_data, 0.0)) / safe_n
-        data_var = jnp.sum(jnp.where(valid_mask, (col_data - data_mean) ** 2, 0.0)) / safe_n
-        data_var = data_var + 1e-6
-        data_std = jnp.sqrt(data_var)
+        data_min = jnp.min(jnp.where(valid_mask, col_data, jnp.inf))
+        data_max = jnp.max(jnp.where(valid_mask, col_data, -jnp.inf))
+        ssd = jnp.sum(jnp.where(valid_mask, (col_data - data_mean) ** 2, 0.0))
+        ssd = jnp.maximum(ssd, 1e-6)
+        num_rows = jnp.maximum(safe_n, 1.0)
 
-        # Sample s
-        s_grid = data_var * jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0])
+        # s_grid: log-spaced [SSD/100, SSD], 31 points (matching probcomp)
+        s_grid = jnp.exp(jnp.linspace(jnp.log(ssd / 100.0), jnp.log(ssd), 31))
         s_scores = _score_grid_ng(v_idx, local_idx, cur_mu, cur_r, s_grid, cur_nu)
         s_scores = s_scores - jnp.max(s_scores)
         new_s_val = s_grid[jax.random.categorical(k1, s_scores)]
 
-        # Sample mu (conditioned on new s)
-        mu_grid = data_mean + data_std * jnp.linspace(-2, 2, 11)
+        # mu_grid: linear [min(data), max(data)], 31 points (matching probcomp)
+        mu_grid = jnp.linspace(data_min, data_max, 31)
         mu_scores = _score_grid_ng_mu(v_idx, local_idx, mu_grid, cur_r, new_s_val, cur_nu)
         mu_scores = mu_scores - jnp.max(mu_scores)
         new_mu_val = mu_grid[jax.random.categorical(k2, mu_scores)]
 
-        # Sample nu (conditioned on new s, new mu)
-        nu_grid = jnp.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0])
+        # nu_grid: log-spaced [1, num_rows], 31 points (matching probcomp)
+        nu_grid = jnp.exp(jnp.linspace(jnp.log(1.0), jnp.log(num_rows), 31))
         nu_scores = _score_grid_ng_nu(v_idx, local_idx, new_mu_val, cur_r, new_s_val, nu_grid)
         nu_scores = nu_scores - jnp.max(nu_scores)
         new_nu_val = nu_grid[jax.random.categorical(k3, nu_scores)]
 
-        # Sample r (precision scale) — paper requires all 4 NormalGamma hypers sampled
-        r_grid = jnp.array([0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+        # r_grid: log-spaced [1/num_rows, num_rows], 31 points (matching probcomp)
+        r_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / num_rows), jnp.log(num_rows), 31))
         r_scores = _score_grid_ng_r(v_idx, local_idx, new_mu_val, r_grid, new_s_val, new_nu_val)
         r_scores = r_scores - jnp.max(r_scores)
         new_r_val = r_grid[jax.random.categorical(k4, r_scores)]
 
-        # --- Categorical: sample dirichlet_alpha ---
+        # --- Categorical: dirichlet_alpha grid log-spaced [1/N, N], 31 points ---
         nc = packed.view_n_clusters[v_idx]
-        cat_alpha_grid = jnp.array([0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0])
+        n_rows_f = jnp.maximum(data.shape[0], 1).astype(jnp.float32)
+        cat_alpha_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / n_rows_f), jnp.log(n_rows_f), 31))
         counts_col_cat = packed.ss_counts[v_idx, :, local_idx]
         cat_counts_col = packed.ss_cat_counts[v_idx, :, local_idx]  # (max_c, max_cats)
 
@@ -651,8 +659,8 @@ def packed_transition_column_hypers(
         cat_scores = cat_scores - jnp.max(cat_scores)
         new_dir_alpha_val = cat_alpha_grid[jax.random.categorical(k1, cat_scores)]
 
-        # --- Binary: sample alpha, beta from 2D grid ---
-        ab_grid = jnp.array([0.5, 1.0, 2.0, 5.0, 10.0])
+        # --- Binary: alpha, beta from 2D grid — 8x8 log-spaced [1/N, N] ---
+        ab_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / n_rows_f), jnp.log(n_rows_f), 8))
         sum_x_col_bb = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
 
         # Create 2D grid: all combinations
@@ -671,23 +679,53 @@ def packed_transition_column_hypers(
         new_alpha_val = a_grid_2d[bb_idx]
         new_beta_val = b_grid_2d[bb_idx]
 
-        # --- Cyclic: sample kappa ---
-        kappa_grid = jnp.array([0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0])
+        # --- Cyclic: sample kappa, vm_a, vm_mu (3 hypers matching original) ---
         sum_sin_col = packed.ss_sum_sin[v_idx, :, local_idx]  # (max_c,)
         sum_cos_col = packed.ss_sum_cos[v_idx, :, local_idx]  # (max_c,)
-
+        cur_vm_a = packed.hyper_vm_a[j]
         cur_vm_mu = packed.hyper_vm_mu[j]
 
-        def score_vm_grid(kappa_val):
+        # Sample kappa: log-spaced [0.01, N], 31 points
+        kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(n_rows_f), 31))
+
+        def score_vm_kappa(kappa_val):
             per_cluster = _vm_log_marginal(
-                counts_col_cat, sum_sin_col, sum_cos_col, kappa_val, cur_vm_mu
+                counts_col_cat, sum_sin_col, sum_cos_col, kappa_val, cur_vm_a, cur_vm_mu
             )
             masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
             return jnp.sum(masked)
 
-        vm_scores = jax.vmap(score_vm_grid)(kappa_grid)
-        vm_scores = vm_scores - jnp.max(vm_scores)
-        new_kappa_val = kappa_grid[jax.random.categorical(k1, vm_scores)]
+        vm_k_scores = jax.vmap(score_vm_kappa)(kappa_grid)
+        vm_k_scores = vm_k_scores - jnp.max(vm_k_scores)
+        new_kappa_val = kappa_grid[jax.random.categorical(k1, vm_k_scores)]
+
+        # Sample vm_a: log-spaced [1/N, N], 31 points
+        a_grid = jnp.exp(jnp.linspace(jnp.log(1.0 / n_rows_f), jnp.log(n_rows_f), 31))
+
+        def score_vm_a(a_val):
+            per_cluster = _vm_log_marginal(
+                counts_col_cat, sum_sin_col, sum_cos_col, new_kappa_val, a_val, cur_vm_mu
+            )
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        vm_a_scores = jax.vmap(score_vm_a)(a_grid)
+        vm_a_scores = vm_a_scores - jnp.max(vm_a_scores)
+        new_vm_a_val = a_grid[jax.random.categorical(k2, vm_a_scores)]
+
+        # Sample vm_mu (b): linear [0, 2*pi], 31 points
+        b_grid = jnp.linspace(0.0, 2.0 * jnp.pi, 31)
+
+        def score_vm_b(b_val):
+            per_cluster = _vm_log_marginal(
+                counts_col_cat, sum_sin_col, sum_cos_col, new_kappa_val, new_vm_a_val, b_val
+            )
+            masked = jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0)
+            return jnp.sum(masked)
+
+        vm_b_scores = jax.vmap(score_vm_b)(b_grid)
+        vm_b_scores = vm_b_scores - jnp.max(vm_b_scores)
+        new_vm_mu_val = b_grid[jax.random.categorical(k3, vm_b_scores)]
 
         # --- Select results based on type_id ---
         out_mu = jnp.where(type_id == CONTINUOUS_ID, new_mu_val, packed.hyper_mu[j])
@@ -700,6 +738,8 @@ def packed_transition_column_hypers(
         out_alpha = jnp.where(type_id == BINARY_ID, new_alpha_val, packed.hyper_alpha[j])
         out_beta = jnp.where(type_id == BINARY_ID, new_beta_val, packed.hyper_beta[j])
         out_kappa = jnp.where(type_id == CYCLIC_ID, new_kappa_val, packed.hyper_kappa[j])
+        out_vm_a = jnp.where(type_id == CYCLIC_ID, new_vm_a_val, packed.hyper_vm_a[j])
+        out_vm_mu = jnp.where(type_id == CYCLIC_ID, new_vm_mu_val, packed.hyper_vm_mu[j])
 
         return (
             out_mu,
@@ -710,36 +750,38 @@ def packed_transition_column_hypers(
             out_alpha,
             out_beta,
             out_kappa,
+            out_vm_a,
+            out_vm_mu,
         )
 
     # vmap over all columns
-    (new_mu, new_r, new_s, new_nu, new_dir_alpha, new_alpha, new_beta, new_kappa) = jax.vmap(
-        process_one_column
-    )(jnp.arange(n_cols))
+    (
+        new_mu,
+        new_r,
+        new_s,
+        new_nu,
+        new_dir_alpha,
+        new_alpha,
+        new_beta,
+        new_kappa,
+        new_vm_a,
+        new_vm_mu,
+    ) = jax.vmap(process_one_column)(jnp.arange(n_cols))
 
+    updates = {
+        "hyper_mu": new_mu,
+        "hyper_r": new_r,
+        "hyper_s": new_s,
+        "hyper_nu": new_nu,
+        "hyper_dirichlet_alpha": new_dir_alpha,
+        "hyper_alpha": new_alpha,
+        "hyper_beta": new_beta,
+        "hyper_kappa": new_kappa,
+        "hyper_vm_a": new_vm_a,
+        "hyper_vm_mu": new_vm_mu,
+    }
     return PackedCrossCatState(
-        **{
-            name: (
-                new_mu
-                if name == "hyper_mu"
-                else new_r
-                if name == "hyper_r"
-                else new_s
-                if name == "hyper_s"
-                else new_nu
-                if name == "hyper_nu"
-                else new_dir_alpha
-                if name == "hyper_dirichlet_alpha"
-                else new_alpha
-                if name == "hyper_alpha"
-                else new_beta
-                if name == "hyper_beta"
-                else new_kappa
-                if name == "hyper_kappa"
-                else getattr(packed, name)
-            )
-            for name in _ARRAY_FIELDS
-        },
+        **{name: updates.get(name, getattr(packed, name)) for name in _ARRAY_FIELDS},
         **{name: getattr(packed, name) for name in _STATIC_FIELDS},
     )
 
@@ -758,10 +800,26 @@ def packed_transition_crp_alphas(
     Scores a grid of alpha values for the outer (column) CRP and each inner
     (row) CRP. Includes Exp(1) prior: log_score -= alpha_val.
     """
-    alpha_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(100.0), 50))
     max_views = packed.max_views
     n_cols = packed.n_cols
     max_c = packed.max_clusters
+    n_rows = packed.n_rows
+
+    # CRP alpha grids: log-spaced [1/N, N], 31 points (matching probcomp)
+    col_alpha_grid = jnp.exp(
+        jnp.linspace(
+            jnp.log(1.0 / jnp.maximum(n_cols, 1).astype(jnp.float32)),
+            jnp.log(jnp.maximum(n_cols, 1).astype(jnp.float32)),
+            31,
+        )
+    )
+    row_alpha_grid = jnp.exp(
+        jnp.linspace(
+            jnp.log(1.0 / jnp.maximum(n_rows, 1).astype(jnp.float32)),
+            jnp.log(jnp.maximum(n_rows, 1).astype(jnp.float32)),
+            31,
+        )
+    )
 
     k_outer, k_inner = jax.random.split(rng_key)
 
@@ -785,9 +843,9 @@ def packed_transition_crp_alphas(
     def score_outer_one(alpha_val):
         return log_crp_score(packed.column_assignments, alpha_val, n_cols)
 
-    outer_scores = jax.vmap(score_outer_one)(alpha_grid)
+    outer_scores = jax.vmap(score_outer_one)(col_alpha_grid)
     outer_scores = outer_scores - jnp.max(outer_scores)
-    new_col_alpha = alpha_grid[jax.random.categorical(k_outer, outer_scores)]
+    new_col_alpha = col_alpha_grid[jax.random.categorical(k_outer, outer_scores)]
 
     # --- Inner CRP alphas (row assignments per view) ---
     view_keys = jax.random.split(k_inner, max_views)
@@ -799,9 +857,9 @@ def packed_transition_crp_alphas(
         def score_inner_one(alpha_val):
             return log_crp_score(assigns, alpha_val, max_c)
 
-        scores = jax.vmap(score_inner_one)(alpha_grid)
+        scores = jax.vmap(score_inner_one)(row_alpha_grid)
         scores = scores - jnp.max(scores)
-        chosen = alpha_grid[jax.random.categorical(view_keys[v_idx], scores)]
+        chosen = row_alpha_grid[jax.random.categorical(view_keys[v_idx], scores)]
 
         # Only update active views
         is_active = packed.view_mask[v_idx]
@@ -878,6 +936,7 @@ def _score_column_in_view(
     alpha: Array,
     beta: Array,
     kappa: Array,
+    vm_a: Array,
     vm_mu: Array,
     max_clusters: int,
     max_categories: int,
@@ -891,7 +950,7 @@ def _score_column_in_view(
         data_col: (n_rows,) column data (may contain NaN).
         row_assignments: (n_rows,) int cluster assignments for this view.
         type_id: scalar int column type.
-        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_mu: scalar hypers.
+        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_a, vm_mu: scalar hypers.
         max_clusters: static int padding.
         max_categories: static int padding.
 
@@ -937,6 +996,7 @@ def _score_column_in_view(
             alpha,
             beta,
             kappa,
+            vm_a,
             vm_mu,
         )
 
@@ -1010,6 +1070,7 @@ def packed_transition_column_assignments(
         h_a = packed.hyper_alpha[j]
         h_b = packed.hyper_beta[j]
         h_k = packed.hyper_kappa[j]
+        h_vm_a = packed.hyper_vm_a[j]
         h_vm = packed.hyper_vm_mu[j]
 
         # Column counts per view, excluding column j
@@ -1034,6 +1095,7 @@ def packed_transition_column_assignments(
                 h_a,
                 h_b,
                 h_k,
+                h_vm_a,
                 h_vm,
                 max_clusters,
                 max_cats,
@@ -1357,6 +1419,7 @@ def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
                 packed.hyper_alpha[col_idx],
                 packed.hyper_beta[col_idx],
                 packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
                 packed.hyper_vm_mu[col_idx],
             )
 
