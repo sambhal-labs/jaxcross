@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-03-20
+
+### Added
+- Benchmark results infrastructure: JSON metrics + matplotlib PNG charts saved to `results/`
+- Shared benchmark utilities (`benchmarks/utils.py`): result persistence, convergence plots, Z-matrix heatmaps
+- Enhanced synthetic benchmark with per-sweep convergence plot, Z-matrix heatmap, and cluster recovery scatter
+- MNIST digit clustering benchmark (`benchmarks/mnist_benchmark.py`): PCA-reduced MNIST with
+  convergence tracking, Z-matrix, digit-cluster contingency table, and held-out evaluation
+- New optional dependency group `benchmark` (matplotlib, scikit-learn)
+
 ## [0.6.0] - 2026-03-20
 
 ### Added
