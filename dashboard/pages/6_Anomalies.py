@@ -36,23 +36,33 @@ n_rows = data.shape[0]
 
 st.write(f"Compute anomaly scores for **{n_rows}** rows.")
 
+if n_rows > 500:
+    st.info(
+        f"Scoring {n_rows} rows may take a while. The first row includes JIT compilation overhead."
+    )
+
 if st.button("Compute Anomaly Scores", type="primary"):
     scores = []
     rng_key = jax.random.key(0)
 
     progress_bar = st.progress(0, text="Scoring rows...")
 
-    for row in range(n_rows):
-        rng_key, score_key = jax.random.split(rng_key)
-        score = packed_anomaly_score(score_key, packed, data, row)
-        scores.append(float(score))
+    try:
+        for row in range(n_rows):
+            rng_key, score_key = jax.random.split(rng_key)
+            score = packed_anomaly_score(score_key, packed, data, row)
+            scores.append(float(score))
 
-        if (row + 1) % max(1, n_rows // 20) == 0 or row == n_rows - 1:
-            progress_bar.progress((row + 1) / n_rows, text=f"Row {row + 1}/{n_rows}")
+            if (row + 1) % max(1, n_rows // 20) == 0 or row == n_rows - 1:
+                progress_bar.progress((row + 1) / n_rows, text=f"Row {row + 1}/{n_rows}")
 
-    progress_bar.progress(1.0, text="Done!")
+        progress_bar.progress(1.0, text="Done!")
+        st.toast("Anomaly scores computed!", icon="✅")
 
-    st.session_state["anomaly_scores"] = np.array(scores)
+        st.session_state["anomaly_scores"] = np.array(scores)
+
+    except Exception as e:
+        st.error(f"Anomaly scoring failed at row {row}: {e}")
 
 # ---------------------------------------------------------------------------
 # Display results
@@ -74,6 +84,23 @@ if "anomaly_scores" in st.session_state:
     with col3:
         st.metric("Max score", f"{scores.max():.4f}")
 
+    # Interpretation guide
+    with st.expander("How to interpret anomaly scores"):
+        p90 = float(np.percentile(scores, 90))
+        p95 = float(np.percentile(scores, 95))
+        p99 = float(np.percentile(scores, 99))
+        st.write(
+            "Anomaly scores are negative log-likelihoods -- **higher = more anomalous**. "
+            "Scores are relative to the learned model, so interpret them by comparison:"
+        )
+        st.write(f"- **90th percentile:** {p90:.4f}")
+        st.write(f"- **95th percentile:** {p95:.4f}")
+        st.write(f"- **99th percentile:** {p99:.4f}")
+        st.caption(
+            "Rows above the 95th percentile are typically worth investigating. "
+            "Scores depend on the data and model — there is no universal threshold."
+        )
+
     # Top-10 most anomalous rows
     st.subheader("Top 10 Most Anomalous Rows")
     sorted_indices = np.argsort(scores)[::-1]
@@ -81,7 +108,13 @@ if "anomaly_scores" in st.session_state:
 
     top_rows = []
     for rank, idx in enumerate(top_10_indices, start=1):
-        row_data = {"Rank": rank, "Row": int(idx), "Anomaly Score": f"{scores[idx]:.4f}"}
+        percentile = float((scores < scores[idx]).mean() * 100)
+        row_data = {
+            "Rank": rank,
+            "Row": int(idx),
+            "Anomaly Score": f"{scores[idx]:.4f}",
+            "Percentile": f"{percentile:.0f}th",
+        }
         # Include first few column values for context
         for j, col_name in enumerate(column_names[:6]):
             row_data[col_name] = f"{float(data[idx, j]):.3f}"
@@ -91,4 +124,4 @@ if "anomaly_scores" in st.session_state:
 
     st.dataframe(pd.DataFrame(top_rows), use_container_width=True, hide_index=True)
 else:
-    st.info("Click **Compute Anomaly Scores** to score all rows.")
+    st.caption("Click **Compute Anomaly Scores** to score all rows.")

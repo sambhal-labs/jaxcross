@@ -31,11 +31,17 @@ packed = st.session_state["packed_state"]
 column_names = st.session_state["column_names"]
 column_types = st.session_state["column_types"]
 n_cols = len(column_names)
+total_pairs = n_cols * (n_cols - 1) // 2
 
 st.write(
-    f"Compute pairwise mutual information for **{n_cols}** columns "
-    f"({n_cols * (n_cols - 1) // 2} unique pairs)."
+    f"Compute pairwise mutual information for **{n_cols}** columns ({total_pairs} unique pairs)."
 )
+
+if total_pairs > 500:
+    st.info(
+        f"Computing {total_pairs} pairs may take a while. "
+        "The first pair includes JIT compilation overhead."
+    )
 
 if st.button("Compute MI Matrix", type="primary"):
     # Use the current packed state as a single-element list (single chain)
@@ -45,29 +51,36 @@ if st.button("Compute MI Matrix", type="primary"):
     linfoot_matrix = np.zeros((n_cols, n_cols))
 
     progress_bar = st.progress(0, text="Computing mutual information...")
-    total_pairs = n_cols * (n_cols - 1) // 2
     done = 0
 
-    for i in range(n_cols):
-        for j in range(i + 1, n_cols):
-            mi, linfoot = packed_mutual_information(packed_states, column_types, i, j)
-            mi_val = float(mi)
-            lf_val = float(linfoot)
+    try:
+        for i in range(n_cols):
+            for j in range(i + 1, n_cols):
+                mi, linfoot = packed_mutual_information(packed_states, column_types, i, j)
+                mi_val = float(mi)
+                lf_val = float(linfoot)
 
-            mi_matrix[i, j] = mi_val
-            mi_matrix[j, i] = mi_val
-            linfoot_matrix[i, j] = lf_val
-            linfoot_matrix[j, i] = lf_val
+                mi_matrix[i, j] = mi_val
+                mi_matrix[j, i] = mi_val
+                linfoot_matrix[i, j] = lf_val
+                linfoot_matrix[j, i] = lf_val
 
-            done += 1
-            if total_pairs > 0:
-                progress_bar.progress(done / total_pairs, text=f"Pair {done}/{total_pairs}")
+                done += 1
+                if total_pairs > 0:
+                    progress_bar.progress(
+                        done / total_pairs,
+                        text=f"Pair {done}/{total_pairs} ({column_names[i]} vs {column_names[j]})",
+                    )
 
-    progress_bar.progress(1.0, text="Done!")
+        progress_bar.progress(1.0, text="Done!")
+        st.toast("MI matrix computed!", icon="✅")
 
-    # Store for display
-    st.session_state["mi_matrix"] = mi_matrix
-    st.session_state["linfoot_matrix"] = linfoot_matrix
+        # Store for display
+        st.session_state["mi_matrix"] = mi_matrix
+        st.session_state["linfoot_matrix"] = linfoot_matrix
+
+    except Exception as e:
+        st.error(f"MI computation failed at pair ({column_names[i]}, {column_names[j]}): {e}")
 
 # ---------------------------------------------------------------------------
 # Display results
@@ -85,9 +98,9 @@ if "mi_matrix" in st.session_state:
         st.subheader("Linfoot Correlation")
         st.caption(
             "Linfoot correlation transforms MI into a [0, 1] scale analogous "
-            "to Pearson r: linfoot = sqrt(1 - exp(-2 * MI))."
+            "to Pearson r: `linfoot = sqrt(1 - exp(-2 * MI))`."
         )
         fig_lf = plot_mi_matrix(st.session_state["linfoot_matrix"], column_names)
         st.plotly_chart(fig_lf, use_container_width=True)
 else:
-    st.info("Click **Compute MI Matrix** to compute pairwise dependencies.")
+    st.caption("Click **Compute MI Matrix** to compute pairwise dependencies.")

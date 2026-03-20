@@ -29,8 +29,13 @@ if not st.session_state.get("inference_done"):
 
 packed = st.session_state["packed_state"]
 column_names = st.session_state["column_names"]
-views = extract_structure(packed)
-n_views = int(packed.n_views)
+
+try:
+    views = extract_structure(packed)
+    n_views = int(packed.n_views)
+except Exception as e:
+    st.error(f"Failed to extract structure from model state: {e}")
+    st.stop()
 
 # ---------------------------------------------------------------------------
 # Column partition
@@ -45,6 +50,15 @@ column_assignments = np.array([int(packed.column_assignments[j]) for j in range(
 
 fig_partition = plot_column_partition(column_assignments, column_names, n_views)
 st.plotly_chart(fig_partition, use_container_width=True)
+
+# Summary table of views
+with st.expander("View summary table", expanded=False):
+    for v_info in views:
+        cols_in = [column_names[c] for c in v_info["columns"]]
+        st.write(
+            f"**View {v_info['view_id']}**: {', '.join(cols_in)} "
+            f"({v_info['n_clusters']} clusters, CRP alpha={v_info['crp_alpha']:.3f})"
+        )
 
 # ---------------------------------------------------------------------------
 # Per-view row clustering

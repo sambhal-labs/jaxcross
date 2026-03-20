@@ -43,8 +43,6 @@ use_all_rows = st.checkbox(
 
 if use_all_rows:
     max_rows = n_rows
-    n_pairs = n_rows * (n_rows - 1) // 2
-    st.write(f"Will compute similarity for all **{n_rows}** rows ({n_pairs} pairs).")
 else:
     max_rows = st.number_input(
         "Max rows to include",
@@ -54,9 +52,19 @@ else:
         step=5,
         key="sim_max_rows",
     )
-    st.write(
-        f"Will compute similarity for the first **{max_rows}** rows "
-        f"({max_rows * (max_rows - 1) // 2} pairs)."
+
+n_pairs = max_rows * (max_rows - 1) // 2
+st.write(f"Will compute similarity for **{max_rows}** rows ({n_pairs} pairs).")
+
+if n_pairs > 5000:
+    st.warning(
+        f"Computing {n_pairs} pairs will be slow. "
+        "Consider reducing the row count for faster results."
+    )
+elif n_pairs > 1000:
+    st.info(
+        f"Computing {n_pairs} pairs may take a moment. "
+        "The first pair includes JIT compilation overhead."
     )
 
 # ---------------------------------------------------------------------------
@@ -73,26 +81,30 @@ if st.button("Compute Similarity", type="primary"):
     # Diagonal is 1.0 (each row is identical to itself)
     np.fill_diagonal(sim_matrix, 1.0)
 
-    total_pairs = subset_size * (subset_size - 1) // 2
     progress_bar = st.progress(0, text="Computing pairwise similarity...")
     done = 0
 
-    for i in range(subset_size):
-        for j in range(i + 1, subset_size):
-            sim = packed_row_similarity(packed_states, column_types, i, j)
-            sim_val = float(sim)
-            sim_matrix[i, j] = sim_val
-            sim_matrix[j, i] = sim_val
+    try:
+        for i in range(subset_size):
+            for j in range(i + 1, subset_size):
+                sim = packed_row_similarity(packed_states, column_types, i, j)
+                sim_val = float(sim)
+                sim_matrix[i, j] = sim_val
+                sim_matrix[j, i] = sim_val
 
-            done += 1
-            if done % max(1, total_pairs // 20) == 0 or done == total_pairs:
-                progress_bar.progress(done / total_pairs, text=f"Pair {done}/{total_pairs}")
+                done += 1
+                if done % max(1, n_pairs // 20) == 0 or done == n_pairs:
+                    progress_bar.progress(done / n_pairs, text=f"Pair {done}/{n_pairs}")
 
-    progress_bar.progress(1.0, text="Done!")
+        progress_bar.progress(1.0, text="Done!")
+        st.toast("Similarity matrix computed!", icon="✅")
 
-    row_labels = [f"Row {i}" for i in range(subset_size)]
-    st.session_state["sim_matrix"] = sim_matrix
-    st.session_state["sim_row_labels"] = row_labels
+        row_labels = [f"Row {i}" for i in range(subset_size)]
+        st.session_state["sim_matrix"] = sim_matrix
+        st.session_state["sim_row_labels"] = row_labels
+
+    except Exception as e:
+        st.error(f"Similarity computation failed at pair ({i}, {j}): {e}")
 
 # ---------------------------------------------------------------------------
 # Display results
@@ -117,5 +129,12 @@ if "sim_matrix" in st.session_state:
         st.metric("Median similarity", f"{np.median(upper_tri):.4f}")
     with col3:
         st.metric("Max similarity", f"{upper_tri.max():.4f}")
+
+    with st.expander("About row similarity"):
+        st.write(
+            "Row similarity measures how often two rows are assigned to the same cluster "
+            "across all views. Values range from **0** (never co-clustered) to **1** "
+            "(always co-clustered in every view)."
+        )
 else:
-    st.info("Click **Compute Similarity** to compute pairwise row similarity.")
+    st.caption("Click **Compute Similarity** to compute pairwise row similarity.")
