@@ -217,6 +217,7 @@ def _score_row_all_clusters(
         hyper_alpha,
         hyper_beta,
         hyper_kappa,
+        hyper_vm_a,
         hyper_vm_mu,
         n_columns,
     )
@@ -685,8 +686,16 @@ def packed_transition_column_hypers(
         cur_vm_a = packed.hyper_vm_a[j]
         cur_vm_mu = packed.hyper_vm_mu[j]
 
-        # Sample kappa: log-spaced [0.01, N], 31 points
-        kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(n_rows_f), 31))
+        # Sample kappa: linspace [kappa_est, N*kappa_est], 31 points
+        # Matches original utils.cpp:construct_cyclic_specific_hyper_grid()
+        col_data_j = data[:, j]
+        valid_mask = ~jnp.isnan(col_data_j)
+        n_obs_j = jnp.maximum(valid_mask.sum(), 1)
+        sin_sum = jnp.nansum(jnp.sin(col_data_j))
+        cos_sum = jnp.nansum(jnp.cos(col_data_j))
+        r_bar = jnp.sqrt(sin_sum**2 + cos_sum**2) / n_obs_j
+        kappa_est = jnp.maximum(r_bar * (2.0 - r_bar**2) / (1.0 - r_bar**2), 0.01)
+        kappa_grid = jnp.linspace(kappa_est, n_rows_f * kappa_est, 31)
 
         def score_vm_kappa(kappa_val):
             per_cluster = _vm_log_marginal(
@@ -1140,6 +1149,7 @@ def packed_transition_column_assignments(
             h_a,
             h_b,
             h_k,
+            h_vm_a,
             h_vm,
             max_clusters,
             max_cats,

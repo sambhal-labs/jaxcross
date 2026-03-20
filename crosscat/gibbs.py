@@ -820,8 +820,17 @@ def transition_column_hypers(
                         log_score = log_score + VonMises.log_marginal_likelihood(ss, test_hypers)
                 return log_score
 
-            # Sample kappa: log-spaced [0.01, num_rows], 31 points
-            kappa_grid = jnp.exp(jnp.linspace(jnp.log(0.01), jnp.log(float(num_rows)), 31))
+            # Sample kappa: linspace [kappa_est, N*kappa_est], 31 points
+            # Matches original utils.cpp:construct_cyclic_specific_hyper_grid()
+            col_data_j = data[:, j]
+            col_data_j = col_data_j[~jnp.isnan(col_data_j)]
+            n_obs_j = col_data_j.shape[0]
+            r_bar = jnp.sqrt(
+                jnp.sum(jnp.sin(col_data_j)) ** 2 + jnp.sum(jnp.cos(col_data_j)) ** 2
+            ) / jnp.maximum(n_obs_j, 1)
+            # MLE kappa approximation (Mardia & Jupp)
+            kappa_est = jnp.maximum(r_bar * (2.0 - r_bar**2) / (1.0 - r_bar**2), 0.01)
+            kappa_grid = jnp.linspace(kappa_est, float(num_rows) * kappa_est, 31)
             log_scores_k = jnp.array(
                 [
                     _score_vm_hypers(
