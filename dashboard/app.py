@@ -44,16 +44,22 @@ for key, default in _DEFAULTS.items():
 with st.sidebar:
     st.title("JAX-CrossCat Explorer")
 
-    # Data summary ---------------------------------------------------------
-    if st.session_state["data"] is not None:
+    # Workflow status ---------------------------------------------------------
+    data_loaded = st.session_state["data"] is not None
+    inference_done = st.session_state.get("inference_done", False)
+
+    if data_loaded:
         data = st.session_state["data"]
         col_names = st.session_state["column_names"]
         col_types = st.session_state["column_types"]
         n_rows, n_cols = data.shape
 
         st.subheader("Data Summary")
-        st.metric("Rows", n_rows)
-        st.metric("Columns", n_cols)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Rows", n_rows)
+        with c2:
+            st.metric("Columns", n_cols)
 
         type_counts: dict[str, int] = {}
         for ct in col_types:
@@ -62,26 +68,52 @@ with st.sidebar:
         for label, count in sorted(type_counts.items()):
             st.write(f"- **{label}**: {count}")
     else:
-        st.info("No data loaded yet.")
+        st.info("No data loaded yet. Start on the **Data Loading** page.")
 
-    # Inference status -----------------------------------------------------
+    # Inference status -------------------------------------------------------
     st.subheader("Inference Status")
     history = st.session_state["sweep_history"]
     if history:
         latest = history[-1]
-        st.metric("Sweeps completed", len(history))
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Sweeps", len(history))
+        with c2:
+            st.metric("Views", latest["n_views"])
         st.metric("log_joint", f"{latest['log_joint']:.2f}")
-        st.metric("Active views", latest["n_views"])
+    elif data_loaded:
+        st.caption("Data is loaded. Go to the **Inference** page to run Gibbs sweeps.")
     else:
-        st.write("No inference run yet.")
+        st.caption("Load data first, then run inference.")
 
-    # Version & reset ------------------------------------------------------
+    # Workflow guide ----------------------------------------------------------
+    st.divider()
+    st.subheader("Workflow")
+    step1 = "~~1. Load data~~" if data_loaded else "**1. Load data**"
+    step2 = "~~2. Run inference~~" if inference_done else "**2. Run inference**"
+    step3 = "**3. Explore results**" if inference_done else "3. Explore results"
+    st.markdown(f"{step1}  \n{step2}  \n{step3}")
+
+    # Version & reset --------------------------------------------------------
     st.divider()
     st.caption(f"jax-crosscat v{crosscat.__version__}")
 
-    if st.button("Reset", type="primary", use_container_width=True):
+    if st.button("Reset All", type="primary", use_container_width=True):
         for key, default in _DEFAULTS.items():
             st.session_state[key] = default
+        # Also clear computed results
+        for result_key in [
+            "mi_matrix",
+            "linfoot_matrix",
+            "anomaly_scores",
+            "pred_samples",
+            "pred_sample_cols",
+            "impute_result",
+            "sim_matrix",
+            "sim_row_labels",
+            "engine",
+        ]:
+            st.session_state.pop(result_key, None)
         st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -106,7 +138,7 @@ if st.session_state["data"] is None:
         ### Getting started
 
         1. **Load data** -- upload a CSV or generate synthetic data via the
-           Data Manager page.
+           Data Loading page.
         2. **Run inference** -- execute Gibbs sweeps to learn the model structure.
         3. **Explore** -- inspect the discovered column partition, row clustering,
            mutual information, and anomaly scores.
@@ -121,4 +153,4 @@ else:
     if st.session_state["inference_done"]:
         st.success("Inference complete. Use the sidebar to navigate to analysis pages.")
     else:
-        st.info("Data is loaded. Run inference to explore the model structure.")
+        st.info("Data is loaded. Navigate to the **Inference** page to run Gibbs sweeps.")
