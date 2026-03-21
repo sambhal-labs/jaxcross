@@ -129,6 +129,7 @@ def test_score_row_all_clusters_produces_valid_scores(mixed_packed_state):
                 packed.hyper_alpha,
                 packed.hyper_beta,
                 packed.hyper_kappa,
+                packed.hyper_vm_a,
                 packed.hyper_vm_mu,
                 alpha,
                 max_c,
