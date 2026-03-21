@@ -187,8 +187,11 @@ flowchart LR
 | [`packed/`](crosscat/packed/) | JIT-compatible padded state with vectorized kernels (`state.py`, `components.py`, `suffstats.py`, `kernels.py`) |
 | [`packed_inference.py`](crosscat/packed_inference.py) | Vectorized inference queries on packed state |
 | [`constraints.py`](crosscat/constraints.py) | Column/row dependency constraint enforcement |
-| [`diagnostics.py`](crosscat/diagnostics.py) | ARI, convergence metrics, held-out likelihood |
+| [`diagnostics.py`](crosscat/diagnostics.py) | ARI, convergence metrics, held-out likelihood, imputation evaluation |
+| [`serialization.py`](crosscat/serialization.py) | Save/load states and checkpoints (`.jxc` format) |
 | [`synthetic.py`](crosscat/synthetic.py) | Synthetic data generation for testing |
+| [`data_utils.py`](crosscat/data_utils.py) | CSV I/O, column type detection, discretization |
+| [`validate.py`](crosscat/validate.py) | State consistency checking |
 
 ### Component Models
 
@@ -233,6 +236,12 @@ state = gibbs_sweep(key, state, data, n_sweeps=100,
 ### Queries
 
 ```python
+from crosscat.inference import (
+    predictive_probability, predictive_sample, mutual_information,
+    predictive_anomalousness, row_similarity, impute_and_confidence,
+    predictive_cdf,
+)
+
 # Conditional probability: p(col=val | conditions)
 log_p = predictive_probability(state, data, query_cols=[0],
                                query_vals=jnp.array([3.5]),
@@ -270,6 +279,25 @@ state = ensure_col_dep_constraints(
     key, state, data,
     constraints=[(0, 1, True)],  # (col_a, col_b, dependent)
 )
+```
+
+### Serialization
+
+```python
+from crosscat import save_packed_state, load_packed_state, save_checkpoint, load_latest_checkpoint
+
+# Save packed state
+save_packed_state(packed, "my_model", column_types=column_types)
+
+# Load it back
+packed, col_types = load_packed_state("my_model")
+
+# Checkpoint during inference
+save_checkpoint(packed, "checkpoints/", sweep_number=50,
+                column_types=column_types, log_joint_value=score)
+
+# Resume from latest checkpoint
+packed, col_types, sweep_num = load_latest_checkpoint("checkpoints/")
 ```
 
 ### Diagnostics
@@ -331,7 +359,7 @@ uv run pytest
 uv run pytest tests/test_packed_state.py -v
 ```
 
-**Test coverage**: 79 fast tests + 31 slow integration tests covering all 5 column types, missing data, convergence diagnostics, anomaly detection, mutual information, constraints, row similarity, and packed kernel correctness.
+**Test coverage**: 127 fast tests + 31 slow integration tests (158 total) covering all 5 column types, missing data, convergence diagnostics, anomaly detection, mutual information, constraints, row similarity, serialization, multi-chain inference, and packed kernel correctness.
 
 ## Development
 
@@ -369,7 +397,7 @@ pre-commit install
 - [x] Interactive visualization dashboard (`dashboard/`)
 - [x] State serialization (save/load/checkpoint)
 - [x] Parallel multi-chain inference via `jax.vmap`
-- [x] GPU-validated test suite (104 fast + 31 slow tests)
+- [x] GPU-validated test suite (127 fast + 31 slow tests)
 - [ ] PyPI release
 
 ## References
