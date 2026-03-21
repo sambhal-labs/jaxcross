@@ -65,6 +65,14 @@ def _crp_sample(rng_key: Array, alpha: float, n: int) -> Array:
     return assignments
 
 
+def _safe_n_categories(col_data: Array) -> int:
+    """Compute number of categories from column data, handling all-NaN gracefully."""
+    clean = col_data[~jnp.isnan(col_data)]
+    if clean.shape[0] == 0:
+        return 2  # default minimum for empty/all-NaN columns
+    return max(int(jnp.max(clean)) + 1, 1)
+
+
 def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
     """Initialize column hyperparameters from data-driven defaults.
 
@@ -75,8 +83,9 @@ def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
     - Ordinal: cutpoints as linspace (but using Dirichlet internally)
     """
     if column_type == ColumnType.CONTINUOUS:
-        mean = jnp.mean(col_data)
-        var = jnp.var(col_data) + 1e-6
+        clean = col_data[~jnp.isnan(col_data)]
+        mean = jnp.nanmean(col_data) if clean.shape[0] > 0 else jnp.array(0.0)
+        var = jnp.nanvar(col_data) + 1e-6 if clean.shape[0] > 0 else jnp.array(1.0)
         return ColumnHypers(
             column_type=column_type,
             mu=mean,
@@ -96,9 +105,10 @@ def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
             beta=jnp.array(1.0),
         )
     elif column_type == ColumnType.ORDINAL:
-        n_levels = int(jnp.max(col_data)) + 1
+        n_levels = _safe_n_categories(col_data)
         return ColumnHypers(
             column_type=column_type,
+            dirichlet_alpha=jnp.array(1.0),
             cutpoints=jnp.linspace(0.0, 1.0, n_levels - 1) if n_levels > 1 else None,
         )
     elif column_type == ColumnType.CYCLIC:
@@ -136,12 +146,12 @@ def _compute_suffstats_for_view(
             if col_type == ColumnType.CONTINUOUS:
                 ss = NormalGamma.sufficient_statistics(col_data)
             elif col_type == ColumnType.CATEGORICAL:
-                n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+                n_cats = _safe_n_categories(data[:, col_idx])
                 ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
             elif col_type == ColumnType.BINARY:
                 ss = BetaBernoulli.sufficient_statistics(col_data)
             elif col_type == ColumnType.ORDINAL:
-                n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+                n_levels = _safe_n_categories(data[:, col_idx])
                 ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
             elif col_type == ColumnType.CYCLIC:
                 ss = VonMises.sufficient_statistics(col_data)
@@ -181,8 +191,27 @@ def initialize(
 
     Returns:
         Single CrossCatState if n_chains=1, else list of states.
+
+    Raises:
+        ValueError: If data is empty, column_types length mismatches data, or
+            invalid initialization mode.
     """
+    if data.ndim != 2:
+        raise ValueError(f"Data must be 2-dimensional, got shape {data.shape}")
     n_rows, n_cols = data.shape
+    if n_rows == 0:
+        raise ValueError("Data must have at least one row")
+    if n_cols == 0:
+        raise ValueError("Data must have at least one column")
+    if len(column_types) != n_cols:
+        raise ValueError(
+            f"column_types length ({len(column_types)}) must match number of columns ({n_cols})"
+        )
+    valid_inits = {"from_the_prior", "together", "apart"}
+    if initialization not in valid_inits:
+        raise ValueError(
+            f"Unknown initialization '{initialization}'. Must be one of {valid_inits}"
+        )
 
     def _init_one(key):
         k1, k2 = jax.random.split(key)

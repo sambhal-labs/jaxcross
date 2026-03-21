@@ -146,7 +146,7 @@ def unified_log_marginal(
     continuous_score = _ng_log_marginal(count, sum_x, sum_x_sq, mu, r, s, nu)
     cat_score = _dc_log_marginal(count, cat_counts, dir_alpha)
     binary_score = _bb_log_marginal(count, sum_x, alpha, beta)
-    ordinal_score = _dc_log_marginal(count, cat_counts, jnp.ones_like(dir_alpha))
+    ordinal_score = _dc_log_marginal(count, cat_counts, dir_alpha)
     cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
@@ -257,7 +257,7 @@ def unified_posterior_predictive_logp(
     cont = _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu, r, s, nu)
     cat = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
     binary = _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta)
-    ordinal = _dc_posterior_predictive_logp(x, count, cat_counts, jnp.ones_like(dir_alpha))
+    ordinal = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
     cyclic = _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
@@ -341,19 +341,23 @@ def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     # Mode logp (envelope for rejection sampling)
     log_M = kappa - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
 
+    max_iters = 1000
+
     def _cond(state):
-        return state[0]  # rejected flag
+        return state[0] & (state[1] < max_iters)
 
     def _body(state):
-        _, _, key_loop = state
+        _, itr, sample, key_loop = state
         k1, k2, k3 = jax.random.split(key_loop, 3)
         x = jax.random.uniform(k1) * 2.0 * jnp.pi
         log_u = jnp.log(jax.random.uniform(k2)) + log_M
         log_target = kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
         accepted = log_u < log_target
-        return (~accepted, jnp.where(accepted, x, 0.0), k3)
+        return (~accepted, itr + 1, jnp.where(accepted, x, sample), k3)
 
-    _, sample, _ = jax.lax.while_loop(_cond, _body, (True, 0.0, rng_key))
+    _, _, sample, _ = jax.lax.while_loop(
+        _cond, _body, (jnp.bool_(True), jnp.int32(0), 0.0, rng_key)
+    )
     return sample % (2.0 * jnp.pi)
 
 
@@ -397,7 +401,7 @@ def unified_sample_posterior_predictive(
     cat_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
     binary_sample = _bb_sample(k3, count, sum_x, alpha, beta)
     cyclic_sample = _vm_sample(k4, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
-    ordinal_sample = _dc_sample(k2, count, cat_counts, jnp.ones_like(dir_alpha))
+    ordinal_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
 
     return jnp.where(
         type_id == CONTINUOUS_ID,
