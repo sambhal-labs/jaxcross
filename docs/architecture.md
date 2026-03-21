@@ -65,11 +65,17 @@ flowchart TB
 
     inference["inference.py\npredictive_probability()\npredictive_sample()\nmutual_information()\nanomaly_score()"]
 
-    packed["packed_state.py\nPackedCrossCatState\npack/unpack, vectorized kernels"]
+    packed["packed/\nPackedCrossCatState\nstate, components, suffstats, kernels"]
+
+    packed_inf["packed_inference.py\npacked_predictive_probability()\npacked_mutual_information()"]
 
     constraints["constraints.py\nensure_col_dep_constraints()\nensure_row_dep_constraint()"]
 
-    diagnostics["diagnostics.py\nadjusted_rand_index()\ncollect_diagnostics()"]
+    diagnostics["diagnostics.py\nadjusted_rand_index()\nevaluate_imputation()"]
+
+    serial["serialization.py\nsave/load state & checkpoints"]
+
+    synthetic["synthetic.py\ngenerate_crosscat_data()"]
 
     types --> model
     types --> gibbs
@@ -83,6 +89,8 @@ flowchart TB
     types --> packed
     components --> packed
     model --> packed
+    packed --> packed_inf
+    types --> serial
 ```
 
 ### Data Flow
@@ -176,11 +184,12 @@ For each column *j*:
 
 ### Hyperparameter Sampling
 
-Grid-based Gibbs following original CrossCat:
-- **Continuous**: grids over s (variance scale), mu (prior mean), nu (degrees of freedom)
-- **Categorical**: grid over dirichlet_alpha (concentration)
-- **Binary**: grid over (alpha, beta) — 5x5 = 25 grid points
-- **Cyclic**: grid over kappa (concentration)
+Grid-based Gibbs following original CrossCat, with data-dependent ranges and N_GRID=31:
+- **Continuous**: grids over s (log-spaced [SSD/100, SSD]), mu (linear [min, max]), nu (log-spaced [1, N]), r (log-spaced [1/N, N])
+- **Categorical**: grid over dirichlet_alpha (log-spaced [1/N, N])
+- **Binary**: grid over (alpha, beta) — 8x8 log-spaced [1/N, N]
+- **Cyclic**: grids over kappa (linspace [kappa_est, N*kappa_est, 31]), vm_a (31 pts), vm_mu (31 pts)
+- **CRP alphas**: separate inner/outer grids, log-spaced [1/N, N] scaled to row/column count
 
 ## JAX Design Patterns
 

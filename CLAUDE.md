@@ -46,7 +46,7 @@ The package is `crosscat/` with these core modules:
 
 - **gibbs.py** — Collapsed Gibbs MCMC kernels: `transition_row_assignments()`, `transition_column_assignments()`, `transition_column_hypers()`, `transition_crp_alphas()`, and `gibbs_sweep()` which runs a full iteration.
 
-- **inference.py** — Posterior predictive queries: `predictive_probability()`, `predictive_sample()`, `predictive_cdf()`, `mutual_information()`, `impute_and_confidence()`, `anomaly_score()`, `row_similarity()`, `sample_and_insert()`.
+- **inference.py** — Posterior predictive queries: `predictive_probability()`, `predictive_sample()`, `predictive_cdf()`, `mutual_information()`, `dependence_probability()`, `dependence_matrix()`, `impute_and_confidence()`, `predictive_anomalousness()`, `row_similarity()`, `row_typicality()`, `column_typicality()`, `sample_and_insert()`, `credible_interval()`, `conditional_entropy()`, `joint_predictive_probability()`.
 
 - **packed/** — JIT-compatible packed state sub-package:
   - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`
@@ -57,9 +57,12 @@ The package is `crosscat/` with these core modules:
 - **packed_inference.py** — Vectorized inference queries on packed state (predictive, MI, anomaly, similarity).
 
 - **constraints.py** — Enforces column/row dependency constraints during inference.
-- **diagnostics.py** — Convergence metrics (Adjusted Rand Index, etc.).
-- **data_utils.py** — CSV I/O and column type detection.
+- **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation).
+- **serialization.py** — Save/load states and checkpoints in `.jxc` format (JSON metadata + NPZ arrays).
+- **synthetic.py** — Synthetic data generation from known CrossCat generative model, missing data injection.
+- **data_utils.py** — CSV I/O, column type detection, discretization.
 - **validate.py** — State consistency checking.
+- **packed_state.py** — Legacy deprecation shim; import from `crosscat.packed` instead.
 - **../contrib/fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific, not part of core).
 
 ## Key Patterns
@@ -71,6 +74,6 @@ The package is `crosscat/` with these core modules:
 
 ## Code Style
 
-- Python 3.11+, ruff for linting (rules: E, F, I, W, UP), line length 99
+- Python 3.11+, ruff for linting (rules: E, F, I, W, UP, B, SIM), line length 99
 - Type hints throughout
 - Private functions prefixed with `_`
