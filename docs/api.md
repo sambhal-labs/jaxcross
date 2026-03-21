@@ -105,6 +105,18 @@ Draw samples from the posterior predictive.
 
 **Returns**: `Array (n_samples, len(query_cols))`.
 
+### `credible_interval(rng_key, state, data, query_col, *, condition_cols=None, condition_vals=None, n_samples=1000, ci_level=0.90)`
+
+Compute a credible interval for a column via posterior predictive sampling.
+
+**Returns**: `(lower, median, upper)`.
+
+### `joint_predictive_probability(state, data, query_cols, query_vals, *, condition_cols=None, condition_vals=None)`
+
+Joint predictive probability over multiple query columns.
+
+**Returns**: Scalar log probability.
+
 ### `predictive_cdf(rng_key, state, data, query_col, query_val, *, condition_cols=None, condition_vals=None, row_id=None, n_samples=10000)`
 
 Posterior predictive CDF: P(X <= value). Analytic for discrete types, MC for continuous/cyclic.
@@ -134,7 +146,7 @@ z = dependence_matrix(posterior_states)
 # z[i,j] ≈ 0.0 means columns i and j are almost always independent
 ```
 
-### `mutual_information(states, col_i, col_j, *, n_samples=1000)`
+### `mutual_information(states, col_i, col_j, *, n_samples=1000, rng_key=None)`
 
 Estimate mutual information between two columns, averaged over posterior samples.
 
@@ -229,6 +241,108 @@ Per-sweep diagnostic metrics: log_joint, n_views, CRP alphas, cluster counts.
 ### `mean_test_log_likelihood(state, data, test_rows)`
 
 Held-out log-likelihood on specified test rows.
+
+### `random_holdout_mask(rng_key, n_rows, n_cols, holdout_fraction=0.1)`
+
+Create a random boolean mask for held-out evaluation.
+
+**Returns**: `Array (n_rows, n_cols)` boolean mask.
+
+### `evaluate_imputation(state, data, mask, col_types, *, rng_key=None)`
+
+Evaluate imputation accuracy on held-out cells. Computes MAE (continuous), accuracy (discrete), and log-likelihood.
+
+**Returns**: `dict` with per-type metrics.
+
+---
+
+## Serialization (`crosscat.serialization`)
+
+### `save_packed_state(packed, path, *, column_types=None)`
+
+Save a `PackedCrossCatState` to a `.jxc` directory (JSON metadata + NPZ arrays).
+
+**Returns**: `Path` to saved directory.
+
+### `load_packed_state(path)`
+
+Load a packed state from a `.jxc` directory.
+
+**Returns**: `(PackedCrossCatState, list[ColumnType] | None)`.
+
+### `save_state(state, path)`
+
+Save an unpacked `CrossCatState` to disk.
+
+**Returns**: `Path` to saved file.
+
+### `load_state(path, data=None)`
+
+Load an unpacked `CrossCatState`. When `data` is provided, sufficient statistics are recomputed.
+
+**Returns**: `CrossCatState`.
+
+### `save_checkpoint(packed, base_path, sweep_number, *, column_types=None, log_joint_value=None)`
+
+Save a checkpoint during inference with sweep number metadata.
+
+**Returns**: `Path` to checkpoint directory.
+
+### `load_latest_checkpoint(base_path)`
+
+Load the most recent checkpoint from a base directory.
+
+**Returns**: `(PackedCrossCatState, list[ColumnType] | None, sweep_number)`.
+
+---
+
+## Data Utilities (`crosscat.data_utils`)
+
+### `read_csv(filepath, *, has_header=True, nan_values=None)`
+
+Read a CSV file into a JAX array.
+
+**Returns**: `(Array, list[str])` — data and column names.
+
+### `write_csv(filepath, data, column_names)`
+
+Write a JAX array to CSV.
+
+### `guess_column_type(col_data, *, count_cutoff=20, ratio_cutoff=0.02)`
+
+Heuristically detect column type from data values.
+
+**Returns**: `ColumnType`.
+
+### `guess_column_types(data, *, count_cutoff=20, ratio_cutoff=0.02)`
+
+Detect types for all columns in a data matrix.
+
+**Returns**: `list[ColumnType]`.
+
+### `gen_column_metadata(data, column_types, column_names=None)`
+
+Generate metadata dict for a dataset (types, categories, ranges).
+
+**Returns**: `dict`.
+
+### `discretize_column(col_data, n_bins=10)`
+
+Bin a continuous column into discrete buckets.
+
+**Returns**: `(binned_data, bin_edges)`.
+
+---
+
+## Validation (`crosscat.validate`)
+
+### `validate_state(state, data=None)`
+
+Check state consistency. Returns list of error messages (empty if valid).
+
+### `assert_valid_state(state, data=None)`
+
+Raise `ValidationError` if state is invalid.
 
 ---
 
@@ -366,7 +480,7 @@ Full dependence probability matrix (Z-matrix) from packed states.
 
 **Returns**: `Array (n_cols, n_cols)` with values in [0, 1].
 
-### `packed_mutual_information(packed_states, column_types, col_i, col_j)`
+### `packed_mutual_information(packed_states, column_types, col_i, col_j, *, n_samples=1000, rng_key=None)`
 
 Estimate mutual information from a list of packed states.
 

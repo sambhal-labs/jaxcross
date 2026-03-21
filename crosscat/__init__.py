@@ -1,6 +1,6 @@
 """jax-crosscat: GPU-accelerated nonparametric cross-categorization in JAX."""
 
-__version__ = "0.4.0"
+__version__ = "0.8.0"
 
 from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import (
@@ -19,6 +19,9 @@ from crosscat.packed import (
     packed_gibbs_sweep,
     packed_log_joint,
     packed_transition_column_assignments,
+    packed_transition_column_hypers,
+    packed_transition_crp_alphas,
+    packed_transition_row_assignments,
     select_best_chain,
     unbatch_packed_states,
     unpack_state,
@@ -82,6 +85,9 @@ __all__ = [
     "packed_predictive_sample",
     "packed_row_similarity",
     "packed_transition_column_assignments",
+    "packed_transition_column_hypers",
+    "packed_transition_crp_alphas",
+    "packed_transition_row_assignments",
     "predictive_probability",
     "predictive_sample",
     "save_checkpoint",
