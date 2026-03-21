@@ -496,3 +496,151 @@ class TestSampleAndInsert:
         new_state, new_data, completed = sample_and_insert(rng_key, state, data, all_nan)
         assert new_state.n_rows == state.n_rows + 1
         assert jnp.all(jnp.isfinite(completed))
+
+
+# ---------------------------------------------------------------------------
+# Production readiness tests
+# ---------------------------------------------------------------------------
+
+
+class TestInputValidation:
+    """Tests for input validation on public APIs."""
+
+    def test_initialize_rejects_empty_data(self, rng_key):
+        from crosscat.model import initialize
+
+        with pytest.raises(ValueError, match="at least one row"):
+            initialize(rng_key, jnp.zeros((0, 3)), [ColumnType.CONTINUOUS] * 3)
+
+    def test_initialize_rejects_1d_data(self, rng_key):
+        from crosscat.model import initialize
+
+        with pytest.raises(ValueError, match="2-dimensional"):
+            initialize(rng_key, jnp.zeros(10), [ColumnType.CONTINUOUS])
+
+    def test_initialize_rejects_column_type_mismatch(self, rng_key):
+        from crosscat.model import initialize
+
+        with pytest.raises(ValueError, match="column_types length"):
+            initialize(rng_key, jnp.zeros((5, 3)), [ColumnType.CONTINUOUS] * 2)
+
+    def test_initialize_rejects_invalid_initialization(self, rng_key):
+        from crosscat.model import initialize
+
+        with pytest.raises(ValueError, match="Unknown initialization"):
+            initialize(
+                rng_key,
+                jnp.zeros((5, 3)),
+                [ColumnType.CONTINUOUS] * 3,
+                initialization="invalid",
+            )
+
+
+class TestSafeNCategories:
+    """Tests for safe category counting with NaN handling."""
+
+    def test_all_nan_column(self):
+        from crosscat.model import _safe_n_categories
+
+        result = _safe_n_categories(jnp.array([jnp.nan, jnp.nan, jnp.nan]))
+        assert result == 2  # default minimum
+
+    def test_normal_column(self):
+        from crosscat.model import _safe_n_categories
+
+        result = _safe_n_categories(jnp.array([0.0, 1.0, 2.0, 1.0]))
+        assert result == 3
+
+    def test_single_category(self):
+        from crosscat.model import _safe_n_categories
+
+        result = _safe_n_categories(jnp.array([0.0, 0.0, 0.0]))
+        assert result == 1
+
+    def test_with_nan_mixed(self):
+        from crosscat.model import _safe_n_categories
+
+        result = _safe_n_categories(jnp.array([0.0, jnp.nan, 2.0, jnp.nan]))
+        assert result == 3
+
+
+class TestOrdinalUsesHypers:
+    """Tests that OrderedLogistic properly uses dirichlet_alpha from hypers."""
+
+    def test_log_marginal_uses_alpha(self):
+        from crosscat.components import OrderedLogistic
+        from crosscat.types import SufficientStats
+
+        counts = jnp.array([5.0, 3.0, 2.0])
+        ss = SufficientStats(
+            column_type=ColumnType.ORDINAL,
+            count=jnp.array(10, dtype=jnp.int32),
+            category_counts=counts,
+        )
+        hypers_1 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(1.0))
+        hypers_2 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(5.0))
+
+        lml_1 = OrderedLogistic.log_marginal_likelihood(ss, hypers_1)
+        lml_2 = OrderedLogistic.log_marginal_likelihood(ss, hypers_2)
+        # Different alpha should give different log marginals
+        assert not jnp.allclose(lml_1, lml_2)
+
+    def test_posterior_predictive_uses_alpha(self):
+        from crosscat.components import OrderedLogistic
+        from crosscat.types import SufficientStats
+
+        counts = jnp.array([5.0, 3.0, 2.0])
+        ss = SufficientStats(
+            column_type=ColumnType.ORDINAL,
+            count=jnp.array(10, dtype=jnp.int32),
+            category_counts=counts,
+        )
+        hypers_1 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(0.1))
+        hypers_2 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(10.0))
+
+        logp_1 = OrderedLogistic.posterior_predictive_logp(jnp.array(0.0), ss, hypers_1)
+        logp_2 = OrderedLogistic.posterior_predictive_logp(jnp.array(0.0), ss, hypers_2)
+        # Small alpha concentrates on observed counts, large alpha smooths
+        assert float(logp_1) > float(logp_2)
+
+
+class TestPackStateValidation:
+    """Tests for pack_state validation."""
+
+    def test_rejects_too_many_views(self, simple_state):
+        from crosscat.packed.state import pack_state
+
+        state, _, _ = simple_state
+        with pytest.raises(ValueError, match="max_views"):
+            pack_state(state, max_views=1)
+
+    def test_rejects_too_many_clusters(self, simple_state):
+        from crosscat.packed.state import pack_state
+
+        state, _, _ = simple_state
+        with pytest.raises(ValueError, match="max_clusters"):
+            pack_state(state, max_clusters=1)
+
+
+class TestVonMisesIterationLimit:
+    """Test that VonMises rejection sampling terminates."""
+
+    def test_sampling_completes(self, rng_key):
+        from crosscat.components import VonMises
+        from crosscat.types import SufficientStats
+
+        ss = SufficientStats(
+            column_type=ColumnType.CYCLIC,
+            count=jnp.array(5, dtype=jnp.int32),
+            sum_sin=jnp.array(0.1),
+            sum_cos=jnp.array(0.1),
+        )
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(0.01),  # very low kappa — nearly uniform
+            vm_a=jnp.array(0.01),
+            vm_mu=jnp.array(0.0),
+        )
+        samples = VonMises.sample_posterior_predictive(rng_key, ss, hypers, n=10)
+        assert samples.shape == (10,)
+        assert jnp.all(samples >= 0.0) & jnp.all(samples < 2.0 * jnp.pi)
