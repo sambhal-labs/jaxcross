@@ -166,10 +166,25 @@ def pack_state(
 
     Returns:
         Padded, JIT-compatible state.
+
+    Raises:
+        ValueError: If state dimensions exceed max_* limits.
     """
     n_rows = state.n_rows
     n_cols = state.n_cols
     n_views = state.n_views
+    if n_views > max_views:
+        raise ValueError(
+            f"State has {n_views} views but max_views={max_views}. "
+            f"Increase max_views to at least {n_views}."
+        )
+    for v_idx, view in enumerate(state.views):
+        n_clusters = len(view.suffstats)
+        if n_clusters > max_clusters:
+            raise ValueError(
+                f"View {v_idx} has {n_clusters} clusters but max_clusters={max_clusters}. "
+                f"Increase max_clusters to at least {n_clusters}."
+            )
     # Use n_cols as max_cols_per_view to handle worst case where all columns
     # merge into a single view during column assignment transitions.
     max_cols_per_view = n_cols
@@ -255,7 +270,13 @@ def pack_state(
                     if ss.sum_x_sq is not None:
                         ss_sum_x_sq = ss_sum_x_sq.at[v_idx, c_idx, l_idx].set(float(ss.sum_x_sq))
                     if ss.category_counts is not None:
-                        nc_cats = min(len(ss.category_counts), max_categories)
+                        nc_cats = len(ss.category_counts)
+                        if nc_cats > max_categories:
+                            raise ValueError(
+                                f"Column has {nc_cats} categories but "
+                                f"max_categories={max_categories}. "
+                                f"Increase max_categories to at least {nc_cats}."
+                            )
                         ss_cat_counts = ss_cat_counts.at[v_idx, c_idx, l_idx, :nc_cats].set(
                             ss.category_counts[:nc_cats]
                         )
@@ -341,7 +362,11 @@ def unpack_state(
                 column_type=ct, alpha=packed.hyper_alpha[j], beta=packed.hyper_beta[j]
             )
         elif ct == ColumnType.ORDINAL:
-            h = ColumnHypers(column_type=ct, cutpoints=None)
+            h = ColumnHypers(
+                column_type=ct,
+                dirichlet_alpha=packed.hyper_dirichlet_alpha[j],
+                cutpoints=None,
+            )
         elif ct == ColumnType.CYCLIC:
             h = ColumnHypers(
                 column_type=ct,
