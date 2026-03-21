@@ -395,17 +395,12 @@ class OrderedLogistic:
         """Log marginal likelihood for ordinal observations.
 
         Uses Dirichlet-Multinomial conjugacy with symmetric concentration
-        derived from cutpoints (default alpha=1.0 per level).
+        ``dirichlet_alpha`` (default 1.0 per level).
         """
         counts = suffstats.category_counts
         n = suffstats.count.astype(jnp.float32)
         k = counts.shape[0]
-        # Use 1.0 as default alpha if cutpoints not provided
-        alpha = jnp.where(
-            hypers.cutpoints is not None,
-            jnp.ones((), dtype=jnp.float32),
-            jnp.ones((), dtype=jnp.float32),
-        )
+        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
 
         log_ml = (
             jnp.sum(gammaln(counts + alpha))
@@ -423,7 +418,7 @@ class OrderedLogistic:
         counts = suffstats.category_counts
         n = suffstats.count.astype(jnp.float32)
         k = counts.shape[0]
-        alpha = jnp.ones((), dtype=jnp.float32)
+        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
 
         probs = (counts + alpha) / (n + k * alpha)
         return jnp.log(probs[x.astype(jnp.int32)])
@@ -436,7 +431,7 @@ class OrderedLogistic:
         counts = suffstats.category_counts
         n_obs = suffstats.count.astype(jnp.float32)
         k = counts.shape[0]
-        alpha = jnp.ones((), dtype=jnp.float32)
+        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
 
         probs = (counts + alpha) / (n_obs + k * alpha)
         return jax.random.categorical(rng_key, jnp.log(probs), shape=(n,))
@@ -662,19 +657,24 @@ class VonMises:
             return kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
 
         def _sample_one(key):
+            max_iters = 1000
+
             def _cond(state):
-                return state[0]  # rejected flag
+                return state[0] & (state[1] < max_iters)
 
             def _body(state):
-                _, itr, key_loop = state
+                _, itr, sample, key_loop = state
                 k1, k2, k3 = jax.random.split(key_loop, 3)
                 x = jax.random.uniform(k1) * 2.0 * jnp.pi
                 log_u = jnp.log(jax.random.uniform(k2)) + log_M
                 log_target = _logp_at(x)
                 accepted = log_u < log_target
-                return (~accepted, jnp.where(accepted, x, itr), k3)
+                return (~accepted, itr + 1, jnp.where(accepted, x, sample), k3)
 
-            _, sample, _ = jax.lax.while_loop(_cond, _body, (True, 0.0, key))
+            _, _, sample, _ = jax.lax.while_loop(
+                _cond, _body, (jnp.bool_(True), jnp.int32(0), 0.0, key)
+            )
+            # Fallback to uniform if max iterations reached
             return sample % (2.0 * jnp.pi)
 
         keys = jax.random.split(rng_key, n)

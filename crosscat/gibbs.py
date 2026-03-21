@@ -27,7 +27,12 @@ from crosscat.components import (
     OrderedLogistic,
     VonMises,
 )
-from crosscat.model import _compute_suffstats_for_view, _crp_sample, _log_crp
+from crosscat.model import (
+    _compute_suffstats_for_view,
+    _crp_sample,
+    _log_crp,
+    _safe_n_categories,
+)
 from crosscat.types import (
     ColumnHypers,
     ColumnType,
@@ -47,7 +52,7 @@ def _empty_suffstats(col_type: ColumnType, data: Array, col_idx: int) -> Suffici
             sum_x_sq=jnp.array(0.0),
         )
     elif col_type == ColumnType.CATEGORICAL:
-        n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+        n_cats = _safe_n_categories(data[:, col_idx])
         return SufficientStats(
             column_type=col_type,
             count=jnp.array(0, dtype=jnp.int32),
@@ -60,7 +65,7 @@ def _empty_suffstats(col_type: ColumnType, data: Array, col_idx: int) -> Suffici
             sum_x=jnp.array(0.0),
         )
     elif col_type == ColumnType.ORDINAL:
-        n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+        n_levels = _safe_n_categories(data[:, col_idx])
         return SufficientStats(
             column_type=col_type,
             count=jnp.array(0, dtype=jnp.int32),
@@ -97,12 +102,12 @@ def _compute_suffstats_for_column(
         if col_type == ColumnType.CONTINUOUS:
             ss = NormalGamma.sufficient_statistics(col_data)
         elif col_type == ColumnType.CATEGORICAL:
-            n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+            n_cats = _safe_n_categories(data[:, col_idx])
             ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
         elif col_type == ColumnType.BINARY:
             ss = BetaBernoulli.sufficient_statistics(col_data)
         elif col_type == ColumnType.ORDINAL:
-            n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+            n_levels = _safe_n_categories(data[:, col_idx])
             ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
         elif col_type == ColumnType.CYCLIC:
             ss = VonMises.sufficient_statistics(col_data)
@@ -129,14 +134,14 @@ def _log_marginal_for_column_in_view(
             ss = NormalGamma.sufficient_statistics(col_data)
             log_ml = log_ml + NormalGamma.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.CATEGORICAL:
-            n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+            n_cats = _safe_n_categories(data[:, col_idx])
             ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
             log_ml = log_ml + DirichletCategorical.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.BINARY:
             ss = BetaBernoulli.sufficient_statistics(col_data)
             log_ml = log_ml + BetaBernoulli.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.ORDINAL:
-            n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+            n_levels = _safe_n_categories(data[:, col_idx])
             ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
             log_ml = log_ml + OrderedLogistic.log_marginal_likelihood(ss, hypers)
         elif col_type == ColumnType.CYCLIC:
@@ -534,12 +539,12 @@ def transition_row_assignments(
                     if col_type == ColumnType.CONTINUOUS:
                         ss = NormalGamma.sufficient_statistics(col_data)
                     elif col_type == ColumnType.CATEGORICAL:
-                        n_cats = int(jnp.nanmax(data[:, col_idx])) + 1
+                        n_cats = _safe_n_categories(data[:, col_idx])
                         ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
                     elif col_type == ColumnType.BINARY:
                         ss = BetaBernoulli.sufficient_statistics(col_data)
                     elif col_type == ColumnType.ORDINAL:
-                        n_levels = int(jnp.nanmax(data[:, col_idx])) + 1
+                        n_levels = _safe_n_categories(data[:, col_idx])
                         ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
                     elif col_type == ColumnType.CYCLIC:
                         ss = VonMises.sufficient_statistics(col_data)
