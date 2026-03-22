@@ -22,38 +22,9 @@ Most clustering methods force a single partition over all columns. CrossCat disc
 
 CrossCat models this with a **two-level Dirichlet Process**:
 
-```mermaid
-flowchart TB
-    subgraph "Outer DP: Column Partition"
-        direction LR
-        V0["View 0\nSalary, Experience"]
-        V1["View 1\nZip, Commute"]
-        V2["View 2\nPerformance"]
-    end
-
-    subgraph "Inner DP: Row Clustering (per view)"
-        direction LR
-        subgraph View0["View 0 Clusters"]
-            C0A["Junior\n(low salary, 0-3 yrs)"]
-            C0B["Senior\n(high salary, 5+ yrs)"]
-        end
-        subgraph View1["View 1 Clusters"]
-            C1A["Urban\n(short commute)"]
-            C1B["Suburban\n(long commute)"]
-            C1C["Remote\n(no commute)"]
-        end
-        subgraph View2["View 2 Clusters"]
-            C2A["High performer"]
-            C2B["Average"]
-        end
-    end
-
-    V0 --> View0
-    V1 --> View1
-    V2 --> View2
-```
-
-**Key insight**: Row 42 can be in `Senior` (view 0), `Remote` (view 1), and `High performer` (view 2) simultaneously. The clusterings are independent across views.
+<p align="center">
+  <img src="docs/diagrams/two-level-dp.svg" alt="Two-Level Dirichlet Process Mixture Model" width="800" />
+</p>
 
 ## Features
 
@@ -138,43 +109,9 @@ uv sync --extra dev
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Input
-        D[("Data Matrix")]
-        T["Column Types"]
-    end
-
-    subgraph "model.py"
-        I["initialize()"]
-        LJ["log_joint()"]
-    end
-
-    subgraph "gibbs.py — Gibbs Sweep"
-        direction TB
-        R["Row assignments"]
-        C["Column assignments"]
-        H["Hyperparameters"]
-        A["CRP alphas"]
-        R --> C --> H --> A
-    end
-
-    subgraph "inference.py — Queries"
-        PP["predictive_probability()"]
-        PS["predictive_sample()"]
-        MI["mutual_information()"]
-        AN["predictive_anomalousness()"]
-    end
-
-    D --> I
-    T --> I
-    I -->|"CrossCatState"| R
-    A -->|"Posterior\nsamples"| PP
-    A --> PS
-    A --> MI
-    A --> AN
-    LJ -.->|"scoring"| A
-```
+<p align="center">
+  <img src="docs/diagrams/architecture-pipeline.svg" alt="JAX-CrossCat Architecture" width="800" />
+</p>
 
 ### Module Map
 
@@ -198,16 +135,9 @@ flowchart LR
 
 Each column type uses a conjugate Bayesian model — parameters are analytically integrated out, so only cluster assignments need to be sampled:
 
-```mermaid
-graph LR
-    subgraph "Data Type → Component Model → Sufficient Statistics"
-        A["Continuous\n(float)"] -->|NormalGamma| A1["count, sum_x, sum_x²\n→ Student-t predictive"]
-        B["Categorical\n(int labels)"] -->|DirichletCategorical| B1["count, category_counts\n→ Categorical predictive"]
-        C["Binary\n(0/1)"] -->|BetaBernoulli| C1["count, sum_x\n→ Bernoulli predictive"]
-        D["Ordinal\n(ordered int)"] -->|OrderedLogistic| D1["count, level_counts\n→ Ordered predictive"]
-        E["Cyclic\n(angle)"] -->|VonMises| E1["count, sum_sin, sum_cos\n→ Von Mises predictive"]
-    end
-```
+<p align="center">
+  <img src="docs/diagrams/component-models.svg" alt="Conjugate Component Models" width="780" />
+</p>
 
 ## API Reference
 
