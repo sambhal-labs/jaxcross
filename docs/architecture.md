@@ -12,21 +12,9 @@ CrossCat is a **two-level Dirichlet Process mixture model** for heterogeneous ta
 
 3. **Component models**: Each (cluster, column) pair uses a conjugate Bayesian model. Parameters are analytically integrated out — only cluster assignments and hyperparameters are stored.
 
-```mermaid
-graph TB
-    subgraph "CrossCatState"
-        CA["column_assignments\n(n_cols,) → view index"]
-        CALPHA["column_crp_alpha\nscalar"]
-        CH["column_hypers\nlist of ColumnHypers"]
-
-        subgraph "ViewState (one per view)"
-            CI["column_indices"]
-            RA["row_assignments\n(n_rows,) → cluster index"]
-            RALPHA["row_crp_alpha"]
-            SS["suffstats\n[cluster][column]"]
-        end
-    end
-```
+<p align="center">
+  <img src="diagrams/crosscat-state.svg" alt="CrossCatState Data Structure" width="650" />
+</p>
 
 ### Why Two Levels?
 
@@ -53,45 +41,9 @@ No per-observation parameters. This is why CrossCat scales well.
 
 ## Module Architecture
 
-```mermaid
-flowchart TB
-    types["types.py\nCrossCatState, ViewState\nSufficientStats, ColumnHypers"]
-
-    components["components.py\nNormalGamma, DirichletCategorical\nBetaBernoulli, OrderedLogistic\nVonMises"]
-
-    model["model.py\ninitialize(), log_joint()\ninsert_rows()"]
-
-    gibbs["gibbs.py\ntransition_row_assignments()\ntransition_column_assignments()\ntransition_column_hypers()\ntransition_crp_alphas()\ngibbs_sweep()"]
-
-    inference["inference.py\npredictive_probability()\npredictive_sample()\nmutual_information()\npredictive_anomalousness()"]
-
-    packed["packed/\nPackedCrossCatState\nstate, components, suffstats, kernels"]
-
-    packed_inf["packed_inference.py\npacked_predictive_probability()\npacked_mutual_information()"]
-
-    constraints["constraints.py\nensure_col_dep_constraints()\nensure_row_dep_constraint()"]
-
-    diagnostics["diagnostics.py\nadjusted_rand_index()\nevaluate_imputation()"]
-
-    serial["serialization.py\nsave/load state & checkpoints"]
-
-    synthetic["synthetic.py\ngenerate_crosscat_data()"]
-
-    types --> model
-    types --> gibbs
-    types --> inference
-    components --> model
-    components --> gibbs
-    components --> inference
-    model --> gibbs
-    gibbs --> constraints
-    model --> inference
-    types --> packed
-    components --> packed
-    model --> packed
-    packed --> packed_inf
-    types --> serial
-```
+<p align="center">
+  <img src="diagrams/module-architecture.svg" alt="Module Architecture" width="800" />
+</p>
 
 ### Data Flow
 
