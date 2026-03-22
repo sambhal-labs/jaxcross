@@ -6,8 +6,13 @@ from typing import TYPE_CHECKING
 
 import jax
 
-from crosscat.model import initialize, log_joint
-from crosscat.packed import PackedCrossCatState, pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.model import initialize
+from crosscat.packed import (
+    PackedCrossCatState,
+    pack_state,
+    packed_gibbs_sweep,
+    packed_log_joint,
+)
 from crosscat.types import ColumnType
 
 if TYPE_CHECKING:
@@ -58,7 +63,7 @@ class InferenceEngine:
         """Run a single Gibbs sweep and return summary statistics.
 
         Executes ``packed_gibbs_sweep`` with ``n_sweeps=1``, then computes
-        ``log_joint`` on the unpacked state.
+        ``log_joint`` directly on the packed state (avoids costly unpack).
 
         Args:
             rng_key: JAX PRNG key for this sweep.
@@ -73,9 +78,7 @@ class InferenceEngine:
             n_sweeps=1,
         )
 
-        # Unpack to compute log_joint via the standard scoring function
-        state = unpack_state(self.packed, self.column_types)
-        lj = float(log_joint(state, self.data))
+        lj = float(packed_log_joint(self.packed, self.data))
         n_views = int(self.packed.n_views)
 
         return {"log_joint": lj, "n_views": n_views}
