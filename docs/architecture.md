@@ -63,7 +63,7 @@ flowchart TB
 
     gibbs["gibbs.py\ntransition_row_assignments()\ntransition_column_assignments()\ntransition_column_hypers()\ntransition_crp_alphas()\ngibbs_sweep()"]
 
-    inference["inference.py\npredictive_probability()\npredictive_sample()\nmutual_information()\nanomaly_score()"]
+    inference["inference.py\npredictive_probability()\npredictive_sample()\nmutual_information()\npredictive_anomalousness()"]
 
     packed["packed/\nPackedCrossCatState\nstate, components, suffstats, kernels"]
 

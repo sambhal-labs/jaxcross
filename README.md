@@ -72,6 +72,7 @@ flowchart TB
 
 ```python
 import jax
+import jax.numpy as jnp
 from crosscat import initialize, gibbs_sweep, predictive_sample, log_joint
 from crosscat.types import ColumnType
 
@@ -101,7 +102,7 @@ samples = predictive_sample(
     subkey, state, data,
     query_cols=[0],
     condition_cols=[1],
-    condition_vals=jax.numpy.array([3.5]),
+    condition_vals=jnp.array([3.5]),
     n_samples=1000,
 )
 ```
@@ -162,7 +163,7 @@ flowchart LR
         PP["predictive_probability()"]
         PS["predictive_sample()"]
         MI["mutual_information()"]
-        AN["anomaly_score()"]
+        AN["predictive_anomalousness()"]
     end
 
     D --> I
@@ -183,7 +184,7 @@ flowchart LR
 | [`components.py`](crosscat/components.py) | Conjugate models: `NormalGamma`, `DirichletCategorical`, `BetaBernoulli`, `OrderedLogistic`, `VonMises` |
 | [`model.py`](crosscat/model.py) | `initialize()`, `log_joint()`, `insert_rows()` |
 | [`gibbs.py`](crosscat/gibbs.py) | MCMC kernels: row/column assignments, hyperparameters, CRP alphas, `gibbs_sweep()` |
-| [`inference.py`](crosscat/inference.py) | Queries: `predictive_probability()`, `predictive_sample()`, `mutual_information()`, `anomaly_score()`, `impute_and_confidence()`, `row_similarity()` |
+| [`inference.py`](crosscat/inference.py) | Queries: `predictive_probability()`, `predictive_sample()`, `mutual_information()`, `predictive_anomalousness()`, `impute_and_confidence()`, `row_similarity()` |
 | [`packed/`](crosscat/packed/) | JIT-compatible padded state with vectorized kernels (`state.py`, `components.py`, `suffstats.py`, `kernels.py`) |
 | [`packed_inference.py`](crosscat/packed_inference.py) | Vectorized inference queries on packed state |
 | [`constraints.py`](crosscat/constraints.py) | Column/row dependency constraint enforcement |
@@ -345,6 +346,28 @@ Run the benchmark to compare:
 ```bash
 python benchmarks/jit_benchmark.py
 ```
+
+## Dashboard
+
+An interactive Streamlit dashboard is included for exploring CrossCat models visually:
+
+```bash
+uv sync --extra dashboard
+streamlit run dashboard/app.py
+```
+
+The dashboard provides 8 pages:
+
+| Page | Description |
+|------|-------------|
+| **Data Loading** | Upload CSV or generate synthetic data |
+| **Inference** | Run Gibbs sweeps with configurable kernels |
+| **Structure** | Inspect column partition and row clusterings |
+| **Dependencies** | Z-matrix heatmap (column dependency probabilities) |
+| **Convergence** | Log-joint trace, ARI over sweeps |
+| **Anomalies** | Per-row anomaly scores |
+| **Predictions** | Conditional sampling and imputation |
+| **Similarity** | Row similarity matrix |
 
 ## Testing
 
