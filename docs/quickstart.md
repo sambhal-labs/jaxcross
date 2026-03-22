@@ -280,3 +280,47 @@ score = packed_anomaly_score(subkey, packed, data, query_row=42)
 - **Column types matter**: Misspecifying types (e.g., treating categorical as continuous) hurts inference.
 - **Scale continuous data**: CrossCat uses data-driven hyper defaults, but extreme scales can cause issues.
 - **Missing data is fine**: NaN values are handled — no imputation needed before inference.
+
+## Troubleshooting
+
+### JIT compilation is slow (~30-60s on first call)
+
+This is expected. JAX traces and compiles the computation graph on the first call to any JIT-compiled function (like `packed_gibbs_sweep`). Subsequent calls with the **same data shape** reuse the compiled kernel and are fast. Changing data dimensions triggers recompilation.
+
+**Tip**: If you're iterating on small experiments, use the unpacked `gibbs_sweep()` which avoids JIT overhead.
+
+### Out of memory on GPU
+
+Packed state pre-allocates padded arrays of shape `(max_views, max_clusters, ...)`. Reduce `max_views` and `max_clusters` when calling `pack_state()`:
+
+```python
+packed = pack_state(state, max_views=8, max_clusters=16)
+```
+
+### `ValueError: category index exceeds max_categories`
+
+The packed representation has a fixed `max_categories` (default 16). If your categorical columns have more unique values, increase it:
+
+```python
+packed = pack_state(state, max_categories=64)
+```
+
+### NaN in log_joint or predictions
+
+- Check that column types are correct (e.g., categorical data should be non-negative integers, not floats)
+- Ensure cyclic data is in `[0, 2*pi)` range
+- If an entire column is NaN, the model still works but provides no information for that column
+
+### `jax.errors.TracerArrayConversionError`
+
+This typically means Python control flow (if/else, for loops) depends on traced values inside a JIT-compiled function. If you're extending the codebase, use `jax.lax.cond`, `jax.lax.scan`, or `jnp.where` instead of Python control flow on array values.
+
+### Tests are slow or timing out
+
+Some tests (marked `@pytest.mark.slow`) involve full inference runs. To skip them:
+
+```bash
+uv run pytest -m "not slow"
+```
+
+VonMises-related tests may trigger recompilation on different column indices. This is a known JIT tracing characteristic — each unique column index combination produces a different trace.

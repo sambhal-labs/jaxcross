@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - 2026-03-20
+## [0.8.0] - 2026-03-20 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.7.0...v0.8.0)
 
 ### Changed
 - VonMises sampling: rejection sampling (uniform proposal on [0, 2π), accept/reject
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `_score_column_in_view` calls for new-cluster scoring
 - `tests/test_new_features.py`: VonMises tests missing `vm_a` hyperparameter
 
-## [0.7.0] - 2026-03-20
+## [0.7.0] - 2026-03-20 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.6.0...v0.7.0)
 
 ### Added
 - Benchmark results infrastructure: JSON metrics + matplotlib PNG charts saved to `results/`
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convergence tracking, Z-matrix, digit-cluster contingency table, and held-out evaluation
 - New optional dependency group `benchmark` (matplotlib, scikit-learn)
 
-## [0.6.0] - 2026-03-20
+## [0.6.0] - 2026-03-20 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.5.0...v0.6.0)
 
 ### Added
 - Synthetic recovery benchmark (`benchmarks/paper_synthetic_benchmark.py`) reproducing
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CRP alpha prior: documented Exp(1) vs flat prior divergence from probcomp/crosscat
 - Components: added note clarifying collapsed-only inference (no Neal Algorithm 8)
 
-## [0.5.0] - 2026-03-20
+## [0.5.0] - 2026-03-20 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.4.0...v0.5.0)
 
 ### Changed
 - **BREAKING**: Von Mises component model now uses separate `vm_a` (prior concentration)
@@ -72,12 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Von Mises log marginal likelihood formula: correctly uses `vm_a` for prior
   and `kappa` for likelihood (was conflating both as `kappa`)
 
-## [0.4.0] - 2026-03-19
+## [0.4.0] - 2026-03-19 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.3.0...v0.4.0)
 
 ### Added
 - Interactive Streamlit dashboard for CrossCat analysis (`dashboard/`)
 
-## [0.3.0] - 2026-03-18
+## [0.3.0] - 2026-03-18 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.2.0...v0.3.0)
 
 ### Added
 - JIT-compiled packed Gibbs kernels using `jax.lax.scan` and `jax.vmap`:
@@ -110,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - v1 packed kernels (Python for-loop implementations) — replaced by JIT-compiled versions
 
-## [0.2.0] - 2026-03-17
+## [0.2.0] - 2026-03-17 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.1.0...v0.2.0)
 
 ### Added
 - Packed state representation for JIT-compatible inference

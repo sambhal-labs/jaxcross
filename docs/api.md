@@ -109,7 +109,7 @@ Draw samples from the posterior predictive.
 
 Compute a credible interval for a column via posterior predictive sampling.
 
-**Returns**: `(lower, median, upper)`.
+**Returns**: `(median, lower, upper)`.
 
 ### `joint_predictive_probability(state, data, query_cols, query_vals, *, condition_cols=None, condition_vals=None)`
 
@@ -212,7 +212,7 @@ Find a state satisfying all column constraints via rejection sampling.
 
 **Returns**: `CrossCatState | None` (None if max_rejections exceeded).
 
-### `ensure_row_dep_constraint(rng_key, state, data, row_a, row_b, dependent, *, view_idx=None, max_iterations=100)`
+### `ensure_row_dep_constraint(rng_key, state, data, row_a, row_b, dependent, *, view_idx=None, max_iterations=100, n_sweeps_per_attempt=5)`
 
 Find a state where two rows are in the same/different cluster.
 
@@ -370,7 +370,7 @@ Run full Gibbs sweeps on packed state. Each sweep runs all 4 kernels: row assign
 
 **Returns**: Updated `PackedCrossCatState`.
 
-### `packed_transition_row_assignments(rng_key, packed, data)`
+### `packed_transition_row_assignments(rng_key, packed, data, *, recompute_suffstats=True)`
 
 Gibbs sweep over row assignments using nested `lax.scan` (outer over views, inner over rows) with `vmap` over clusters for scoring.
 
