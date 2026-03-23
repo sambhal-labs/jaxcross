@@ -183,7 +183,7 @@ class NormalGamma:
         df = nu_n
         loc = mu_n
         scale_sq = (nu_n_s_n / nu_n) * (1.0 + 1.0 / r_n)
-        scale = jnp.sqrt(scale_sq)
+        scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
 
         # Student-t log pdf
         z = (x - loc) / scale
@@ -501,7 +501,11 @@ class BetaBernoulli:
         b = hypers.beta
 
         p1 = (k + a) / (n + a + b)
-        return jnp.where(x > 0.5, jnp.log(p1), jnp.log(1.0 - p1))
+        return jnp.where(
+            x > 0.5,
+            jnp.log(jnp.maximum(p1, 1e-30)),
+            jnp.log(jnp.maximum(1.0 - p1, 1e-30)),
+        )
 
     @staticmethod
     def sample_posterior_predictive(

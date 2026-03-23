@@ -442,13 +442,13 @@ def _estimate_mi_sample(
 
         mi_sample = float(log_pxy - log_px - log_py)
         mi_samples.append(mi_sample)
-        log_weights.append(float(log_pxy))
 
-    # Weighted average with softmax(log_pxy) weights (matching original)
+    # Unweighted average: samples are already drawn from p(x,y) via CRP cluster
+    # sampling, so no importance weighting is needed. Previously used
+    # softmax(log_pxy) weights which double-counted joint density and biased
+    # MI estimates upward.
     mi_arr = jnp.array(mi_samples)
-    lw_arr = jnp.array(log_weights)
-    weights = jax.nn.softmax(lw_arr)
-    mi_est = float(jnp.sum(weights * mi_arr))
+    mi_est = float(jnp.mean(mi_arr))
 
     return max(mi_est, 0.0)
 
@@ -708,10 +708,8 @@ def impute_and_confidence(
 
     if col_type == ColumnType.CONTINUOUS:
         point_est = jnp.median(s)
-        # Confidence: inverse of normalized IQR
-        iqr = jnp.percentile(s, 75) - jnp.percentile(s, 25)
-        std = jnp.std(s) + 1e-30
-        confidence = jnp.exp(-iqr / std)
+        # Confidence: inverse-variance measure — tighter posterior → higher confidence
+        confidence = 1.0 / (1.0 + jnp.std(s))
     else:
         # Categorical, ordinal, binary: mode and mode frequency
         s_int = s.astype(jnp.int32)
@@ -769,9 +767,11 @@ def predictive_anomalousness(
     if n_scored == 0:
         return jnp.array(0.5)
 
-    # Convert to anomaly score: compare against samples
+    # Convert to anomaly score via sigmoid transform on avg log predictive prob.
+    # The +2.0 offset empirically centers the scale so that "typical" data
+    # (avg_log_p ≈ -2) maps to anomaly ≈ 0.5. This is an ad-hoc calibration
+    # matching the original probcomp/crosscat behavior, not a principled threshold.
     avg_log_p = log_p_total / n_scored
-    # Use sigmoid-like transform: more negative log_p = more anomalous
     anomaly = 1.0 / (1.0 + jnp.exp(avg_log_p + 2.0))
     return jnp.clip(anomaly, 0.0, 1.0)
 
