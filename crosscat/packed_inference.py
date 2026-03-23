@@ -419,13 +419,11 @@ def _packed_estimate_mi_sample(
             log_pxy = jnp.logaddexp(log_pxy, lw + lp_x_c + lp_y_c)
 
         mi_samples.append(float(log_pxy - log_px - log_py))
-        log_weights.append(float(log_pxy))
 
-    # Weighted average with softmax weights
+    # Unweighted average: samples are already drawn from p(x,y) via CRP cluster
+    # sampling, so no importance weighting is needed.
     mi_arr = jnp.array(mi_samples)
-    lw_arr = jnp.array(log_weights)
-    weights = jax.nn.softmax(lw_arr)
-    mi_est = float(jnp.sum(weights * mi_arr))
+    mi_est = float(jnp.mean(mi_arr))
 
     return max(mi_est, 0.0)
 
@@ -566,9 +564,8 @@ def packed_impute_and_confidence(
 
     if type_id == CONTINUOUS_ID:
         point_est = jnp.median(s)
-        iqr = jnp.percentile(s, 75) - jnp.percentile(s, 25)
-        std = jnp.std(s) + 1e-30
-        confidence = jnp.exp(-iqr / std)
+        # Confidence: inverse-variance measure — tighter posterior → higher confidence
+        confidence = 1.0 / (1.0 + jnp.std(s))
     else:
         # Categorical, ordinal, binary: mode and mode frequency
         s_int = s.astype(jnp.int32)
