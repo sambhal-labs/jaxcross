@@ -177,64 +177,40 @@ def _remove_row_from_suffstats(
 ) -> tuple[Array, Array, Array, Array, Array, Array]:
     """Remove one row's contribution from a cluster's suffstats.
 
-    All updates vectorized over columns via lax.scan. NaN values produce zero
-    deltas. Uses .at[traced_idx].add() for JIT compatibility.
-
-    Args:
-        ss_counts: (max_clusters, max_cols_per_view) int
-        ss_sum_x, ss_sum_x_sq: (max_clusters, max_cols_per_view)
-        ss_cat_counts: (max_clusters, max_cols_per_view, max_categories)
-        ss_sum_sin, ss_sum_cos: (max_clusters, max_cols_per_view)
-        cluster_id: scalar traced int — which cluster to update
-        row_data: (n_cols_total,) — full row from data matrix
-        col_indices: (max_cols_per_view,) int — column indices for this view,
-            -1 for padding
-        col_type_ids: (n_cols_total,) int — type ID per column
-        max_categories: int (static)
-
-    Returns:
-        Updated (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts,
-        ss_sum_sin, ss_sum_cos).
+    Vectorized over columns using batched scatter. NaN values produce zero
+    deltas. Uses .at[traced_idx, array].add() for JIT compatibility.
     """
     n_cols_v = col_indices.shape[0]
+    li_range = jnp.arange(n_cols_v)
 
-    def update_one_col(carry, li):
-        ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = carry
-        col_idx = col_indices[li]
-        safe_col_idx = jnp.clip(col_idx, 0, row_data.shape[0] - 1)
-        x = row_data[safe_col_idx]
-        type_id = col_type_ids[safe_col_idx]
-        is_valid = (~jnp.isnan(x)) & (col_idx >= 0)
-        is_valid_f = is_valid.astype(jnp.float32)
+    safe_col_indices = jnp.clip(col_indices, 0, row_data.shape[0] - 1)
+    xs = row_data[safe_col_indices]
+    types = col_type_ids[safe_col_indices]
+    is_valid = (~jnp.isnan(xs)) & (col_indices >= 0)
+    is_valid_f = is_valid.astype(jnp.float32)
+    clean_xs = jnp.where(jnp.isnan(xs), 0.0, xs)
 
-        # Count delta (applies to all types)
-        ss_c = ss_c.at[cluster_id, li].add(-is_valid.astype(jnp.int32))
+    # Counts (all types)
+    ss_counts = ss_counts.at[cluster_id, li_range].add(-is_valid.astype(jnp.int32))
 
-        # Continuous / Binary: sum_x -= x, sum_x_sq -= x^2
-        clean_x = jnp.where(jnp.isnan(x), 0.0, x)
-        is_sum_type = (type_id == CONTINUOUS_ID) | (type_id == BINARY_ID)
-        sx_delta = clean_x * is_valid_f * is_sum_type.astype(jnp.float32)
-        sxsq_delta = clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
-        ss_sx = ss_sx.at[cluster_id, li].add(-sx_delta)
-        ss_sxsq = ss_sxsq.at[cluster_id, li].add(-sxsq_delta)
+    # Continuous / Binary: sum_x
+    is_sum_type = ((types == CONTINUOUS_ID) | (types == BINARY_ID)).astype(jnp.float32)
+    ss_sum_x = ss_sum_x.at[cluster_id, li_range].add(-clean_xs * is_valid_f * is_sum_type)
 
-        # Categorical / Ordinal: cat_counts[category] -= 1
-        is_cat_type = (type_id == CATEGORICAL_ID) | (type_id == ORDINAL_ID)
-        cat_idx = jnp.clip(clean_x.astype(jnp.int32), 0, max_categories - 1)
-        cat_delta = is_valid_f * is_cat_type.astype(jnp.float32)
-        ss_cat = ss_cat.at[cluster_id, li, cat_idx].add(-cat_delta)
+    # Continuous only: sum_x_sq
+    is_cont = (types == CONTINUOUS_ID).astype(jnp.float32)
+    ss_sum_x_sq = ss_sum_x_sq.at[cluster_id, li_range].add(-(clean_xs**2) * is_valid_f * is_cont)
 
-        # Cyclic: sum_sin -= sin(x), sum_cos -= cos(x)
-        is_cyc = (type_id == CYCLIC_ID).astype(jnp.float32)
-        ss_sin = ss_sin.at[cluster_id, li].add(-jnp.sin(clean_x) * is_valid_f * is_cyc)
-        ss_cos = ss_cos.at[cluster_id, li].add(-jnp.cos(clean_x) * is_valid_f * is_cyc)
+    # Categorical / Ordinal: cat_counts
+    is_cat_type = ((types == CATEGORICAL_ID) | (types == ORDINAL_ID)).astype(jnp.float32)
+    cat_idxs = jnp.clip(clean_xs.astype(jnp.int32), 0, max_categories - 1)
+    ss_cat_counts = ss_cat_counts.at[cluster_id, li_range, cat_idxs].add(-is_valid_f * is_cat_type)
 
-        return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
+    # Cyclic: sin/cos
+    is_cyc = (types == CYCLIC_ID).astype(jnp.float32)
+    ss_sum_sin = ss_sum_sin.at[cluster_id, li_range].add(-jnp.sin(clean_xs) * is_valid_f * is_cyc)
+    ss_sum_cos = ss_sum_cos.at[cluster_id, li_range].add(-jnp.cos(clean_xs) * is_valid_f * is_cyc)
 
-    carry = (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos)
-    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = jax.lax.scan(
-        update_one_col, carry, jnp.arange(n_cols_v)
-    )
     return ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
 
 
@@ -253,41 +229,32 @@ def _add_row_to_suffstats(
 ) -> tuple[Array, Array, Array, Array, Array, Array]:
     """Add one row's contribution to a cluster's suffstats.
 
-    Same structure as _remove_row_from_suffstats with positive deltas.
+    Vectorized over columns using batched scatter.
     """
     n_cols_v = col_indices.shape[0]
+    li_range = jnp.arange(n_cols_v)
 
-    def update_one_col(carry, li):
-        ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = carry
-        col_idx = col_indices[li]
-        safe_col_idx = jnp.clip(col_idx, 0, row_data.shape[0] - 1)
-        x = row_data[safe_col_idx]
-        type_id = col_type_ids[safe_col_idx]
-        is_valid = (~jnp.isnan(x)) & (col_idx >= 0)
-        is_valid_f = is_valid.astype(jnp.float32)
+    safe_col_indices = jnp.clip(col_indices, 0, row_data.shape[0] - 1)
+    xs = row_data[safe_col_indices]
+    types = col_type_ids[safe_col_indices]
+    is_valid = (~jnp.isnan(xs)) & (col_indices >= 0)
+    is_valid_f = is_valid.astype(jnp.float32)
+    clean_xs = jnp.where(jnp.isnan(xs), 0.0, xs)
 
-        ss_c = ss_c.at[cluster_id, li].add(is_valid.astype(jnp.int32))
+    ss_counts = ss_counts.at[cluster_id, li_range].add(is_valid.astype(jnp.int32))
 
-        clean_x = jnp.where(jnp.isnan(x), 0.0, x)
-        is_sum_type = (type_id == CONTINUOUS_ID) | (type_id == BINARY_ID)
-        sx_delta = clean_x * is_valid_f * is_sum_type.astype(jnp.float32)
-        sxsq_delta = clean_x**2 * is_valid_f * (type_id == CONTINUOUS_ID).astype(jnp.float32)
-        ss_sx = ss_sx.at[cluster_id, li].add(sx_delta)
-        ss_sxsq = ss_sxsq.at[cluster_id, li].add(sxsq_delta)
+    is_sum_type = ((types == CONTINUOUS_ID) | (types == BINARY_ID)).astype(jnp.float32)
+    ss_sum_x = ss_sum_x.at[cluster_id, li_range].add(clean_xs * is_valid_f * is_sum_type)
 
-        is_cat_type = (type_id == CATEGORICAL_ID) | (type_id == ORDINAL_ID)
-        cat_idx = jnp.clip(clean_x.astype(jnp.int32), 0, max_categories - 1)
-        cat_delta = is_valid_f * is_cat_type.astype(jnp.float32)
-        ss_cat = ss_cat.at[cluster_id, li, cat_idx].add(cat_delta)
+    is_cont = (types == CONTINUOUS_ID).astype(jnp.float32)
+    ss_sum_x_sq = ss_sum_x_sq.at[cluster_id, li_range].add(clean_xs**2 * is_valid_f * is_cont)
 
-        is_cyc = (type_id == CYCLIC_ID).astype(jnp.float32)
-        ss_sin = ss_sin.at[cluster_id, li].add(jnp.sin(clean_x) * is_valid_f * is_cyc)
-        ss_cos = ss_cos.at[cluster_id, li].add(jnp.cos(clean_x) * is_valid_f * is_cyc)
+    is_cat_type = ((types == CATEGORICAL_ID) | (types == ORDINAL_ID)).astype(jnp.float32)
+    cat_idxs = jnp.clip(clean_xs.astype(jnp.int32), 0, max_categories - 1)
+    ss_cat_counts = ss_cat_counts.at[cluster_id, li_range, cat_idxs].add(is_valid_f * is_cat_type)
 
-        return (ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos), None
+    is_cyc = (types == CYCLIC_ID).astype(jnp.float32)
+    ss_sum_sin = ss_sum_sin.at[cluster_id, li_range].add(jnp.sin(clean_xs) * is_valid_f * is_cyc)
+    ss_sum_cos = ss_sum_cos.at[cluster_id, li_range].add(jnp.cos(clean_xs) * is_valid_f * is_cyc)
 
-    carry = (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos)
-    (ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos), _ = jax.lax.scan(
-        update_one_col, carry, jnp.arange(n_cols_v)
-    )
     return ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
