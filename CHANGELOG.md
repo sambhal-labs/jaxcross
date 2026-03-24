@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-24 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.8.0...v0.9.0)
+
+### Added
+- **12x faster packed Gibbs kernels** via three optimizations:
+  1. Vectorized column scanning: replaced `lax.scan` over columns with
+     `jax.vmap` in row scoring and batched scatter in suffstat updates
+  2. Type-specialized scoring: `batch_bb_posterior_predictive_logp`,
+     `batch_ng_posterior_predictive_logp`, `batch_dc_posterior_predictive_logp`
+     skip 5-way type dispatch for uniform-type views
+  3. AOT compilation caching: `enable_xla_cache()` activates JAX's persistent
+     compilation cache to skip 20+ min recompilation on subsequent runs
+- MNIST Paper Benchmark notebook (`benchmarks/mnist_paper_colab.ipynb`)
+  reproducing Section 3.2 of Mansinghka et al. (2016): Z-matrix (Fig 13b),
+  pixel dependence map (Fig 13c), classification ROC (Fig 15), and pixel
+  inpainting (Fig 14)
+- Checkpoint/resume support in benchmark notebooks via `save_checkpoint()`
+  and `load_latest_checkpoint()` — sessions resume from last saved state
+- `_compute_dominant_type()` helper for detecting uniform-type views
+
+### Changed
+- `_score_row_one_cluster`: sequential `lax.scan` over columns replaced with
+  parallel `jax.vmap(unified_posterior_predictive_logp)` over all columns
+- `_remove_row_from_suffstats` / `_add_row_to_suffstats`: sequential
+  `lax.scan` replaced with batched `.at[cluster_id, li_range].add()`
+- `_score_row_all_clusters`: accepts optional `dominant_type` for
+  type-specialized fast path
+
+### Performance
+- 1000 rows × 257 cols (16×16 MNIST): **238s → 20s per sweep** (12x speedup)
+- 100 rows × 65 cols: **38s → 4.8s per sweep** (7.9x speedup)
+- 50 rows × 11 cols: **25s → 4.5s per sweep** (5.5x speedup)
+- JIT compilation time reduced from 20+ min to ~23s for 257 columns
+- Full MNIST benchmark (10 chains × 100 sweeps × 257 cols) completes in
+  ~3.5 hours on P100 (previously ~40+ hours)
+
+### Fixed
+- Mutual information estimation: removed self-normalized importance weighting
+  that biased MI upward by ~5-15%
+- BetaBernoulli `posterior_predictive_logp`: clamped `log(1-p)` to prevent
+  `-inf` when p approaches 1.0
+- NormalGamma `posterior_predictive_logp`: clamped `scale_sq` before `sqrt`
+  to prevent NaN from negative floating-point artifacts
+- Imputation confidence: replaced ad-hoc `exp(-IQR/std)` with principled
+  inverse-variance measure `1/(1+std)`
+
 ## [0.8.0] - 2026-03-20 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.7.0...v0.8.0)
 
 ### Changed
