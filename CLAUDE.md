@@ -50,9 +50,10 @@ The package is `crosscat/` with these core modules:
 
 - **packed/** — JIT-compatible packed state sub-package:
   - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`
-  - `components.py` — unified scoring (log marginal, posterior predictive) via `jnp.where` type dispatch
-  - `suffstats.py` — vectorized sufficient statistics (matrix ops, incremental add/remove)
-  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas) via `lax.scan`/`vmap`
+  - `components.py` — unified scoring (log marginal, posterior predictive) via `jnp.where` type dispatch + batch-vectorized type-specialized scoring (`batch_bb_posterior_predictive_logp`, `batch_ng_posterior_predictive_logp`, `batch_dc_posterior_predictive_logp`)
+  - `suffstats.py` — vectorized sufficient statistics (matrix ops, batched scatter add/remove)
+  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas) via `vmap`/`lax.scan` with type-specialized fast paths (`_compute_dominant_type`, `_score_row_one_cluster_typed`)
+  - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `clear_cache()`)
 
 - **packed_inference.py** — Vectorized inference queries on packed state (predictive, MI, anomaly, similarity).
 
