@@ -187,6 +187,9 @@ def pack_state(
             )
     # Use n_cols as max_cols_per_view to handle worst case where all columns
     # merge into a single view during column assignment transitions.
+    # NOTE: This is conservative. For large n_cols (>100), reducing this value
+    # via the max_cols_per_view parameter can significantly speed up inner scans,
+    # but risks silent column loss if a view exceeds the limit during inference.
     max_cols_per_view = n_cols
 
     # Column assignments and CRP alpha
