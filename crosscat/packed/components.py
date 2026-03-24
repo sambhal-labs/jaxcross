@@ -416,3 +416,84 @@ def unified_sample_posterior_predictive(
             ),
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Batch-vectorized type-specialized scoring (no type dispatch overhead)
+# ---------------------------------------------------------------------------
+
+
+def batch_bb_posterior_predictive_logp(
+    xs: Array, counts: Array, sum_xs: Array, alphas: Array, betas: Array
+) -> Array:
+    """Vectorized Beta-Bernoulli posterior predictive for a batch of columns.
+
+    All inputs are (n_cols,) arrays. Returns (n_cols,) logps.
+    Skips all type dispatch — caller must ensure all columns are binary.
+    """
+    n = counts.astype(jnp.float32)
+    p1 = (sum_xs + alphas) / jnp.maximum(n + alphas + betas, 1e-30)
+    log_p1 = jnp.log(jnp.maximum(p1, 1e-30))
+    log_p0 = jnp.log(jnp.maximum(1.0 - p1, 1e-30))
+    return jnp.where(xs > 0.5, log_p1, log_p0)
+
+
+def batch_ng_posterior_predictive_logp(
+    xs: Array,
+    counts: Array,
+    sum_xs: Array,
+    sum_x_sqs: Array,
+    mus: Array,
+    rs: Array,
+    ss: Array,
+    nus: Array,
+) -> Array:
+    """Vectorized Normal-Gamma posterior predictive for a batch of columns.
+
+    All inputs are (n_cols,) arrays. Returns (n_cols,) logps.
+    """
+    n = counts.astype(jnp.float32)
+    r_n = rs + n
+    mu_n = (rs * mus + sum_xs) / jnp.maximum(r_n, 1e-30)
+    nu_n = nus + n
+    nu_s = nus * ss
+    mean = jnp.where(n > 0, sum_xs / jnp.maximum(n, 1.0), 0.0)
+    nu_n_s_n = (
+        nu_s
+        + sum_x_sqs
+        - sum_xs**2 / jnp.maximum(n, 1.0)
+        + rs * n * (mus - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+    )
+    nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+
+    df = nu_n
+    loc = mu_n
+    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, 1e-30)) * (1.0 + 1.0 / jnp.maximum(r_n, 1e-30))
+    scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+    z = (xs - loc) / scale
+
+    return (
+        gammaln((df + 1.0) / 2.0)
+        - gammaln(df / 2.0)
+        - 0.5 * jnp.log(df * jnp.pi)
+        - jnp.log(scale)
+        - (df + 1.0) / 2.0 * jnp.log(1.0 + z**2 / jnp.maximum(df, 1e-30))
+    )
+
+
+def batch_dc_posterior_predictive_logp(
+    xs: Array, counts: Array, cat_counts_batch: Array, dir_alphas: Array
+) -> Array:
+    """Vectorized Dirichlet-Categorical posterior predictive.
+
+    xs: (n_cols,), counts: (n_cols,), cat_counts_batch: (n_cols, max_cats),
+    dir_alphas: (n_cols,). Returns (n_cols,) logps.
+    """
+    n = counts.astype(jnp.float32)
+    k = jnp.array(cat_counts_batch.shape[-1], dtype=jnp.float32)
+    probs = (cat_counts_batch + dir_alphas[:, None]) / jnp.maximum(
+        n[:, None] + k * dir_alphas[:, None], 1e-30
+    )
+    idxs = jnp.clip(xs.astype(jnp.int32), 0, cat_counts_batch.shape[-1] - 1)
+    return jnp.log(jnp.maximum(probs[jnp.arange(xs.shape[0]), idxs], 1e-30))

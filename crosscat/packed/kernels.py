@@ -16,6 +16,9 @@ from crosscat.packed.components import (
     _dc_log_marginal,
     _ng_log_marginal,
     _vm_log_marginal,
+    batch_bb_posterior_predictive_logp,
+    batch_dc_posterior_predictive_logp,
+    batch_ng_posterior_predictive_logp,
     unified_log_marginal,
     unified_posterior_predictive_logp,
 )
@@ -26,6 +29,7 @@ from crosscat.packed.state import (
     CATEGORICAL_ID,
     CONTINUOUS_ID,
     CYCLIC_ID,
+    ORDINAL_ID,
     PackedCrossCatState,
 )
 from crosscat.packed.suffstats import (
@@ -35,7 +39,132 @@ from crosscat.packed.suffstats import (
 )
 
 # ---------------------------------------------------------------------------
-# Vectorized row scoring (lax.scan over columns, vmap over clusters)
+# Type specialization helpers
+# ---------------------------------------------------------------------------
+
+
+def _compute_dominant_type(col_indices: Array, col_type_ids: Array, n_columns: Array) -> Array:
+    """Return the type_id if all active columns share it, else -1.
+
+    Cheap O(max_cols_per_view) check computed once per view before the row scan.
+    """
+    max_cpv = col_indices.shape[0]
+    safe_indices = jnp.clip(col_indices, 0, col_type_ids.shape[0] - 1)
+    types = col_type_ids[safe_indices]
+    active = (col_indices >= 0) & (jnp.arange(max_cpv) < n_columns)
+    first_type = types[0]
+    all_same = jnp.all(jnp.where(active, types == first_type, True))
+    return jnp.where(all_same & (n_columns > 0), first_type, jnp.int32(-1))
+
+
+def _score_row_one_cluster_typed(
+    row_data: Array,
+    col_indices: Array,
+    col_type_ids: Array,
+    ss_counts_c: Array,
+    ss_sum_x_c: Array,
+    ss_sum_x_sq_c: Array,
+    ss_cat_counts_c: Array,
+    ss_sum_sin_c: Array,
+    ss_sum_cos_c: Array,
+    hyper_mu: Array,
+    hyper_r: Array,
+    hyper_s: Array,
+    hyper_nu: Array,
+    hyper_dir_alpha: Array,
+    hyper_alpha: Array,
+    hyper_beta: Array,
+    hyper_kappa: Array,
+    hyper_vm_a: Array,
+    hyper_vm_mu: Array,
+    n_columns: Array,
+    dominant_type: Array,
+) -> Array:
+    """Score a row against one cluster with type-specialized fast paths.
+
+    If dominant_type matches a known type, uses a batch-vectorized scorer
+    that skips all type dispatch. Falls back to the general vmap path otherwise.
+    """
+    n_total_cols = row_data.shape[0]
+    max_cpv = col_indices.shape[0]
+
+    safe_col_indices = jnp.clip(col_indices, 0, n_total_cols - 1)
+    xs = row_data[safe_col_indices]
+    valid = (col_indices >= 0) & (jnp.arange(max_cpv) < n_columns) & (~jnp.isnan(xs))
+
+    # --- Binary fast path ---
+    h_alpha = hyper_alpha[safe_col_indices]
+    h_beta = hyper_beta[safe_col_indices]
+    bb_logps = batch_bb_posterior_predictive_logp(
+        xs, ss_counts_c.astype(jnp.float32), ss_sum_x_c, h_alpha, h_beta
+    )
+    bb_score = jnp.sum(jnp.where(valid, bb_logps, 0.0))
+
+    # --- Continuous fast path ---
+    h_mu = hyper_mu[safe_col_indices]
+    h_r = hyper_r[safe_col_indices]
+    h_s = hyper_s[safe_col_indices]
+    h_nu = hyper_nu[safe_col_indices]
+    ng_logps = batch_ng_posterior_predictive_logp(
+        xs,
+        ss_counts_c.astype(jnp.float32),
+        ss_sum_x_c,
+        ss_sum_x_sq_c,
+        h_mu,
+        h_r,
+        h_s,
+        h_nu,
+    )
+    ng_score = jnp.sum(jnp.where(valid, ng_logps, 0.0))
+
+    # --- Categorical fast path ---
+    h_dir = hyper_dir_alpha[safe_col_indices]
+    dc_logps = batch_dc_posterior_predictive_logp(
+        xs, ss_counts_c.astype(jnp.float32), ss_cat_counts_c, h_dir
+    )
+    dc_score = jnp.sum(jnp.where(valid, dc_logps, 0.0))
+
+    # --- General fallback (vmap over unified dispatch) ---
+    general_score = _score_row_one_cluster(
+        row_data,
+        col_indices,
+        col_type_ids,
+        ss_counts_c,
+        ss_sum_x_c,
+        ss_sum_x_sq_c,
+        ss_cat_counts_c,
+        ss_sum_sin_c,
+        ss_sum_cos_c,
+        hyper_mu,
+        hyper_r,
+        hyper_s,
+        hyper_nu,
+        hyper_dir_alpha,
+        hyper_alpha,
+        hyper_beta,
+        hyper_kappa,
+        hyper_vm_a,
+        hyper_vm_mu,
+        n_columns,
+    )
+
+    return jnp.where(
+        dominant_type == BINARY_ID,
+        bb_score,
+        jnp.where(
+            dominant_type == CONTINUOUS_ID,
+            ng_score,
+            jnp.where(
+                (dominant_type == CATEGORICAL_ID) | (dominant_type == ORDINAL_ID),
+                dc_score,
+                general_score,
+            ),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Vectorized row scoring (vmap over columns and clusters)
 # ---------------------------------------------------------------------------
 
 
@@ -61,7 +190,10 @@ def _score_row_one_cluster(
     hyper_vm_mu: Array,
     n_columns: Array,
 ) -> Array:
-    """Score a row against ONE cluster using lax.scan over columns.
+    """Score a row against ONE cluster using vectorized ops over columns.
+
+    Gathers all column data in parallel and vmaps the posterior predictive
+    scoring, replacing the sequential lax.scan.
 
     Args:
         row_data: (n_cols_total,) full row from data matrix.
@@ -78,42 +210,51 @@ def _score_row_one_cluster(
         Scalar log likelihood of row under this cluster.
     """
     n_total_cols = row_data.shape[0]
-
-    def scan_body(log_lik, li):
-        col_idx = col_indices[li]
-        safe_col_idx = jnp.clip(col_idx, 0, n_total_cols - 1)
-        x = row_data[safe_col_idx]
-        type_id = col_type_ids[safe_col_idx]
-
-        # Valid if: not padding (-1), within active columns, and not NaN
-        is_valid = (col_idx >= 0) & (li < n_columns) & (~jnp.isnan(x))
-
-        logp = unified_posterior_predictive_logp(
-            x,
-            type_id,
-            ss_counts_c[li].astype(jnp.float32),
-            ss_sum_x_c[li],
-            ss_sum_x_sq_c[li],
-            ss_cat_counts_c[li],
-            ss_sum_sin_c[li],
-            ss_sum_cos_c[li],
-            hyper_mu[safe_col_idx],
-            hyper_r[safe_col_idx],
-            hyper_s[safe_col_idx],
-            hyper_nu[safe_col_idx],
-            hyper_dir_alpha[safe_col_idx],
-            hyper_alpha[safe_col_idx],
-            hyper_beta[safe_col_idx],
-            hyper_kappa[safe_col_idx],
-            hyper_vm_a[safe_col_idx],
-            hyper_vm_mu[safe_col_idx],
-        )
-        log_lik = log_lik + jnp.where(is_valid, logp, 0.0)
-        return log_lik, None
-
     max_cols_per_view = col_indices.shape[0]
-    log_lik, _ = jax.lax.scan(scan_body, jnp.array(0.0), jnp.arange(max_cols_per_view))
-    return log_lik
+
+    # Gather all column data at once
+    safe_col_indices = jnp.clip(col_indices, 0, n_total_cols - 1)
+    xs = row_data[safe_col_indices]  # (max_cpv,)
+    type_ids = col_type_ids[safe_col_indices]  # (max_cpv,)
+
+    # Validity mask
+    valid = (col_indices >= 0) & (jnp.arange(max_cols_per_view) < n_columns) & (~jnp.isnan(xs))
+
+    # Gather hypers for all columns at once
+    h_mu = hyper_mu[safe_col_indices]
+    h_r = hyper_r[safe_col_indices]
+    h_s = hyper_s[safe_col_indices]
+    h_nu = hyper_nu[safe_col_indices]
+    h_dir = hyper_dir_alpha[safe_col_indices]
+    h_alpha = hyper_alpha[safe_col_indices]
+    h_beta = hyper_beta[safe_col_indices]
+    h_kappa = hyper_kappa[safe_col_indices]
+    h_vm_a = hyper_vm_a[safe_col_indices]
+    h_vm_mu = hyper_vm_mu[safe_col_indices]
+
+    # vmap posterior predictive over all columns in parallel
+    logps = jax.vmap(unified_posterior_predictive_logp)(
+        xs,
+        type_ids,
+        ss_counts_c.astype(jnp.float32),
+        ss_sum_x_c,
+        ss_sum_x_sq_c,
+        ss_cat_counts_c,
+        ss_sum_sin_c,
+        ss_sum_cos_c,
+        h_mu,
+        h_r,
+        h_s,
+        h_nu,
+        h_dir,
+        h_alpha,
+        h_beta,
+        h_kappa,
+        h_vm_a,
+        h_vm_mu,
+    )  # (max_cpv,)
+
+    return jnp.sum(jnp.where(valid, logps, 0.0))
 
 
 def _score_row_all_clusters(
@@ -140,10 +281,13 @@ def _score_row_all_clusters(
     hyper_vm_mu: Array,
     crp_alpha: Array,
     max_clusters: int,
+    dominant_type: Array | None = None,
 ) -> Array:
     """Score a row against ALL clusters (existing + one new) using vmap.
 
     Uses vmap over the cluster axis instead of a Python for-loop.
+    When dominant_type is provided and >= 0, uses type-specialized scoring
+    that skips the unified 5-way dispatch for significant speedup.
 
     Args:
         row_data: (n_cols_total,) full row from data matrix.
@@ -158,6 +302,7 @@ def _score_row_all_clusters(
         hyper_*: (n_cols_total,) hyperparameters.
         crp_alpha: scalar CRP concentration.
         max_clusters: int (static) — padding size.
+        dominant_type: If all cols share one type, that type_id; else -1.
 
     Returns:
         (max_clusters + 1,) array of log probabilities.
@@ -166,18 +311,101 @@ def _score_row_all_clusters(
     log_prior = jnp.log(jnp.maximum(cluster_counts.astype(jnp.float32), 1e-30))
     log_prior = jnp.where(cluster_counts > 0, log_prior, -jnp.inf)
 
-    # vmap _score_row_one_cluster over the cluster dimension (axis 0 of ss_*)
-    def score_one(ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos):
-        return _score_row_one_cluster(
+    # Choose scoring function based on type specialization
+    if dominant_type is not None:
+        _scorer = _score_row_one_cluster_typed
+
+        def score_one(ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos):
+            return _scorer(
+                row_data,
+                col_indices,
+                col_type_ids,
+                ss_c,
+                ss_sx,
+                ss_sxsq,
+                ss_cat,
+                ss_sin,
+                ss_cos,
+                hyper_mu,
+                hyper_r,
+                hyper_s,
+                hyper_nu,
+                hyper_dir_alpha,
+                hyper_alpha,
+                hyper_beta,
+                hyper_kappa,
+                hyper_vm_a,
+                hyper_vm_mu,
+                n_columns,
+                dominant_type,
+            )
+    else:
+
+        def score_one(ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos):
+            return _score_row_one_cluster(
+                row_data,
+                col_indices,
+                col_type_ids,
+                ss_c,
+                ss_sx,
+                ss_sxsq,
+                ss_cat,
+                ss_sin,
+                ss_cos,
+                hyper_mu,
+                hyper_r,
+                hyper_s,
+                hyper_nu,
+                hyper_dir_alpha,
+                hyper_alpha,
+                hyper_beta,
+                hyper_kappa,
+                hyper_vm_a,
+                hyper_vm_mu,
+                n_columns,
+            )
+
+    log_liks = jax.vmap(score_one)(
+        ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
+    )
+    log_probs_existing = log_prior + log_liks
+
+    # New cluster: empty suffstats -> prior predictive
+    max_cols_per_view = col_indices.shape[0]
+    max_cats = ss_cat_counts.shape[-1]
+    empty_args = (
+        jnp.zeros(max_cols_per_view, dtype=jnp.int32),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros((max_cols_per_view, max_cats)),
+        jnp.zeros(max_cols_per_view),
+        jnp.zeros(max_cols_per_view),
+    )
+    if dominant_type is not None:
+        log_lik_new = _score_row_one_cluster_typed(
             row_data,
             col_indices,
             col_type_ids,
-            ss_c,
-            ss_sx,
-            ss_sxsq,
-            ss_cat,
-            ss_sin,
-            ss_cos,
+            *empty_args,
+            hyper_mu,
+            hyper_r,
+            hyper_s,
+            hyper_nu,
+            hyper_dir_alpha,
+            hyper_alpha,
+            hyper_beta,
+            hyper_kappa,
+            hyper_vm_a,
+            hyper_vm_mu,
+            n_columns,
+            dominant_type,
+        )
+    else:
+        log_lik_new = _score_row_one_cluster(
+            row_data,
+            col_indices,
+            col_type_ids,
+            *empty_args,
             hyper_mu,
             hyper_r,
             hyper_s,
@@ -190,37 +418,6 @@ def _score_row_all_clusters(
             hyper_vm_mu,
             n_columns,
         )
-
-    log_liks = jax.vmap(score_one)(
-        ss_counts, ss_sum_x, ss_sum_x_sq, ss_cat_counts, ss_sum_sin, ss_sum_cos
-    )
-    log_probs_existing = log_prior + log_liks
-
-    # New cluster: empty suffstats -> prior predictive
-    max_cols_per_view = col_indices.shape[0]
-    max_cats = ss_cat_counts.shape[-1]
-    log_lik_new = _score_row_one_cluster(
-        row_data,
-        col_indices,
-        col_type_ids,
-        jnp.zeros(max_cols_per_view, dtype=jnp.int32),
-        jnp.zeros(max_cols_per_view),
-        jnp.zeros(max_cols_per_view),
-        jnp.zeros((max_cols_per_view, max_cats)),
-        jnp.zeros(max_cols_per_view),
-        jnp.zeros(max_cols_per_view),
-        hyper_mu,
-        hyper_r,
-        hyper_s,
-        hyper_nu,
-        hyper_dir_alpha,
-        hyper_alpha,
-        hyper_beta,
-        hyper_kappa,
-        hyper_vm_a,
-        hyper_vm_mu,
-        n_columns,
-    )
     log_prior_new = jnp.log(crp_alpha)
     log_prob_new = log_prior_new + log_lik_new
 
@@ -304,6 +501,9 @@ def packed_transition_row_assignments(
         n_columns = packed.view_n_columns[v_idx]
         alpha = packed.view_row_crp_alpha[v_idx]
 
+        # Compute dominant type once per view for type-specialized scoring
+        dom_type = _compute_dominant_type(col_indices, packed.col_type_ids, n_columns)
+
         # Working suffstats for this view (will be mutated row by row)
         w_ss_c = packed.ss_counts[v_idx]  # (max_c, max_cols_per_view)
         w_ss_sx = packed.ss_sum_x[v_idx]
@@ -345,7 +545,7 @@ def packed_transition_row_assignments(
             temp_assigns = r_assigns.at[row_idx].set(max_c)  # out of range
             counts = jnp.bincount(temp_assigns, length=max_c).astype(jnp.int32)
 
-            # Score all clusters
+            # Score all clusters (with type-specialized fast path)
             log_probs = _score_row_all_clusters(
                 row_data,
                 col_indices,
@@ -370,6 +570,7 @@ def packed_transition_row_assignments(
                 packed.hyper_vm_mu,
                 alpha,
                 max_c,
+                dominant_type=dom_type,
             )
 
             # If budget exhausted (n_cl >= max_c - 1), block new cluster

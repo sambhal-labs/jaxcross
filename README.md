@@ -122,7 +122,7 @@ uv sync --extra dev
 | [`model.py`](crosscat/model.py) | `initialize()`, `log_joint()`, `insert_rows()` |
 | [`gibbs.py`](crosscat/gibbs.py) | MCMC kernels: row/column assignments, hyperparameters, CRP alphas, `gibbs_sweep()` |
 | [`inference.py`](crosscat/inference.py) | Queries: `predictive_probability()`, `predictive_sample()`, `mutual_information()`, `predictive_anomalousness()`, `impute_and_confidence()`, `row_similarity()` |
-| [`packed/`](crosscat/packed/) | JIT-compatible padded state with vectorized kernels (`state.py`, `components.py`, `suffstats.py`, `kernels.py`) |
+| [`packed/`](crosscat/packed/) | JIT-compatible padded state with vectorized kernels (`state.py`, `components.py`, `suffstats.py`, `kernels.py`, `aot_cache.py`) |
 | [`packed_inference.py`](crosscat/packed_inference.py) | Vectorized inference queries on packed state |
 | [`constraints.py`](crosscat/constraints.py) | Column/row dependency constraint enforcement |
 | [`diagnostics.py`](crosscat/diagnostics.py) | ARI, convergence metrics, held-out likelihood, imputation evaluation |
@@ -246,10 +246,14 @@ metrics = collect_diagnostics(state, data)
 
 ## Performance
 
-The `crosscat.packed` sub-package provides a JIT-compatible representation using padded fixed-size arrays. All Python-level branching on column types is replaced with `jnp.where` dispatch, enabling full XLA compilation via `jax.lax.scan` and `jax.vmap`:
+The `crosscat.packed` sub-package provides a JIT-compatible representation using padded fixed-size arrays with vectorized column scoring and type-specialized fast paths:
 
 ```python
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.packed.aot_cache import enable_xla_cache
+
+# Enable persistent compilation cache (skips 20+ min recompilation on re-runs)
+enable_xla_cache()
 
 # Convert to packed representation
 packed = pack_state(state, max_views=16, max_clusters=32)
@@ -261,20 +265,27 @@ packed = packed_gibbs_sweep(key, packed, data, n_sweeps=100)
 state = unpack_state(packed, column_types, data=data)
 ```
 
-Individual kernels are also available for fine-grained control:
+**Benchmark results (P100 GPU):**
+
+| Dataset | Rows × Cols | Per Sweep | 100 Sweeps |
+|---------|-------------|-----------|------------|
+| Small (mixed types) | 50 × 11 | 4.5s | 7.5 min |
+| Medium (binary+cat) | 100 × 65 | 4.8s | 8 min |
+| MNIST 16×16 | 1000 × 257 | 12s | 20 min |
+
+Save and resume long-running inference with checkpointing:
 
 ```python
-from crosscat.packed import (
-    packed_transition_row_assignments,
-    packed_transition_column_assignments,
-    packed_transition_column_hypers,
-    packed_transition_crp_alphas,
-)
-```
+from crosscat.serialization import save_checkpoint, load_latest_checkpoint, save_state
 
-Run the benchmark to compare:
-```bash
-python benchmarks/jit_benchmark.py
+# Checkpoint during inference
+save_checkpoint(packed, "checkpoints/", sweep_number=50, column_types=col_types)
+
+# Resume from last checkpoint
+packed, col_types, sweep_num = load_latest_checkpoint("checkpoints/")
+
+# Save final state
+save_state(state, "results/my_model")
 ```
 
 ## Dashboard
@@ -351,6 +362,10 @@ pre-commit install
 - [x] State serialization (save/load/checkpoint)
 - [x] Parallel multi-chain inference via `jax.vmap`
 - [x] GPU-validated test suite (127 fast + 31 slow tests)
+- [x] Vectorized column scoring (12x speedup over sequential scan)
+- [x] Type-specialized scoring fast paths (binary, continuous, categorical)
+- [x] XLA persistent compilation caching
+- [x] MNIST paper benchmark reproduction (Section 3.2, Figs 13-15)
 - [ ] PyPI release
 
 ## References
