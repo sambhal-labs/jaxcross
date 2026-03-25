@@ -48,6 +48,9 @@ dashboard = [
 benchmark = [
     "matplotlib>=3.8",
     "scikit-learn>=1.3",
+    "wbgapi>=1.0",
+    "pandas>=2.0",
+    "seaborn>=0.13",
 ]
 
 [project.urls]
