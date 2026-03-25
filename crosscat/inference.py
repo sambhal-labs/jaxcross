@@ -403,7 +403,6 @@ def _estimate_mi_sample(
     hypers_j = state.column_hypers[col_j]
 
     mi_samples = []
-    log_weights = []
 
     keys = jax.random.split(rng_key, n_samples)
 

@@ -68,10 +68,20 @@ The package is `crosscat/` with these core modules:
 
 ## Key Patterns
 
-- **JAX idioms**: Uses `jax.lax.scan` for sequential loops (column sweeps), `jax.vmap` for parallel operations (row clustering across views), `jax.jit` for compilation. All state is immutable — operations return new arrays.
+- **JAX idioms**: Uses `jax.lax.scan` for sequential loops (view/row sweeps), `jax.vmap` for parallel operations (column scoring, cluster scoring, row clustering across views), `jax.jit` for compilation. All state is immutable — operations return new arrays.
+- **Vectorized column scoring**: Row scoring in `_score_row_one_cluster` uses `jax.vmap(unified_posterior_predictive_logp)` over all columns simultaneously (not sequential `lax.scan`). This is the key optimization that gave 12x speedup in v0.9.0.
+- **Type-specialized fast paths**: `_compute_dominant_type()` detects when all columns in a view share the same type (e.g., all BINARY for MNIST). When dominant, `_score_row_one_cluster_typed` bypasses the 5-way `jnp.where` dispatch and calls type-specific batch functions directly (`batch_bb_posterior_predictive_logp`, etc.).
+- **Batched suffstat updates**: `_add_row_to_suffstats` / `_remove_row_from_suffstats` use `.at[].add()` scatter operations over all columns at once instead of sequential `lax.scan`.
 - **Deterministic RNG**: Always use `jax.random.key()` and `jax.random.split()` for reproducibility.
 - **NaN transparency**: Missing data is represented as NaN and silently filtered during sufficient statistic computation.
 - **Docstring cross-references**: Many functions include "Maps to original..." comments linking to the probcomp/crosscat equivalent.
+
+## Benchmarks
+
+- **MNIST paper benchmark** (`benchmarks/mnist_paper_colab.ipynb`): Reproduces Section 3.2 of Mansinghka et al. (2016). 16×16 binary MNIST (257 cols), 10 chains × 100 sweeps on P100. Validates Z-matrix, pixel dependence map, inpainting (93% accuracy), and classification (79% accuracy).
+- **Synthetic benchmark** (`benchmarks/paper_synthetic_benchmark.py`): Figure 7 recovery with known ground truth.
+- **JIT benchmark** (`benchmarks/jit_benchmark.py`): Per-sweep timing comparison.
+- Run notebooks on Kaggle (P100) or Colab (T4/A100) for GPU-accelerated benchmarks.
 
 ## Code Style
 
