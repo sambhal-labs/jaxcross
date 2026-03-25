@@ -22,7 +22,14 @@ from crosscat.components import (
     OrderedLogistic,
     VonMises,
 )
-from crosscat.types import ColumnHypers, ColumnType, CrossCatState, SufficientStats, ViewState
+from crosscat.types import (
+    LOG_EPS,
+    ColumnHypers,
+    ColumnType,
+    CrossCatState,
+    SufficientStats,
+    ViewState,
+)
 
 
 def _crp_sample(rng_key: Array, alpha: float, n: int) -> Array:
@@ -48,7 +55,7 @@ def _crp_sample(rng_key: Array, alpha: float, n: int) -> Array:
         table_probs = jnp.where(jnp.arange(max_tables) < n_tables, counts[:max_tables], 0.0)
         # Probability of new table
         new_table_probs = table_probs.at[n_tables].set(alpha)
-        log_probs = jnp.log(new_table_probs + 1e-30)
+        log_probs = jnp.log(new_table_probs + LOG_EPS)
         chosen = jax.random.categorical(key, log_probs)
 
         # Update
@@ -312,7 +319,7 @@ def insert_rows(
             cluster_counts = jnp.array(
                 [jnp.sum(row_assignments == c) for c in range(n_existing_clusters)]
             ).astype(jnp.float32)
-            log_probs = jnp.log(cluster_counts + 1e-30)
+            log_probs = jnp.log(cluster_counts + LOG_EPS)
             # Add likelihood of row under each cluster using existing suffstats
             row_data = new_rows[i]
             for c in range(n_existing_clusters):

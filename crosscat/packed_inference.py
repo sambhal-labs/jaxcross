@@ -15,6 +15,7 @@ from crosscat.packed import (
     unified_posterior_predictive_logp,
     unified_sample_posterior_predictive,
 )
+from crosscat.types import LOG_EPS
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -37,7 +38,7 @@ def _cluster_weights_packed(packed: PackedCrossCatState, view_idx: int) -> Array
     # bincount via one-hot reduction (JIT-safe)
     one_hot = jax.nn.one_hot(assigns, max_k)  # (n_rows, max_k)
     counts = one_hot.sum(axis=0).astype(jnp.float32)
-    return counts / jnp.maximum(counts.sum(), 1e-30)
+    return counts / jnp.maximum(counts.sum(), LOG_EPS)
 
 
 def _cluster_weights_for_row(packed: PackedCrossCatState, view_idx: int, row_id: int) -> Array:
@@ -97,7 +98,7 @@ def _logp_one_column_mixture(
     log_liks = jax.vmap(_score_cluster)(cluster_indices)  # (max_k,)
 
     # Mask inactive clusters (weight == 0 -> log_weight = -inf)
-    log_weights = jnp.log(jnp.maximum(weights, 1e-30))
+    log_weights = jnp.log(jnp.maximum(weights, LOG_EPS))
     # Where weights are exactly 0, force -inf
     log_weights = jnp.where(weights > 0, log_weights, -jnp.inf)
     log_terms = log_weights + log_liks
@@ -117,7 +118,7 @@ def _sample_one_column(
     k1, k2 = jax.random.split(rng_key)
 
     # Sample cluster from weights
-    log_w = jnp.log(jnp.maximum(weights, 1e-30))
+    log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
     cluster = jax.random.categorical(k1, log_w)
 
     # Gather suffstats for the sampled cluster
@@ -247,7 +248,7 @@ def packed_predictive_sample(
             w = weights_arr[q_idx]
 
             # Sample cluster
-            log_w = jnp.log(jnp.maximum(w, 1e-30))
+            log_w = jnp.log(jnp.maximum(w, LOG_EPS))
             cluster = jax.random.categorical(k1, log_w)
 
             return unified_sample_posterior_predictive(
@@ -348,7 +349,7 @@ def _packed_estimate_mi_sample(
     Maps to original inference_utils.estimate_MI_sample().
     """
     cluster_weights = _cluster_weights_packed(packed, view_idx)
-    log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, 1e-30))
+    log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, LOG_EPS))
     n_clusters = int(packed.view_n_clusters[view_idx])
 
     local_i = int(_find_local_col_index(packed, view_idx, col_i))
