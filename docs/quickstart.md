@@ -271,7 +271,50 @@ score = packed_anomaly_score(subkey, packed, data, query_row=42)
 - GPU/TPU execution (compile once, run many sweeps fast)
 - Batch inference across many PRNG keys
 
-**Tip**: The first call to `packed_gibbs_sweep` triggers JIT compilation (~30-60s). Subsequent calls with the same data shape are fast.
+**Tip**: The first call to `packed_gibbs_sweep` triggers JIT compilation (~23s for 257 cols). Subsequent calls with the same data shape are fast.
+
+### XLA Compilation Cache
+
+Enable persistent compilation caching so JIT compilation is skipped on subsequent runs:
+
+```python
+from crosscat.packed.aot_cache import enable_xla_cache
+
+enable_xla_cache()  # call once at startup, before any JIT calls
+```
+
+This saves the compiled XLA executables to `~/.cache/jax/` and reuses them across Python sessions.
+
+### Save / Load / Checkpoint
+
+Save trained models and resume long-running inference:
+
+```python
+from crosscat.serialization import (
+    save_packed_state, load_packed_state,
+    save_state, load_state,
+    save_checkpoint, load_latest_checkpoint,
+)
+
+# Save packed state (efficient, preserves all arrays)
+save_packed_state(packed, "my_model", column_types=column_types)
+packed, col_types = load_packed_state("my_model")
+
+# Save unpacked CrossCatState (packs internally)
+save_state(state, "my_model")
+state = load_state("my_model", data=data)  # pass data= for exact suffstats
+
+# Checkpoint during inference loop
+for sweep in range(100):
+    packed = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
+    if (sweep + 1) % 10 == 0:
+        save_checkpoint(packed, "checkpoints/", sweep_number=sweep + 1,
+                        column_types=column_types)
+
+# Resume from latest checkpoint
+packed, col_types, sweep_num = load_latest_checkpoint("checkpoints/")
+print(f"Resuming from sweep {sweep_num}")
+```
 
 ## Tips
 
