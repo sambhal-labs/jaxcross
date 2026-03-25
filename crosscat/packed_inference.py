@@ -385,7 +385,6 @@ def _packed_estimate_mi_sample(
         )
 
     mi_samples = []
-    log_weights = []
     keys = jax.random.split(rng_key, n_samples)
 
     for s in range(n_samples):
