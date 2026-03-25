@@ -17,7 +17,6 @@ from crosscat.constraints import (
     ensure_col_dep_constraints,
     ensure_row_dep_constraint,
 )
-from crosscat.gibbs import gibbs_sweep
 from crosscat.inference import (
     column_typicality,
     mutual_information,
@@ -26,6 +25,7 @@ from crosscat.inference import (
     row_typicality,
 )
 from crosscat.model import initialize, log_joint
+from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 from crosscat.types import ColumnType
 
 # ---------------------------------------------------------------------------
@@ -51,11 +51,13 @@ def inferred_continuous_state():
     data = jnp.column_stack([col0, col1, col2, col3])
     column_types = [ColumnType.CONTINUOUS] * 4
 
-    states = initialize(k5, data, column_types, n_chains=4)
+    init_states = initialize(k5, data, column_types, n_chains=4)
     final_states = []
-    for i, state in enumerate(states):
+    for i, state in enumerate(init_states):
         k = jax.random.fold_in(k5, i + 100)
-        state = gibbs_sweep(k, state, data, n_sweeps=20)
+        packed = pack_state(state)
+        packed = packed_gibbs_sweep(k, packed, data, n_sweeps=20)
+        state = unpack_state(packed, column_types, data=data)
         final_states.append(state)
 
     best_idx = max(range(len(final_states)), key=lambda i: float(log_joint(final_states[i], data)))
