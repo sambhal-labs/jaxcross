@@ -19,14 +19,16 @@ import pytest
 
 def _run_multi_chain(rng_key, data, column_types, n_chains=3, n_sweeps=20):
     """Run multi-chain inference and return the best state by log_joint."""
-    from crosscat.gibbs import gibbs_sweep
     from crosscat.model import initialize, log_joint
+    from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
     states = initialize(rng_key, data, column_types, n_chains=n_chains)
     best_state, best_score = None, -jnp.inf
     for i, s in enumerate(states):
         key_i = jax.random.fold_in(rng_key, i + 1000)
-        s = gibbs_sweep(key_i, s, data, n_sweeps=n_sweeps)
+        packed = pack_state(s)
+        packed = packed_gibbs_sweep(key_i, packed, data, n_sweeps=n_sweeps)
+        s = unpack_state(packed, column_types, data=data)
         score = log_joint(s, data)
         if score > best_score:
             best_score = score
