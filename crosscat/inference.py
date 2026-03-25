@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from crosscat.components import get_component
-from crosscat.types import ColumnType, CrossCatState
+from crosscat.types import LOG_EPS, ColumnType, CrossCatState
 
 
 def _get_view_for_column(state: CrossCatState, col: int) -> int:
@@ -57,7 +57,7 @@ def _cluster_weights_conditioned(
         jnp.float32
     )
 
-    log_weights = jnp.log(counts + 1e-30)
+    log_weights = jnp.log(counts + LOG_EPS)
 
     # Add likelihood of condition columns that are in this view
     for cond_idx, col in enumerate(condition_cols):
@@ -237,7 +237,7 @@ def predictive_sample(
 
             # Sample cluster
             k1, k2 = jax.random.split(sample_keys[q_idx])
-            cluster = jax.random.categorical(k1, jnp.log(weights + 1e-30))
+            cluster = jax.random.categorical(k1, jnp.log(weights + LOG_EPS))
             cluster = int(cluster)
 
             # Find local index
@@ -391,7 +391,7 @@ def _estimate_mi_sample(
     """
     n_clusters = int(jnp.max(view.row_assignments)) + 1
     cluster_weights = _cluster_weights(view, state.n_rows)
-    log_cluster_weights = jnp.log(cluster_weights + 1e-30)
+    log_cluster_weights = jnp.log(cluster_weights + LOG_EPS)
 
     # Find local column indices in the view
     local_i = _local_col_index(view, col_i)
@@ -604,12 +604,12 @@ def column_typicality(
     # Remove self-co-occurrence
     co_other = jnp.concatenate([co_occurrence[:col_id], co_occurrence[col_id + 1 :]])
     # Normalize to probability-like
-    p = co_other / jnp.maximum(co_other.sum(), 1e-30)
-    entropy = -jnp.sum(jnp.where(p > 0, p * jnp.log(p + 1e-30), 0.0))
+    p = co_other / jnp.maximum(co_other.sum(), LOG_EPS)
+    entropy = -jnp.sum(jnp.where(p > 0, p * jnp.log(p + LOG_EPS), 0.0))
     max_entropy = jnp.log(jnp.float32(n_cols - 1))
 
     # Typicality: 1 - normalized entropy (high = consistent grouping = typical)
-    typicality = 1.0 - entropy / jnp.maximum(max_entropy, 1e-30)
+    typicality = 1.0 - entropy / jnp.maximum(max_entropy, LOG_EPS)
     return jnp.clip(typicality, 0.0, 1.0)
 
 

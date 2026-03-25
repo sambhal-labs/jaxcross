@@ -37,6 +37,7 @@ from crosscat.packed.suffstats import (
     _remove_row_from_suffstats,
     recompute_all_suffstats,
 )
+from crosscat.types import LOG_EPS
 
 # ---------------------------------------------------------------------------
 # Type specialization helpers
@@ -308,7 +309,7 @@ def _score_row_all_clusters(
         (max_clusters + 1,) array of log probabilities.
     """
     # CRP prior: log(count_c) for existing clusters, -inf for empty
-    log_prior = jnp.log(jnp.maximum(cluster_counts.astype(jnp.float32), 1e-30))
+    log_prior = jnp.log(jnp.maximum(cluster_counts.astype(jnp.float32), LOG_EPS))
     log_prior = jnp.where(cluster_counts > 0, log_prior, -jnp.inf)
 
     # Choose scoring function based on type specialization
@@ -1117,7 +1118,7 @@ def _crp_sample_bounded(
         table_probs = jnp.where(jnp.arange(max_clusters) < n_tables, counts, 0.0)
         can_new = n_tables < max_clusters
         table_probs = table_probs.at[n_tables].set(jnp.where(can_new, alpha, 0.0))
-        log_probs = jnp.log(table_probs + 1e-30)
+        log_probs = jnp.log(table_probs + LOG_EPS)
         chosen = jax.random.categorical(key, log_probs)
 
         is_new = (chosen == n_tables) & can_new
@@ -1288,7 +1289,7 @@ def packed_transition_column_assignments(
 
         # --- Score existing views ---
         # CRP prior: log(count_v) for views with columns, -inf otherwise
-        log_prior = jnp.log(jnp.maximum(counts_excl.astype(jnp.float32), 1e-30))
+        log_prior = jnp.log(jnp.maximum(counts_excl.astype(jnp.float32), LOG_EPS))
         log_prior = jnp.where((counts_excl > 0) & view_mask, log_prior, -jnp.inf)
 
         # Likelihood: vmap _score_column_in_view over views

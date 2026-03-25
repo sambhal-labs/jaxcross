@@ -31,7 +31,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import gammaln
 
-from crosscat.types import ColumnHypers, ColumnType, SufficientStats
+from crosscat.types import LOG_EPS, ColumnHypers, ColumnType, SufficientStats
 
 
 def _filter_nan(data: Array) -> Array:
@@ -183,7 +183,7 @@ class NormalGamma:
         df = nu_n
         loc = mu_n
         scale_sq = (nu_n_s_n / nu_n) * (1.0 + 1.0 / r_n)
-        scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+        scale = jnp.sqrt(jnp.maximum(scale_sq, LOG_EPS))
 
         # Student-t log pdf
         z = (x - loc) / scale
@@ -503,8 +503,8 @@ class BetaBernoulli:
         p1 = (k + a) / (n + a + b)
         return jnp.where(
             x > 0.5,
-            jnp.log(jnp.maximum(p1, 1e-30)),
-            jnp.log(jnp.maximum(1.0 - p1, 1e-30)),
+            jnp.log(jnp.maximum(p1, LOG_EPS)),
+            jnp.log(jnp.maximum(1.0 - p1, LOG_EPS)),
         )
 
     @staticmethod
@@ -548,7 +548,7 @@ def _log_bessel_i0(x: Array) -> Array:
             + 0.0360768 * (x / 3.75) ** 10
             + 0.0045813 * (x / 3.75) ** 12
         ),
-        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, 1e-30)),
+        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, LOG_EPS)),
     )
 
 
