@@ -79,6 +79,7 @@ from crosscat.serialization import (
 )
 from crosscat.synthetic import add_missing_data, generate_crosscat_data
 from crosscat.types import (
+    LOG_EPS,
     ColumnHypers,
     ColumnType,
     CrossCatState,
@@ -89,6 +90,7 @@ from crosscat.validate import assert_valid_state, validate_state
 
 __all__ = [
     # Types
+    "LOG_EPS",
     "ColumnHypers",
     "ColumnType",
     "CrossCatState",

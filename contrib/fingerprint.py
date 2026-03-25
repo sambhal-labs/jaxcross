@@ -16,7 +16,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jax import Array
 
-from crosscat.types import CrossCatState
+from crosscat.types import LOG_EPS, CrossCatState
 
 
 def extract_fingerprint(
@@ -97,4 +97,4 @@ def fingerprint_similarity(
     norm_a = jnp.linalg.norm(fingerprint_a)
     norm_b = jnp.linalg.norm(fingerprint_b)
     denom = norm_a * norm_b
-    return jnp.where(denom > 1e-30, jnp.dot(fingerprint_a, fingerprint_b) / denom, 0.0)
+    return jnp.where(denom > LOG_EPS, jnp.dot(fingerprint_a, fingerprint_b) / denom, 0.0)

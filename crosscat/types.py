@@ -24,6 +24,10 @@ from typing import Any
 import jax.numpy as jnp
 from jax import Array
 
+# Numerical stability constant — used throughout the codebase to guard
+# against log(0) and division-by-zero in posterior computations.
+LOG_EPS: float = 1e-30
+
 
 class ColumnType(enum.Enum):
     """Supported column data types.

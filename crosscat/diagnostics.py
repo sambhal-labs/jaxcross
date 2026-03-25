@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from crosscat.model import log_joint
-from crosscat.types import ColumnType, CrossCatState
+from crosscat.types import LOG_EPS, ColumnType, CrossCatState
 
 
 def adjusted_rand_index(assignments_true: Array, assignments_pred: Array) -> Array:
@@ -54,7 +54,7 @@ def adjusted_rand_index(assignments_true: Array, assignments_pred: Array) -> Arr
     sum_comb_b = jnp.sum(comb2(b))
     comb_n = comb2(jnp.float32(n))
 
-    expected = sum_comb_a * sum_comb_b / jnp.maximum(comb_n, 1e-30)
+    expected = sum_comb_a * sum_comb_b / jnp.maximum(comb_n, LOG_EPS)
     max_index = 0.5 * (sum_comb_a + sum_comb_b)
 
     denominator = max_index - expected

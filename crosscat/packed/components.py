@@ -13,6 +13,7 @@ from jax import Array
 from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
+from crosscat.types import LOG_EPS
 
 # ---------------------------------------------------------------------------
 # JIT-compatible scoring functions (unified type dispatch)
@@ -32,7 +33,7 @@ def _log_bessel_i0(x: Array) -> Array:
             + 0.0360768 * (x / 3.75) ** 10
             + 0.0045813 * (x / 3.75) ** 12
         ),
-        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, 1e-30)),
+        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, LOG_EPS)),
     )
 
 
@@ -47,17 +48,17 @@ def _ng_log_marginal(n, sum_x, sum_x_sq, mu0, r, s, nu):
         nu_s
         + sum_x_sq
         - sum_x**2 / jnp.maximum(n, 1.0)
-        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, LOG_EPS)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
     # Clamp to avoid log of negative
-    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, LOG_EPS)
 
     log_ml = (
         -0.5 * n * jnp.log(2.0 * jnp.pi)
-        + 0.5 * jnp.log(r / jnp.maximum(r_n, 1e-30))
-        + 0.5 * nu * jnp.log(jnp.maximum(nu_s / 2.0, 1e-30))
-        - 0.5 * nu_n * jnp.log(jnp.maximum(nu_n_s_n / 2.0, 1e-30))
+        + 0.5 * jnp.log(r / jnp.maximum(r_n, LOG_EPS))
+        + 0.5 * nu * jnp.log(jnp.maximum(nu_s / 2.0, LOG_EPS))
+        - 0.5 * nu_n * jnp.log(jnp.maximum(nu_n_s_n / 2.0, LOG_EPS))
         + gammaln(nu_n / 2.0)
         - gammaln(nu / 2.0)
     )
@@ -177,7 +178,7 @@ def _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu0, r, s, nu):
     """Normal-Gamma posterior predictive log p(x | suffstats, hypers)."""
     n = count.astype(jnp.float32)
     r_n = r + n
-    mu_n = (r * mu0 + sum_x) / jnp.maximum(r_n, 1e-30)
+    mu_n = (r * mu0 + sum_x) / jnp.maximum(r_n, LOG_EPS)
     nu_n = nu + n
     nu_s = nu * s
     mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
@@ -185,15 +186,15 @@ def _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu0, r, s, nu):
         nu_s
         + sum_x_sq
         - sum_x**2 / jnp.maximum(n, 1.0)
-        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, LOG_EPS)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
-    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, LOG_EPS)
 
     df = nu_n
     loc = mu_n
-    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, 1e-30)) * (1.0 + 1.0 / jnp.maximum(r_n, 1e-30))
-    scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, LOG_EPS)) * (1.0 + 1.0 / jnp.maximum(r_n, LOG_EPS))
+    scale = jnp.sqrt(jnp.maximum(scale_sq, LOG_EPS))
     z = (x - loc) / scale
 
     log_p = (
@@ -201,7 +202,7 @@ def _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu0, r, s, nu):
         - gammaln(df / 2.0)
         - 0.5 * jnp.log(df * jnp.pi)
         - jnp.log(scale)
-        - (df + 1.0) / 2.0 * jnp.log(1.0 + z**2 / jnp.maximum(df, 1e-30))
+        - (df + 1.0) / 2.0 * jnp.log(1.0 + z**2 / jnp.maximum(df, LOG_EPS))
     )
     return log_p
 
@@ -210,18 +211,18 @@ def _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha):
     """Dirichlet-Categorical posterior predictive log p(x | suffstats, hypers)."""
     n = count.astype(jnp.float32)
     k = jnp.array(cat_counts.shape[-1], dtype=jnp.float32)
-    probs = (cat_counts + dir_alpha) / jnp.maximum(n + k * dir_alpha, 1e-30)
+    probs = (cat_counts + dir_alpha) / jnp.maximum(n + k * dir_alpha, LOG_EPS)
     idx = x.astype(jnp.int32)
     idx = jnp.clip(idx, 0, cat_counts.shape[-1] - 1)
-    return jnp.log(jnp.maximum(probs[idx], 1e-30))
+    return jnp.log(jnp.maximum(probs[idx], LOG_EPS))
 
 
 def _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta):
     """Beta-Bernoulli posterior predictive log p(x | suffstats, hypers)."""
     n = count.astype(jnp.float32)
-    p1 = (sum_x + alpha) / jnp.maximum(n + alpha + beta, 1e-30)
-    log_p1 = jnp.log(jnp.maximum(p1, 1e-30))
-    log_p0 = jnp.log(jnp.maximum(1.0 - p1, 1e-30))
+    p1 = (sum_x + alpha) / jnp.maximum(n + alpha + beta, LOG_EPS)
+    log_p1 = jnp.log(jnp.maximum(p1, LOG_EPS))
+    log_p0 = jnp.log(jnp.maximum(1.0 - p1, LOG_EPS))
     return jnp.where(x > 0.5, log_p1, log_p0)
 
 
@@ -285,7 +286,7 @@ def _ng_sample(rng_key, count, sum_x, sum_x_sq, mu0, r, s, nu):
     """
     n = count.astype(jnp.float32)
     r_n = r + n
-    mu_n = (r * mu0 + sum_x) / jnp.maximum(r_n, 1e-30)
+    mu_n = (r * mu0 + sum_x) / jnp.maximum(r_n, LOG_EPS)
     nu_n = nu + n
     nu_s = nu * s
     mean = jnp.where(n > 0, sum_x / jnp.maximum(n, 1.0), 0.0)
@@ -293,38 +294,38 @@ def _ng_sample(rng_key, count, sum_x, sum_x_sq, mu0, r, s, nu):
         nu_s
         + sum_x_sq
         - sum_x**2 / jnp.maximum(n, 1.0)
-        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+        + r * n * (mu0 - mean) ** 2 / jnp.maximum(r_n, LOG_EPS)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
-    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, LOG_EPS)
 
     df = nu_n
     loc = mu_n
-    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, 1e-30)) * (1.0 + 1.0 / jnp.maximum(r_n, 1e-30))
-    scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, LOG_EPS)) * (1.0 + 1.0 / jnp.maximum(r_n, LOG_EPS))
+    scale = jnp.sqrt(jnp.maximum(scale_sq, LOG_EPS))
 
     # Student-t sample: loc + scale * Normal(0,1) / sqrt(Chi2(df)/df)
     k1, k2 = jax.random.split(rng_key)
     z = jax.random.normal(k1)
     # Chi2(df) = sum of df standard normals squared; use gamma distribution
     chi2 = 2.0 * jax.random.gamma(k2, df / 2.0)
-    chi2 = jnp.maximum(chi2, 1e-30)
-    return loc + scale * z / jnp.sqrt(chi2 / jnp.maximum(df, 1e-30))
+    chi2 = jnp.maximum(chi2, LOG_EPS)
+    return loc + scale * z / jnp.sqrt(chi2 / jnp.maximum(df, LOG_EPS))
 
 
 def _dc_sample(rng_key, count, cat_counts, dir_alpha):
     """Sample from Dirichlet-Categorical posterior predictive."""
     n = count.astype(jnp.float32)
     k = jnp.array(cat_counts.shape[-1], dtype=jnp.float32)
-    probs = (cat_counts + dir_alpha) / jnp.maximum(n + k * dir_alpha, 1e-30)
-    log_probs = jnp.log(jnp.maximum(probs, 1e-30))
+    probs = (cat_counts + dir_alpha) / jnp.maximum(n + k * dir_alpha, LOG_EPS)
+    log_probs = jnp.log(jnp.maximum(probs, LOG_EPS))
     return jax.random.categorical(rng_key, log_probs).astype(jnp.float32)
 
 
 def _bb_sample(rng_key, count, sum_x, alpha, beta):
     """Sample from Beta-Bernoulli posterior predictive."""
     n = count.astype(jnp.float32)
-    p1 = (sum_x + alpha) / jnp.maximum(n + alpha + beta, 1e-30)
+    p1 = (sum_x + alpha) / jnp.maximum(n + alpha + beta, LOG_EPS)
     return jax.random.bernoulli(rng_key, p1).astype(jnp.float32)
 
 
@@ -432,9 +433,9 @@ def batch_bb_posterior_predictive_logp(
     Skips all type dispatch — caller must ensure all columns are binary.
     """
     n = counts.astype(jnp.float32)
-    p1 = (sum_xs + alphas) / jnp.maximum(n + alphas + betas, 1e-30)
-    log_p1 = jnp.log(jnp.maximum(p1, 1e-30))
-    log_p0 = jnp.log(jnp.maximum(1.0 - p1, 1e-30))
+    p1 = (sum_xs + alphas) / jnp.maximum(n + alphas + betas, LOG_EPS)
+    log_p1 = jnp.log(jnp.maximum(p1, LOG_EPS))
+    log_p0 = jnp.log(jnp.maximum(1.0 - p1, LOG_EPS))
     return jnp.where(xs > 0.5, log_p1, log_p0)
 
 
@@ -454,7 +455,7 @@ def batch_ng_posterior_predictive_logp(
     """
     n = counts.astype(jnp.float32)
     r_n = rs + n
-    mu_n = (rs * mus + sum_xs) / jnp.maximum(r_n, 1e-30)
+    mu_n = (rs * mus + sum_xs) / jnp.maximum(r_n, LOG_EPS)
     nu_n = nus + n
     nu_s = nus * ss
     mean = jnp.where(n > 0, sum_xs / jnp.maximum(n, 1.0), 0.0)
@@ -462,15 +463,15 @@ def batch_ng_posterior_predictive_logp(
         nu_s
         + sum_x_sqs
         - sum_xs**2 / jnp.maximum(n, 1.0)
-        + rs * n * (mus - mean) ** 2 / jnp.maximum(r_n, 1e-30)
+        + rs * n * (mus - mean) ** 2 / jnp.maximum(r_n, LOG_EPS)
     )
     nu_n_s_n = jnp.where(n > 0, nu_n_s_n, nu_s)
-    nu_n_s_n = jnp.maximum(nu_n_s_n, 1e-30)
+    nu_n_s_n = jnp.maximum(nu_n_s_n, LOG_EPS)
 
     df = nu_n
     loc = mu_n
-    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, 1e-30)) * (1.0 + 1.0 / jnp.maximum(r_n, 1e-30))
-    scale = jnp.sqrt(jnp.maximum(scale_sq, 1e-30))
+    scale_sq = (nu_n_s_n / jnp.maximum(nu_n, LOG_EPS)) * (1.0 + 1.0 / jnp.maximum(r_n, LOG_EPS))
+    scale = jnp.sqrt(jnp.maximum(scale_sq, LOG_EPS))
     z = (xs - loc) / scale
 
     return (
@@ -478,7 +479,7 @@ def batch_ng_posterior_predictive_logp(
         - gammaln(df / 2.0)
         - 0.5 * jnp.log(df * jnp.pi)
         - jnp.log(scale)
-        - (df + 1.0) / 2.0 * jnp.log(1.0 + z**2 / jnp.maximum(df, 1e-30))
+        - (df + 1.0) / 2.0 * jnp.log(1.0 + z**2 / jnp.maximum(df, LOG_EPS))
     )
 
 
@@ -493,7 +494,7 @@ def batch_dc_posterior_predictive_logp(
     n = counts.astype(jnp.float32)
     k = jnp.array(cat_counts_batch.shape[-1], dtype=jnp.float32)
     probs = (cat_counts_batch + dir_alphas[:, None]) / jnp.maximum(
-        n[:, None] + k * dir_alphas[:, None], 1e-30
+        n[:, None] + k * dir_alphas[:, None], LOG_EPS
     )
     idxs = jnp.clip(xs.astype(jnp.int32), 0, cat_counts_batch.shape[-1] - 1)
-    return jnp.log(jnp.maximum(probs[jnp.arange(xs.shape[0]), idxs], 1e-30))
+    return jnp.log(jnp.maximum(probs[jnp.arange(xs.shape[0]), idxs], LOG_EPS))

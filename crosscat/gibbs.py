@@ -34,6 +34,7 @@ from crosscat.model import (
     _safe_n_categories,
 )
 from crosscat.types import (
+    LOG_EPS,
     ColumnHypers,
     ColumnType,
     CrossCatState,
@@ -205,7 +206,7 @@ def transition_column_assignments(
                 continue
 
             # CRP prior: proportional to number of columns in this view
-            log_prior = jnp.log(jnp.maximum(count_v, 1e-30).astype(jnp.float32))
+            log_prior = jnp.log(jnp.maximum(count_v, LOG_EPS).astype(jnp.float32))
 
             # Likelihood: how well does column j's data fit view v's row clustering?
             n_clusters = int(jnp.max(view.row_assignments)) + 1
@@ -360,7 +361,7 @@ def transition_column_assignments_mh(
             )
 
             # Log acceptance ratio
-            log_prior_ratio = jnp.log(alpha) - jnp.log(jnp.maximum(float(old_count), 1e-30))
+            log_prior_ratio = jnp.log(alpha) - jnp.log(jnp.maximum(float(old_count), LOG_EPS))
             log_lik_ratio = log_lik_new - log_lik_old
             log_accept = log_prior_ratio + log_lik_ratio
 
@@ -393,8 +394,8 @@ def transition_column_assignments_mh(
             )
 
             new_count = int(jnp.sum(temp_assignments == new_view_idx))
-            log_prior_ratio = jnp.log(jnp.maximum(float(new_count), 1e-30)) - jnp.log(
-                jnp.maximum(float(old_count), 1e-30)
+            log_prior_ratio = jnp.log(jnp.maximum(float(new_count), LOG_EPS)) - jnp.log(
+                jnp.maximum(float(old_count), LOG_EPS)
             )
             log_lik_ratio = log_lik_new - log_lik_old
             log_accept = log_prior_ratio + log_lik_ratio
