@@ -649,3 +649,184 @@ def packed_predictive_cdf(
     """
     samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
     return jnp.mean(samples[:, 0] <= query_val)
+
+
+# ---------------------------------------------------------------------------
+# Multi-chain inference — average queries across posterior samples
+# ---------------------------------------------------------------------------
+
+
+def multi_chain_predictive_probability(
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_cols: list[int],
+    query_vals: Array,
+    *,
+    row_id: int | None = None,
+) -> Array:
+    """Average predictive log probability across multiple chains.
+
+    Computes log-mean-exp: log(mean(exp(log_p_i))) which is the log of the
+    average predictive probability across chains. This is the standard
+    Bayesian model averaging approach.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC posterior samples).
+        data: Observation matrix (n_rows, n_cols).
+        query_cols: Column indices to query.
+        query_vals: Values to evaluate probability at.
+        row_id: If provided, use observed row's cluster assignment.
+
+    Returns:
+        Scalar log probability (averaged across chains).
+    """
+    log_ps = jnp.array(
+        [
+            packed_predictive_probability(p, data, query_cols, query_vals, row_id=row_id)
+            for p in packed_states
+        ]
+    )
+    return jax.scipy.special.logsumexp(log_ps) - jnp.log(jnp.float32(len(packed_states)))
+
+
+def multi_chain_predictive_sample(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_cols: list[int],
+    *,
+    n_samples: int = 1000,
+    row_id: int | None = None,
+) -> Array:
+    """Draw samples from posterior predictive, mixing across chains.
+
+    Allocates samples proportionally across chains (each chain gets
+    n_samples // n_chains samples) for proper Bayesian model averaging.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        query_cols: Column indices to sample.
+        n_samples: Total number of samples.
+        row_id: If provided, use observed row's cluster assignment.
+
+    Returns:
+        Array of shape (n_samples, len(query_cols)).
+    """
+    n_chains = len(packed_states)
+    per_chain = n_samples // n_chains
+    remainder = n_samples - per_chain * n_chains
+
+    all_samples = []
+    keys = jax.random.split(rng_key, n_chains)
+
+    for i, packed in enumerate(packed_states):
+        n_i = per_chain + (1 if i < remainder else 0)
+        if n_i > 0:
+            s = packed_predictive_sample(
+                keys[i], packed, data, query_cols, n_samples=n_i, row_id=row_id
+            )
+            all_samples.append(s)
+
+    return jnp.concatenate(all_samples, axis=0)
+
+
+def multi_chain_anomaly_score(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_row: int,
+) -> Array:
+    """Average anomaly score across multiple chains.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        query_row: Row index to score.
+
+    Returns:
+        Anomaly score in [0, 1] averaged across chains.
+    """
+    scores = jnp.array(
+        [
+            packed_anomaly_score(jax.random.fold_in(rng_key, i), p, data, query_row)
+            for i, p in enumerate(packed_states)
+        ]
+    )
+    return jnp.mean(scores)
+
+
+def multi_chain_impute_and_confidence(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_col: int,
+    *,
+    n_samples: int = 1000,
+) -> tuple[Array, Array]:
+    """Impute a value with confidence, mixing samples across chains.
+
+    Draws samples from all chains, then computes point estimate and
+    confidence from the pooled samples.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        query_col: Column to impute.
+        n_samples: Total samples across all chains.
+
+    Returns:
+        Tuple of (point_estimate, confidence_score).
+    """
+    from crosscat.packed import CONTINUOUS_ID
+
+    # Pool samples across chains
+    samples = multi_chain_predictive_sample(
+        rng_key, packed_states, data, [query_col], n_samples=n_samples
+    )
+    s = samples[:, 0]
+
+    type_id = int(packed_states[0].col_type_ids[query_col])
+
+    if type_id == CONTINUOUS_ID:
+        point_est = jnp.median(s)
+        confidence = 1.0 / (1.0 + jnp.std(s))
+    else:
+        s_int = s.astype(jnp.int32)
+        max_val = int(jnp.max(s_int)) + 1
+        counts = jnp.bincount(s_int, length=max_val)
+        point_est = jnp.argmax(counts).astype(jnp.float32)
+        confidence = counts[jnp.argmax(counts)] / jnp.float32(n_samples)
+
+    return point_est, confidence
+
+
+def multi_chain_predictive_cdf(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_col: int,
+    query_val: Array,
+    *,
+    n_samples: int = 10000,
+) -> Array:
+    """Posterior predictive CDF averaged across chains.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        query_col: Column index.
+        query_val: Value at which to evaluate CDF.
+        n_samples: Total MC samples across all chains.
+
+    Returns:
+        CDF value P(X <= query_val) in [0, 1].
+    """
+    samples = multi_chain_predictive_sample(
+        rng_key, packed_states, data, [query_col], n_samples=n_samples
+    )
+    return jnp.mean(samples[:, 0] <= query_val)
