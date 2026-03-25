@@ -273,6 +273,51 @@ state = unpack_state(packed, column_types, data=data)
 | Medium (binary+cat) | 100 × 65 | 4.8s | 8 min |
 | MNIST 16×16 | 1000 × 257 | 12s | 20 min |
 
+## MNIST Paper Benchmark (Section 3.2 Reproduction)
+
+We reproduce the MNIST experiments from [Mansinghka et al. (2016)](https://jmlr.org/papers/v17/11-392.html), Section 3.2. Setup: 1000 images downsampled to 16×16 binary pixels (256 BetaBernoulli features) + digit label (Categorical), run with 10 independent chains × 100 Gibbs sweeps on a P100 GPU.
+
+**Dependence matrix (Z-matrix)** — Pairwise probability that two columns share the same view, averaged across 10 chains. Block structure reveals groups of dependent pixels. The digit label column (rightmost) shows which pixels carry digit information.
+
+<p align="center">
+  <img src="docs/benchmark-results/mnist-z-matrix.png" alt="Z-matrix: Pairwise dependence probabilities between 256 pixels and digit label" width="600" />
+</p>
+
+**Pixel dependence spatial map** — Maps each pixel's dependence on the digit label back to the 16×16 grid. Blue = foreground (digit-dependent), magenta = background (independent). Matches Paper Figure 13c.
+
+<p align="center">
+  <img src="docs/benchmark-results/mnist-pixel-dependence.png" alt="Foreground vs background pixel separation" width="700" />
+</p>
+
+**Pixel inpainting** — Predict missing pixels from partial observations. At 30% observed, the model achieves 93.1% pixel accuracy. Matches Paper Figure 14.
+
+<p align="center">
+  <img src="docs/benchmark-results/mnist-inpainting.png" alt="Predicted images given sparse observations" width="700" />
+</p>
+
+**Digit-cluster contingency** — How digits map to inferred row clusters. The model discovers 30 clusters capturing sub-digit handwriting variation, with clear digit-cluster correspondence.
+
+<p align="center">
+  <img src="docs/benchmark-results/mnist-contingency.png" alt="Digit-cluster correspondence" width="800" />
+</p>
+
+**Classification ROC** — Digit classification via posterior predictive P(digit | pixels) compared against SVM baselines. CrossCat achieves 79% accuracy as a generative model — competitive with linear SVM despite not being optimized for classification.
+
+<p align="center">
+  <img src="docs/benchmark-results/mnist-classification-roc.png" alt="Classification ROC curves vs SVM baselines" width="700" />
+</p>
+
+| Metric | Result |
+|--------|--------|
+| Pixel dependence map | Foreground/background separation matches paper Fig 13c |
+| Inpainting accuracy (30% observed) | 93.1% |
+| Classification accuracy | 79.0% (generative, no tuning) |
+| Posterior views | 4 views (mode across 10 chains) |
+| Row clusters | 28-31 per view |
+| Total inference time | ~3.5 hours (10 chains × 100 sweeps, P100) |
+
+> **Run it yourself:** Open [`benchmarks/mnist_paper_colab.ipynb`](benchmarks/mnist_paper_colab.ipynb) in Kaggle (P100) or Colab (T4/A100). See the [benchmark README](benchmarks/README.md) for configuration options.
+
 Save and resume long-running inference with checkpointing:
 
 ```python
