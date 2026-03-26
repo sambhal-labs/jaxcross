@@ -52,8 +52,8 @@ The package is `crosscat/` with these core modules:
   - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`, `batch_packed_states()`, `unbatch_packed_states()`, `select_best_chain()`
   - `components.py` — unified scoring (log marginal, posterior predictive) via `jnp.where` type dispatch + batch-vectorized type-specialized scoring (`batch_bb_posterior_predictive_logp`, `batch_ng_posterior_predictive_logp`, `batch_dc_posterior_predictive_logp`)
   - `suffstats.py` — vectorized sufficient statistics (matrix ops, batched scatter add/remove)
-  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths
-  - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `clear_cache()`)
+  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths. Sub-kernels have `@jax.jit` for independent compilation.
+  - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `compile_kernels()`, `clear_cache()`)
 
 - **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus multi-chain support:
   - **Single-state:** `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
@@ -85,7 +85,11 @@ For streaming/online inference:
 packed, data = packed_insert_rows(key, packed, data, new_rows)
 ```
 
-**Known issue:** JIT compilation of `packed_gibbs_sweep` takes 90+ minutes for large datasets (257+ columns, e.g. MNIST). This is the #1 performance bottleneck. Kernel splitting and AOT cache improvements are needed.
+**Two sweep modes:**
+- `packed_gibbs_sweep` — uses `lax.scan` for maximum throughput in production (multi-sweep, multi-chain). First compile is cached by XLA persistent cache (auto-enabled on import).
+- `packed_gibbs_step` — calls `@jax.jit` sub-kernels independently (4 smaller compilations). Used by constraint enforcement and interactive/exploratory workflows.
+
+**Compilation caching:** XLA persistent cache is auto-enabled when `crosscat.packed` is imported. Use `compile_kernels(packed, data)` to pre-compile all sub-kernels for a given shape.
 
 ## Key Patterns
 
