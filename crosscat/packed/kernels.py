@@ -31,7 +31,6 @@ from crosscat.packed.state import (
     CATEGORICAL_ID,
     CONTINUOUS_ID,
     CYCLIC_ID,
-    ORDINAL_ID,
     PackedCrossCatState,
 )
 from crosscat.packed.suffstats import (
@@ -80,6 +79,7 @@ def _score_row_one_cluster_typed(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     n_columns: Array,
     dominant_type: Array,
 ) -> Array:
@@ -148,6 +148,7 @@ def _score_row_one_cluster_typed(
         hyper_kappa,
         hyper_vm_a,
         hyper_vm_mu,
+        hyper_cutpoints,
         n_columns,
     )
 
@@ -158,7 +159,7 @@ def _score_row_one_cluster_typed(
             dominant_type == CONTINUOUS_ID,
             ng_score,
             jnp.where(
-                (dominant_type == CATEGORICAL_ID) | (dominant_type == ORDINAL_ID),
+                dominant_type == CATEGORICAL_ID,
                 dc_score,
                 general_score,
             ),
@@ -191,6 +192,7 @@ def _score_row_one_cluster(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     n_columns: Array,
 ) -> Array:
     """Score a row against ONE cluster using vectorized ops over columns.
@@ -234,6 +236,7 @@ def _score_row_one_cluster(
     h_kappa = hyper_kappa[safe_col_indices]
     h_vm_a = hyper_vm_a[safe_col_indices]
     h_vm_mu = hyper_vm_mu[safe_col_indices]
+    h_cutpoints = hyper_cutpoints[safe_col_indices]
 
     # vmap posterior predictive over all columns in parallel
     logps = jax.vmap(unified_posterior_predictive_logp)(
@@ -255,6 +258,7 @@ def _score_row_one_cluster(
         h_kappa,
         h_vm_a,
         h_vm_mu,
+        h_cutpoints,
     )  # (max_cpv,)
 
     return jnp.sum(jnp.where(valid, logps, 0.0))
@@ -282,6 +286,7 @@ def _score_row_all_clusters(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     crp_alpha: Array,
     max_clusters: int,
     dominant_type: Array | None = None,
@@ -339,6 +344,7 @@ def _score_row_all_clusters(
                 hyper_kappa,
                 hyper_vm_a,
                 hyper_vm_mu,
+                hyper_cutpoints,
                 n_columns,
                 dominant_type,
             )
@@ -365,6 +371,7 @@ def _score_row_all_clusters(
                 hyper_kappa,
                 hyper_vm_a,
                 hyper_vm_mu,
+                hyper_cutpoints,
                 n_columns,
             )
 
@@ -400,6 +407,7 @@ def _score_row_all_clusters(
             hyper_kappa,
             hyper_vm_a,
             hyper_vm_mu,
+            hyper_cutpoints,
             n_columns,
             dominant_type,
         )
@@ -419,6 +427,7 @@ def _score_row_all_clusters(
             hyper_kappa,
             hyper_vm_a,
             hyper_vm_mu,
+            hyper_cutpoints,
             n_columns,
         )
     log_prior_new = jnp.log(crp_alpha)
@@ -572,6 +581,7 @@ def packed_transition_row_assignments(
                 packed.hyper_kappa,
                 packed.hyper_vm_a,
                 packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
                 alpha,
                 max_c,
                 dominant_type=dom_type,
@@ -1154,6 +1164,7 @@ def _score_column_in_view(
     kappa: Array,
     vm_a: Array,
     vm_mu: Array,
+    cutpoints: Array,
     max_clusters: int,
     max_categories: int,
 ) -> Array:
@@ -1214,6 +1225,7 @@ def _score_column_in_view(
             kappa,
             vm_a,
             vm_mu,
+            cutpoints,
         )
 
     log_mls = jax.vmap(score_one_cluster)(
@@ -1289,6 +1301,7 @@ def packed_transition_column_assignments(
         h_k = packed.hyper_kappa[j]
         h_vm_a = packed.hyper_vm_a[j]
         h_vm = packed.hyper_vm_mu[j]
+        h_cutpoints = packed.hyper_cutpoints[j]
 
         # Column counts per view, excluding column j
         counts_excl = view_n_cols.at[old_view].add(-1)
@@ -1314,6 +1327,7 @@ def packed_transition_column_assignments(
                 h_k,
                 h_vm_a,
                 h_vm,
+                h_cutpoints,
                 max_clusters,
                 max_cats,
             )
@@ -1359,6 +1373,7 @@ def packed_transition_column_assignments(
             h_k,
             h_vm_a,
             h_vm,
+            h_cutpoints,
             max_clusters,
             max_cats,
         )
@@ -1670,6 +1685,7 @@ def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
                 packed.hyper_kappa[col_idx],
                 packed.hyper_vm_a[col_idx],
                 packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
             )
 
         # vmap over clusters and columns
