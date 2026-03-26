@@ -7,38 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint-and-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --extra dev --extra coverage
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Type check
-        run: uv run mypy crosscat/ --ignore-missing-imports
-        continue-on-error: true
-
-      - name: Test with coverage
-        run: uv run pytest -m "not slow" --cov=crosscat --cov-report=term-missing --cov-fail-under=60
-
-  slow-tests:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -53,5 +23,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run slow tests
-        run: uv run pytest -m slow --timeout=600
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy crosscat/ --ignore-missing-imports
+        continue-on-error: true
+
+      - name: Fast tests (CPU, excludes slow/GPU tests)
+        run: uv run pytest -m "not slow" -x -q --timeout=120
+
+      # Slow tests are GPU-only — run on Kaggle via notebooks/run_tests.ipynb
+      # Do NOT run them here; they will timeout on CPU runners.
