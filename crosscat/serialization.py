@@ -25,7 +25,7 @@ from crosscat.packed.state import (
 )
 from crosscat.types import ColumnType, CrossCatState
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
@@ -100,15 +100,25 @@ def load_packed_state(
         metadata = json.load(f)
 
     version = metadata.get("schema_version", 0)
-    if version != _SCHEMA_VERSION:
+    if version > _SCHEMA_VERSION:
         raise ValueError(
-            f"Unsupported schema version {version} (expected {_SCHEMA_VERSION}). "
-            f"This state was saved with a different version of jax-crosscat."
+            f"Unsupported schema version {version} (expected <={_SCHEMA_VERSION}). "
+            f"This state was saved with a newer version of jax-crosscat."
         )
 
     # Arrays
     npz = np.load(path / "arrays.npz")
-    kwargs = {name: jnp.array(npz[name]) for name in _ARRAY_FIELDS}
+    kwargs = {}
+    for name in _ARRAY_FIELDS:
+        if name in npz:
+            kwargs[name] = jnp.array(npz[name])
+        elif name == "hyper_cutpoints":
+            # Migration from schema v1: synthesize default cutpoints (+inf padding)
+            n_cols = int(metadata["n_cols"])
+            max_cats = int(metadata["max_categories"])
+            kwargs[name] = jnp.full((n_cols, max_cats - 1), jnp.inf)
+        else:
+            raise ValueError(f"Missing required array field '{name}' in saved state")
     for name in _STATIC_FIELDS:
         kwargs[name] = int(metadata[name])
 
