@@ -140,6 +140,7 @@ def _sample_one_column(
         packed.hyper_alpha[col_idx],
         packed.hyper_beta[col_idx],
         packed.hyper_kappa[col_idx],
+        packed.hyper_vm_a[col_idx],
         packed.hyper_vm_mu[col_idx],
         packed.hyper_cutpoints[col_idx],
     )
