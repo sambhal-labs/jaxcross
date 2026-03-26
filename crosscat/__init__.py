@@ -49,6 +49,7 @@ from crosscat.packed import (
     multi_chain_packed_gibbs_sweep,
     pack_state,
     packed_gibbs_sweep,
+    packed_insert_rows,
     packed_log_joint,
     packed_transition_column_assignments,
     packed_transition_column_hypers,
@@ -78,6 +79,7 @@ from crosscat.packed_inference import (
     packed_predictive_sample,
     packed_row_similarity,
     packed_row_typicality,
+    packed_sample_and_insert,
 )
 from crosscat.serialization import (
     load_latest_checkpoint,
@@ -166,6 +168,7 @@ __all__ = [
     "multi_chain_packed_gibbs_sweep",
     "pack_state",
     "packed_gibbs_sweep",
+    "packed_insert_rows",
     "packed_log_joint",
     "packed_transition_column_assignments",
     "packed_transition_column_hypers",
@@ -195,4 +198,5 @@ __all__ = [
     "packed_predictive_sample",
     "packed_row_similarity",
     "packed_row_typicality",
+    "packed_sample_and_insert",
 ]
