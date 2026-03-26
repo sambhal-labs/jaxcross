@@ -7,8 +7,8 @@ import jax.numpy as jnp
 import pytest
 
 from crosscat.diagnostics import collect_diagnostics
-from crosscat.gibbs import gibbs_sweep
 from crosscat.model import initialize
+from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 from crosscat.synthetic import add_missing_data, generate_crosscat_data
 from crosscat.types import ColumnType
 
@@ -108,20 +108,29 @@ def synthetic_missing_data():
 def run_multi_chain_with_diagnostics(data, column_types, *, n_chains=4, n_sweeps=20, seed=42):
     """Run multi-chain inference collecting diagnostics at each sweep.
 
+    Uses packed Gibbs kernels for speed, unpacking periodically for diagnostics.
+
     Returns:
         Tuple of (final_states, all_diagnostics) where all_diagnostics
         is a list of lists: all_diagnostics[chain][sweep] = diagnostics dict.
     """
     key = jax.random.key(seed)
-    states = initialize(key, data, column_types, n_chains=n_chains)
+    init_states = initialize(key, data, column_types, n_chains=n_chains)
     all_diagnostics = []
-    for i, state in enumerate(states):
+    final_states = []
+    diag_interval = max(1, n_sweeps // 5)
+    for i, state in enumerate(init_states):
         chain_diags = []
+        packed = pack_state(state)
         k = jax.random.fold_in(key, i + 1000)
-        for _s in range(n_sweeps):
+        done = 0
+        while done < n_sweeps:
+            batch = min(diag_interval, n_sweeps - done)
             k, subkey = jax.random.split(k)
-            state = gibbs_sweep(subkey, state, data, n_sweeps=1)
+            packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=batch)
+            done += batch
+            state = unpack_state(packed, column_types, data=data)
             chain_diags.append(collect_diagnostics(state, data))
-        states[i] = state
+        final_states.append(state)
         all_diagnostics.append(chain_diags)
-    return states, all_diagnostics
+    return final_states, all_diagnostics
