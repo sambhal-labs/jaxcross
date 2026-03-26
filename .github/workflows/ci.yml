@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -33,8 +33,6 @@ jobs:
         run: uv run mypy crosscat/ --ignore-missing-imports
         continue-on-error: true
 
-      - name: Fast tests (CPU, excludes slow/GPU tests)
-        run: uv run pytest -m "not slow" -x -q --timeout=120
-
-      # Slow tests are GPU-only — run on Kaggle via notebooks/run_tests.ipynb
-      # Do NOT run them here; they will timeout on CPU runners.
+      # All tests (fast + slow) require JAX JIT compilation which is
+      # too slow for CPU runners. Run tests on Kaggle P100 GPU via
+      # notebooks/run_tests.ipynb instead.
