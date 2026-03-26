@@ -565,9 +565,9 @@ class TestSafeNCategories:
 
 
 class TestOrdinalUsesHypers:
-    """Tests that OrderedLogistic properly uses dirichlet_alpha from hypers."""
+    """Tests that OrderedLogistic properly uses cutpoints and prior hypers."""
 
-    def test_log_marginal_uses_alpha(self):
+    def test_log_marginal_uses_cutpoints(self):
         from crosscat.components import OrderedLogistic
         from crosscat.types import SufficientStats
 
@@ -577,15 +577,25 @@ class TestOrdinalUsesHypers:
             count=jnp.array(10, dtype=jnp.int32),
             category_counts=counts,
         )
-        hypers_1 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(1.0))
-        hypers_2 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(5.0))
+        hypers_1 = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-1.0, 1.0]),
+        )
+        hypers_2 = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-0.5, 0.5]),
+        )
 
         lml_1 = OrderedLogistic.log_marginal_likelihood(ss, hypers_1)
         lml_2 = OrderedLogistic.log_marginal_likelihood(ss, hypers_2)
-        # Different alpha should give different log marginals
+        # Different cutpoints should give different log marginals
         assert not jnp.allclose(lml_1, lml_2)
 
-    def test_posterior_predictive_uses_alpha(self):
+    def test_posterior_predictive_uses_cutpoints(self):
         from crosscat.components import OrderedLogistic
         from crosscat.types import SufficientStats
 
@@ -595,13 +605,60 @@ class TestOrdinalUsesHypers:
             count=jnp.array(10, dtype=jnp.int32),
             category_counts=counts,
         )
-        hypers_1 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(0.1))
-        hypers_2 = ColumnHypers(column_type=ColumnType.ORDINAL, dirichlet_alpha=jnp.array(10.0))
+        hypers_1 = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-1.0, 1.0]),
+        )
+        hypers_2 = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-3.0, 3.0]),
+        )
 
         logp_1 = OrderedLogistic.posterior_predictive_logp(jnp.array(0.0), ss, hypers_1)
         logp_2 = OrderedLogistic.posterior_predictive_logp(jnp.array(0.0), ss, hypers_2)
-        # Small alpha concentrates on observed counts, large alpha smooths
-        assert float(logp_1) > float(logp_2)
+        # Different cutpoints → different predictive probabilities
+        assert not jnp.allclose(logp_1, logp_2)
+
+    def test_log_marginal_empty_is_zero(self):
+        from crosscat.components import OrderedLogistic
+        from crosscat.types import SufficientStats
+
+        ss = SufficientStats(
+            column_type=ColumnType.ORDINAL,
+            count=jnp.array(0, dtype=jnp.int32),
+            category_counts=jnp.zeros(3),
+        )
+        hypers = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-1.0, 1.0]),
+        )
+        assert float(OrderedLogistic.log_marginal_likelihood(ss, hypers)) == 0.0
+
+    def test_posterior_predictive_finite(self):
+        from crosscat.components import OrderedLogistic
+        from crosscat.types import SufficientStats
+
+        counts = jnp.array([5.0, 3.0, 2.0])
+        ss = SufficientStats(
+            column_type=ColumnType.ORDINAL,
+            count=jnp.array(10, dtype=jnp.int32),
+            category_counts=counts,
+        )
+        hypers = ColumnHypers(
+            column_type=ColumnType.ORDINAL,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.array([-1.0, 1.0]),
+        )
+        for k in range(3):
+            logp = OrderedLogistic.posterior_predictive_logp(jnp.array(float(k)), ss, hypers)
+            assert jnp.isfinite(logp), f"Non-finite predictive at level {k}: {logp}"
 
 
 class TestPackStateValidation:

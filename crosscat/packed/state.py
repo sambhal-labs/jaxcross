@@ -56,6 +56,7 @@ _ARRAY_FIELDS = (
     "hyper_kappa",
     "hyper_vm_a",
     "hyper_vm_mu",
+    "hyper_cutpoints",
     "view_column_indices",
     "view_n_columns",
     "view_row_assignments",
@@ -108,6 +109,7 @@ class PackedCrossCatState:
     hyper_kappa: Array  # (n_cols,)
     hyper_vm_a: Array  # (n_cols,) — prior concentration on mean direction
     hyper_vm_mu: Array  # (n_cols,) — prior mean direction (b)
+    hyper_cutpoints: Array  # (n_cols, max_categories - 1) — ordinal cutpoints, +inf=pad
 
     # View data — leading (max_views,) dimension
     view_column_indices: Array  # (max_views, max_cols_per_view) int, -1=invalid
@@ -237,6 +239,13 @@ def pack_state(
         if h.vm_mu is not None:
             hyper_vm_mu = hyper_vm_mu.at[j].set(float(h.vm_mu))
 
+    # Pack ordinal cutpoints — padded with +inf (sigmoid(+inf - μ) = 1 → prob 0)
+    hyper_cutpoints = jnp.full((n_cols, max_categories - 1), jnp.inf)
+    for j, h in enumerate(state.column_hypers):
+        if h.cutpoints is not None:
+            n_cp = len(h.cutpoints)
+            hyper_cutpoints = hyper_cutpoints.at[j, :n_cp].set(jnp.array(h.cutpoints))
+
     # Pack view data
     view_column_indices = jnp.full((max_views, max_cols_per_view), -1, dtype=jnp.int32)
     view_n_columns = jnp.zeros(max_views, dtype=jnp.int32)
@@ -304,6 +313,7 @@ def pack_state(
         hyper_kappa=hyper_kappa,
         hyper_vm_a=hyper_vm_a,
         hyper_vm_mu=hyper_vm_mu,
+        hyper_cutpoints=hyper_cutpoints,
         view_column_indices=view_column_indices,
         view_n_columns=view_n_columns,
         view_row_assignments=view_row_assignments,
@@ -367,8 +377,9 @@ def unpack_state(
         elif ct == ColumnType.ORDINAL:
             h = ColumnHypers(
                 column_type=ct,
-                dirichlet_alpha=packed.hyper_dirichlet_alpha[j],
-                cutpoints=None,
+                mu=packed.hyper_mu[j],
+                s=packed.hyper_s[j],
+                cutpoints=packed.hyper_cutpoints[j],
             )
         elif ct == ColumnType.CYCLIC:
             h = ColumnHypers(

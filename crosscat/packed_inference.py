@@ -92,6 +92,7 @@ def _logp_one_column_mixture(
             packed.hyper_kappa[col_idx],
             packed.hyper_vm_a[col_idx],
             packed.hyper_vm_mu[col_idx],
+            packed.hyper_cutpoints[col_idx],
         )
 
     cluster_indices = jnp.arange(max_k)
@@ -140,6 +141,7 @@ def _sample_one_column(
         packed.hyper_beta[col_idx],
         packed.hyper_kappa[col_idx],
         packed.hyper_vm_mu[col_idx],
+        packed.hyper_cutpoints[col_idx],
     )
 
 
@@ -270,6 +272,7 @@ def packed_predictive_sample(
                 packed.hyper_kappa[c],
                 packed.hyper_vm_a[c],
                 packed.hyper_vm_mu[c],
+                packed.hyper_cutpoints[c],
             )
 
         q_indices = jnp.arange(n_q)
@@ -370,6 +373,7 @@ def _packed_estimate_mi_sample(
             packed.hyper_kappa[col],
             packed.hyper_vm_a[col],
             packed.hyper_vm_mu[col],
+            packed.hyper_cutpoints[col],
         )
 
     hypers_i = _get_hypers(col_i)

@@ -17,6 +17,7 @@ from crosscat.packed.components import (
     _bb_log_marginal,
     _dc_log_marginal,
     _ng_log_marginal,
+    _ol_log_marginal,
     _vm_log_marginal,
     batch_bb_posterior_predictive_logp,
     batch_dc_posterior_predictive_logp,
@@ -80,6 +81,7 @@ def _score_row_one_cluster_typed(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     n_columns: Array,
     dominant_type: Array,
 ) -> Array:
@@ -148,6 +150,7 @@ def _score_row_one_cluster_typed(
         hyper_kappa,
         hyper_vm_a,
         hyper_vm_mu,
+        hyper_cutpoints,
         n_columns,
     )
 
@@ -158,7 +161,7 @@ def _score_row_one_cluster_typed(
             dominant_type == CONTINUOUS_ID,
             ng_score,
             jnp.where(
-                (dominant_type == CATEGORICAL_ID) | (dominant_type == ORDINAL_ID),
+                dominant_type == CATEGORICAL_ID,
                 dc_score,
                 general_score,
             ),
@@ -191,6 +194,7 @@ def _score_row_one_cluster(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     n_columns: Array,
 ) -> Array:
     """Score a row against ONE cluster using vectorized ops over columns.
@@ -234,6 +238,7 @@ def _score_row_one_cluster(
     h_kappa = hyper_kappa[safe_col_indices]
     h_vm_a = hyper_vm_a[safe_col_indices]
     h_vm_mu = hyper_vm_mu[safe_col_indices]
+    h_cutpoints = hyper_cutpoints[safe_col_indices]
 
     # vmap posterior predictive over all columns in parallel
     logps = jax.vmap(unified_posterior_predictive_logp)(
@@ -255,6 +260,7 @@ def _score_row_one_cluster(
         h_kappa,
         h_vm_a,
         h_vm_mu,
+        h_cutpoints,
     )  # (max_cpv,)
 
     return jnp.sum(jnp.where(valid, logps, 0.0))
@@ -282,6 +288,7 @@ def _score_row_all_clusters(
     hyper_kappa: Array,
     hyper_vm_a: Array,
     hyper_vm_mu: Array,
+    hyper_cutpoints: Array,
     crp_alpha: Array,
     max_clusters: int,
     dominant_type: Array | None = None,
@@ -339,6 +346,7 @@ def _score_row_all_clusters(
                 hyper_kappa,
                 hyper_vm_a,
                 hyper_vm_mu,
+                hyper_cutpoints,
                 n_columns,
                 dominant_type,
             )
@@ -365,6 +373,7 @@ def _score_row_all_clusters(
                 hyper_kappa,
                 hyper_vm_a,
                 hyper_vm_mu,
+                hyper_cutpoints,
                 n_columns,
             )
 
@@ -400,6 +409,7 @@ def _score_row_all_clusters(
             hyper_kappa,
             hyper_vm_a,
             hyper_vm_mu,
+            hyper_cutpoints,
             n_columns,
             dominant_type,
         )
@@ -419,6 +429,7 @@ def _score_row_all_clusters(
             hyper_kappa,
             hyper_vm_a,
             hyper_vm_mu,
+            hyper_cutpoints,
             n_columns,
         )
     log_prior_new = jnp.log(crp_alpha)
@@ -572,6 +583,7 @@ def packed_transition_row_assignments(
                 packed.hyper_kappa,
                 packed.hyper_vm_a,
                 packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
                 alpha,
                 max_c,
                 dominant_type=dom_type,
@@ -942,10 +954,72 @@ def packed_transition_column_hypers(
         vm_b_scores = vm_b_scores - jnp.max(vm_b_scores)
         new_vm_mu_val = b_grid[jax.random.categorical(k3, vm_b_scores)]
 
+        # --- Ordinal: sequential cutpoint Gibbs via lax.scan ---
+        k5, k6 = jax.random.split(col_keys[j])[:2]
+        max_cats = packed.max_categories
+        n_cutpoints = max_cats - 1
+        nc = packed.view_n_clusters[v_idx]
+        counts_col_cat = packed.ss_cat_counts[v_idx, :, local_idx]  # (max_c, max_cats)
+
+        def _update_one_cutpoint(carry, k_idx):
+            cutpts, key = carry
+            k_cp, key = jax.random.split(key)
+            lower = jnp.where(k_idx > 0, cutpts[k_idx - 1], jnp.float32(-10.0))
+            upper = jnp.where(k_idx < n_cutpoints - 1, cutpts[k_idx + 1], jnp.float32(10.0))
+            grid = jnp.linspace(lower + 0.01, upper - 0.01, 31)
+
+            def score_candidate(c_val):
+                test_cp = cutpts.at[k_idx].set(c_val)
+                per_cluster = jax.vmap(
+                    lambda c_idx: _ol_log_marginal(
+                        counts_col_cat[c_idx].sum().astype(jnp.int32),
+                        counts_col_cat[c_idx],
+                        test_cp,
+                        packed.hyper_mu[j],
+                        packed.hyper_s[j],
+                    )
+                )(jnp.arange(max_c))
+                return jnp.sum(jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0))
+
+            scores = jax.vmap(score_candidate)(grid)
+            scores = scores - jnp.max(scores)
+            chosen = grid[jax.random.categorical(k_cp, scores)]
+            new_cutpts = cutpts.at[k_idx].set(chosen)
+            return (new_cutpts, key), None
+
+        (new_cutpoints_val, _), _ = jax.lax.scan(
+            _update_one_cutpoint,
+            (packed.hyper_cutpoints[j], k5),
+            jnp.arange(n_cutpoints),
+        )
+
+        # Sample mu prior variance (s) for ordinal via log-spaced grid
+        s_grid_ord = jnp.exp(jnp.linspace(jnp.log(0.1), jnp.log(100.0), 31))
+
+        def score_ord_s(s_val):
+            per_cluster = jax.vmap(
+                lambda c_idx: _ol_log_marginal(
+                    counts_col_cat[c_idx].sum().astype(jnp.int32),
+                    counts_col_cat[c_idx],
+                    new_cutpoints_val,
+                    packed.hyper_mu[j],
+                    s_val,
+                )
+            )(jnp.arange(max_c))
+            return jnp.sum(jnp.where(jnp.arange(max_c) < nc, per_cluster, 0.0))
+
+        ord_s_scores = jax.vmap(score_ord_s)(s_grid_ord)
+        ord_s_scores = ord_s_scores - jnp.max(ord_s_scores)
+        new_s_ordinal = s_grid_ord[jax.random.categorical(k6, ord_s_scores)]
+
         # --- Select results based on type_id ---
         out_mu = jnp.where(type_id == CONTINUOUS_ID, new_mu_val, packed.hyper_mu[j])
         out_r = jnp.where(type_id == CONTINUOUS_ID, new_r_val, packed.hyper_r[j])
-        out_s = jnp.where(type_id == CONTINUOUS_ID, new_s_val, packed.hyper_s[j])
+        out_s = jnp.where(
+            type_id == CONTINUOUS_ID,
+            new_s_val,
+            jnp.where(type_id == ORDINAL_ID, new_s_ordinal, packed.hyper_s[j]),
+        )
         out_nu = jnp.where(type_id == CONTINUOUS_ID, new_nu_val, packed.hyper_nu[j])
         out_dir_alpha = jnp.where(
             type_id == CATEGORICAL_ID, new_dir_alpha_val, packed.hyper_dirichlet_alpha[j]
@@ -955,6 +1029,9 @@ def packed_transition_column_hypers(
         out_kappa = jnp.where(type_id == CYCLIC_ID, new_kappa_val, packed.hyper_kappa[j])
         out_vm_a = jnp.where(type_id == CYCLIC_ID, new_vm_a_val, packed.hyper_vm_a[j])
         out_vm_mu = jnp.where(type_id == CYCLIC_ID, new_vm_mu_val, packed.hyper_vm_mu[j])
+        out_cutpoints = jnp.where(
+            type_id == ORDINAL_ID, new_cutpoints_val, packed.hyper_cutpoints[j]
+        )
 
         return (
             out_mu,
@@ -967,6 +1044,7 @@ def packed_transition_column_hypers(
             out_kappa,
             out_vm_a,
             out_vm_mu,
+            out_cutpoints,
         )
 
     # vmap over all columns
@@ -981,6 +1059,7 @@ def packed_transition_column_hypers(
         new_kappa,
         new_vm_a,
         new_vm_mu,
+        new_cutpoints,
     ) = jax.vmap(process_one_column)(jnp.arange(n_cols))
 
     updates = {
@@ -994,6 +1073,7 @@ def packed_transition_column_hypers(
         "hyper_kappa": new_kappa,
         "hyper_vm_a": new_vm_a,
         "hyper_vm_mu": new_vm_mu,
+        "hyper_cutpoints": new_cutpoints,
     }
     return PackedCrossCatState(
         **{name: updates.get(name, getattr(packed, name)) for name in _ARRAY_FIELDS},
@@ -1154,6 +1234,7 @@ def _score_column_in_view(
     kappa: Array,
     vm_a: Array,
     vm_mu: Array,
+    cutpoints: Array,
     max_clusters: int,
     max_categories: int,
 ) -> Array:
@@ -1214,6 +1295,7 @@ def _score_column_in_view(
             kappa,
             vm_a,
             vm_mu,
+            cutpoints,
         )
 
     log_mls = jax.vmap(score_one_cluster)(
@@ -1289,6 +1371,7 @@ def packed_transition_column_assignments(
         h_k = packed.hyper_kappa[j]
         h_vm_a = packed.hyper_vm_a[j]
         h_vm = packed.hyper_vm_mu[j]
+        h_cutpoints = packed.hyper_cutpoints[j]
 
         # Column counts per view, excluding column j
         counts_excl = view_n_cols.at[old_view].add(-1)
@@ -1314,6 +1397,7 @@ def packed_transition_column_assignments(
                 h_k,
                 h_vm_a,
                 h_vm,
+                h_cutpoints,
                 max_clusters,
                 max_cats,
             )
@@ -1359,6 +1443,7 @@ def packed_transition_column_assignments(
             h_k,
             h_vm_a,
             h_vm,
+            h_cutpoints,
             max_clusters,
             max_cats,
         )
@@ -1670,6 +1755,7 @@ def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
                 packed.hyper_kappa[col_idx],
                 packed.hyper_vm_a[col_idx],
                 packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
             )
 
         # vmap over clusters and columns
@@ -1835,6 +1921,7 @@ def packed_insert_rows(
                 packed.hyper_kappa,
                 packed.hyper_vm_a,
                 packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
                 packed.view_row_crp_alpha[v],
                 max_k,
             )
@@ -1898,6 +1985,7 @@ def packed_insert_rows(
         hyper_kappa=packed.hyper_kappa,
         hyper_vm_a=packed.hyper_vm_a,
         hyper_vm_mu=packed.hyper_vm_mu,
+        hyper_cutpoints=packed.hyper_cutpoints,
         view_column_indices=packed.view_column_indices,
         view_n_columns=packed.view_n_columns,
         view_row_assignments=new_view_row_assigns,
