@@ -10,7 +10,7 @@ from __future__ import annotations
 import jax
 from jax import Array
 
-from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.packed import pack_state, packed_gibbs_step, unpack_state
 from crosscat.types import CrossCatState
 
 
@@ -83,8 +83,9 @@ def ensure_col_dep_constraints(
     """
     packed = pack_state(state)
     for _attempt in range(max_rejections):
-        rng_key, subkey = jax.random.split(rng_key)
-        packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=n_sweeps_per_attempt)
+        for _ in range(n_sweeps_per_attempt):
+            rng_key, step_key = jax.random.split(rng_key)
+            packed = packed_gibbs_step(step_key, packed, data)
         state = unpack_state(packed, state.column_types, data=data)
 
         if check_all_column_constraints(state, constraints):
@@ -153,8 +154,9 @@ def ensure_row_dep_constraint(
     """
     packed = pack_state(state)
     for _attempt in range(max_iterations):
-        rng_key, subkey = jax.random.split(rng_key)
-        packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=n_sweeps_per_attempt)
+        for _ in range(n_sweeps_per_attempt):
+            rng_key, step_key = jax.random.split(rng_key)
+            packed = packed_gibbs_step(step_key, packed, data)
         state = unpack_state(packed, state.column_types, data=data)
 
         if check_row_dep_constraint(state, row_a, row_b, dependent, view_idx=view_idx):

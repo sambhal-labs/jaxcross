@@ -6,6 +6,8 @@ Extracted from packed_state.py (v2 kernels) with _v2 suffixes removed.
 
 from __future__ import annotations
 
+import functools
+
 import jax
 import jax.numpy as jnp
 from jax import Array
@@ -459,6 +461,7 @@ def _compact_clusters(
 # ---------------------------------------------------------------------------
 
 
+@functools.partial(jax.jit, static_argnames=("recompute_suffstats",))
 def packed_transition_row_assignments(
     rng_key: Array,
     packed: PackedCrossCatState,
@@ -675,6 +678,7 @@ def packed_transition_row_assignments(
 # ---------------------------------------------------------------------------
 
 
+@jax.jit
 def packed_transition_column_hypers(
     rng_key: Array,
     packed: PackedCrossCatState,
@@ -1002,6 +1006,7 @@ def packed_transition_column_hypers(
 # ---------------------------------------------------------------------------
 
 
+@jax.jit
 def packed_transition_crp_alphas(
     rng_key: Array,
     packed: PackedCrossCatState,
@@ -1224,6 +1229,7 @@ def _score_column_in_view(
 # ---------------------------------------------------------------------------
 
 
+@jax.jit
 def packed_transition_column_assignments(
     rng_key: Array,
     packed: PackedCrossCatState,
@@ -1554,6 +1560,37 @@ def packed_gibbs_sweep(
 
     (result, _), _ = jax.lax.scan(one_sweep, (packed, rng_key), jnp.arange(n_sweeps))
     return result
+
+
+def packed_gibbs_step(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+) -> PackedCrossCatState:
+    """One Gibbs sweep using independently-compiled sub-kernels.
+
+    Unlike packed_gibbs_sweep (which uses lax.scan for maximum throughput),
+    this calls each kernel as a separate JIT compilation unit. Useful for:
+    - Constraint enforcement loops (avoid monolithic recompilation)
+    - Interactive/exploratory use (faster first compile)
+    - Cases where sub-kernels are also called individually
+
+    For production multi-sweep inference, use packed_gibbs_sweep instead.
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+
+    Returns:
+        Updated PackedCrossCatState after one sweep.
+    """
+    k1, k2, k3, k4, _ = jax.random.split(rng_key, 5)
+    packed = packed_transition_row_assignments(k1, packed, data)
+    packed = packed_transition_column_assignments(k2, packed, data)
+    packed = packed_transition_column_hypers(k3, packed, data)
+    packed = packed_transition_crp_alphas(k4, packed)
+    return packed
 
 
 # ---------------------------------------------------------------------------

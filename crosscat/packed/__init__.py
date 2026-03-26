@@ -5,8 +5,10 @@ Sub-modules:
     components  — Conjugate component scoring (log marginal, posterior predictive)
     suffstats   — Sufficient statistics computation and incremental updates
     kernels     — Gibbs kernels (row/column assignments, hypers, CRP alphas, sweep)
+    aot_cache   — XLA persistent compilation cache
 """
 
+from crosscat.packed.aot_cache import clear_cache, compile_kernels, enable_xla_cache
 from crosscat.packed.components import (
     unified_log_marginal,
     unified_posterior_predictive_logp,
@@ -14,6 +16,7 @@ from crosscat.packed.components import (
 )
 from crosscat.packed.kernels import (
     multi_chain_packed_gibbs_sweep,
+    packed_gibbs_step,
     packed_gibbs_sweep,
     packed_insert_rows,
     packed_log_joint,
@@ -46,6 +49,9 @@ from crosscat.packed.suffstats import (
     recompute_all_suffstats,
 )
 
+# Auto-enable XLA persistent cache so compiled kernels are reused across runs.
+enable_xla_cache()
+
 __all__ = [
     "BINARY_ID",
     "CATEGORICAL_ID",
@@ -60,9 +66,13 @@ __all__ = [
     "_add_row_to_suffstats",
     "_remove_row_from_suffstats",
     "batch_packed_states",
+    "clear_cache",
+    "compile_kernels",
     "compute_suffstats_vectorized",
+    "enable_xla_cache",
     "multi_chain_packed_gibbs_sweep",
     "pack_state",
+    "packed_gibbs_step",
     "packed_gibbs_sweep",
     "packed_insert_rows",
     "packed_log_joint",

@@ -253,9 +253,6 @@ def test_ensure_col_dep_constraints_dependent(inferred_continuous_state):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason="JIT compile of packed_gibbs_sweep with new state shape exceeds 600s on P100"
-)
 def test_ensure_col_dep_constraints_independent(inferred_continuous_state):
     """ensure_col_dep_constraints finds a state with columns separated."""
     d = inferred_continuous_state
@@ -265,7 +262,7 @@ def test_ensure_col_dep_constraints_independent(inferred_continuous_state):
     # Constrain cols 0 and 2 to be independent (different views)
     constraints = [(0, 2, False)]
     result = ensure_col_dep_constraints(
-        key, state, data, constraints, max_rejections=50, n_sweeps_per_attempt=3
+        key, state, data, constraints, max_rejections=100, n_sweeps_per_attempt=3
     )
     assert result is not None, "Failed to find state satisfying independent constraint"
     assert check_column_dep_constraint(result, 0, 2, dependent=False)
