@@ -38,33 +38,54 @@ uv run ruff format .
 
 The package is `crosscat/` with these core modules:
 
-- **types.py** — Dataclasses for all state: `CrossCatState` (full model), `ViewState` (one column group with row clustering), `ColumnHypers`, `SufficientStats`, and `ColumnType` enum (CONTINUOUS, CATEGORICAL, ORDINAL, BINARY, CYCLIC).
+- **types.py** — Dataclasses for all state: `CrossCatState` (full model), `ViewState` (one column group with row clustering), `ColumnHypers`, `SufficientStats`, `ColumnType` enum (CONTINUOUS, CATEGORICAL, ORDINAL, BINARY, CYCLIC), and `LOG_EPS` numerical stability constant.
 
 - **components.py** — Conjugate Bayesian component models (`NormalGamma`, `DirichletCategorical`, `BetaBernoulli`, `OrderedLogistic`, `VonMises`). Each provides `sufficient_statistics()`, `log_marginal_likelihood()`, and `posterior_predictive_logp()`.
 
 - **model.py** — State initialization (`initialize()`), scoring (`log_joint()`), and row insertion (`insert_rows()`). Uses Chinese Restaurant Process sampling for cluster assignments and data-driven hyperparameter defaults.
 
-- **gibbs.py** — Collapsed Gibbs MCMC kernels: `transition_row_assignments()`, `transition_column_assignments()`, `transition_column_hypers()`, `transition_crp_alphas()`, and `gibbs_sweep()` which runs a full iteration.
+- **gibbs.py** — Collapsed Gibbs MCMC kernels: `transition_row_assignments()`, `transition_column_assignments()`, `transition_column_hypers()`, `transition_crp_alphas()`, and `gibbs_sweep()` which runs a full iteration. **Note:** The unpacked gibbs.py path uses Python for-loops and is extremely slow — always prefer the packed path for inference.
 
-- **inference.py** — Posterior predictive queries: `predictive_probability()`, `predictive_sample()`, `predictive_cdf()`, `mutual_information()`, `dependence_probability()`, `dependence_matrix()`, `impute_and_confidence()`, `predictive_anomalousness()`, `row_similarity()`, `row_typicality()`, `column_typicality()`, `sample_and_insert()`, `credible_interval()`, `conditional_entropy()`, `joint_predictive_probability()`.
+- **inference.py** — Posterior predictive queries (unpacked path): `predictive_probability()`, `predictive_sample()`, `predictive_cdf()`, `mutual_information()`, `dependence_probability()`, `dependence_matrix()`, `impute_and_confidence()`, `predictive_anomalousness()`, `row_similarity()`, `row_typicality()`, `column_typicality()`, `sample_and_insert()`, `credible_interval()`, `conditional_entropy()`, `joint_predictive_probability()`.
 
 - **packed/** — JIT-compatible packed state sub-package:
-  - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`
+  - `state.py` — `PackedCrossCatState` dataclass, `pack_state()`, `unpack_state()`, `batch_packed_states()`, `unbatch_packed_states()`, `select_best_chain()`
   - `components.py` — unified scoring (log marginal, posterior predictive) via `jnp.where` type dispatch + batch-vectorized type-specialized scoring (`batch_bb_posterior_predictive_logp`, `batch_ng_posterior_predictive_logp`, `batch_dc_posterior_predictive_logp`)
   - `suffstats.py` — vectorized sufficient statistics (matrix ops, batched scatter add/remove)
-  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas) via `vmap`/`lax.scan` with type-specialized fast paths (`_compute_dominant_type`, `_score_row_one_cluster_typed`)
+  - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths
   - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `clear_cache()`)
 
-- **packed_inference.py** — Vectorized inference queries on packed state (predictive, MI, anomaly, similarity).
+- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus multi-chain support:
+  - **Single-state:** `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
+  - **Multi-state (already accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
+  - **Multi-chain wrappers:** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`
 
-- **constraints.py** — Enforces column/row dependency constraints during inference.
+- **constraints.py** — Enforces column/row dependency constraints via packed Gibbs rejection sampling.
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation).
 - **serialization.py** — Save/load states and checkpoints in `.jxc` format (JSON metadata + NPZ arrays).
 - **synthetic.py** — Synthetic data generation from known CrossCat generative model, missing data injection.
 - **data_utils.py** — CSV I/O, column type detection, discretization.
 - **validate.py** — State consistency checking.
-- **packed_state.py** — Legacy deprecation shim; import from `crosscat.packed` instead.
 - **../contrib/fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific, not part of core).
+
+## Packed vs Unpacked Paths
+
+**Always prefer the packed path.** The unpacked path (`gibbs.py`, `inference.py`) uses Python for-loops and is 10-100x slower. The packed path (`packed/kernels.py`, `packed_inference.py`) uses JAX JIT compilation with `lax.scan`/`vmap` and runs on GPU.
+
+Typical workflow:
+```python
+state = initialize(key, data, column_types)
+packed = pack_state(state)
+packed = packed_gibbs_sweep(key, packed, data, n_sweeps=100)
+state = unpack_state(packed, column_types, data=data)
+```
+
+For streaming/online inference:
+```python
+packed, data = packed_insert_rows(key, packed, data, new_rows)
+```
+
+**Known issue:** JIT compilation of `packed_gibbs_sweep` takes 90+ minutes for large datasets (257+ columns, e.g. MNIST). This is the #1 performance bottleneck. Kernel splitting and AOT cache improvements are needed.
 
 ## Key Patterns
 
@@ -72,16 +93,32 @@ The package is `crosscat/` with these core modules:
 - **Vectorized column scoring**: Row scoring in `_score_row_one_cluster` uses `jax.vmap(unified_posterior_predictive_logp)` over all columns simultaneously (not sequential `lax.scan`). This is the key optimization that gave 12x speedup in v0.9.0.
 - **Type-specialized fast paths**: `_compute_dominant_type()` detects when all columns in a view share the same type (e.g., all BINARY for MNIST). When dominant, `_score_row_one_cluster_typed` bypasses the 5-way `jnp.where` dispatch and calls type-specific batch functions directly (`batch_bb_posterior_predictive_logp`, etc.).
 - **Batched suffstat updates**: `_add_row_to_suffstats` / `_remove_row_from_suffstats` use `.at[].add()` scatter operations over all columns at once instead of sequential `lax.scan`.
+- **Numerical stability**: `LOG_EPS = 1e-30` constant in `types.py` used throughout for underflow protection. All files import from `crosscat.types`.
 - **Deterministic RNG**: Always use `jax.random.key()` and `jax.random.split()` for reproducibility.
 - **NaN transparency**: Missing data is represented as NaN and silently filtered during sufficient statistic computation.
 - **Docstring cross-references**: Many functions include "Maps to original..." comments linking to the probcomp/crosscat equivalent.
+
+## Testing
+
+- **Do NOT run pytest locally** — tests require JAX JIT compilation which is slow even on GPU. Run on Kaggle P100 via `notebooks/run_tests.ipynb`.
+- **CI (GitHub Actions)** runs lint + format + type check only (~1 min). No pytest in CI.
+- **Kaggle setup**: Use `pip install -e . --no-deps` to preserve Kaggle's pre-installed JAX+CUDA stack. Do NOT use `uv sync --extra gpu` on Kaggle (causes ptxas version mismatch).
+- **Test markers**: `@pytest.mark.slow` for GPU-heavy tests (30+ Gibbs sweeps). `@pytest.mark.xfail` for 3 known flaky tests (JIT timeout + stochastic recovery).
+- **Test suite**: 159 fast tests, 31 slow tests (28 pass, 3 xfail).
 
 ## Benchmarks
 
 - **MNIST paper benchmark** (`benchmarks/mnist_paper_colab.ipynb`): Reproduces Section 3.2 of Mansinghka et al. (2016). 16×16 binary MNIST (257 cols), 10 chains × 100 sweeps on P100. Validates Z-matrix, pixel dependence map, inpainting (93% accuracy), and classification (79% accuracy).
 - **Synthetic benchmark** (`benchmarks/paper_synthetic_benchmark.py`): Figure 7 recovery with known ground truth.
 - **JIT benchmark** (`benchmarks/jit_benchmark.py`): Per-sweep timing comparison.
-- Run notebooks on Kaggle (P100) or Colab (T4/A100) for GPU-accelerated benchmarks.
+- Run notebooks on Kaggle (P100) for GPU-accelerated benchmarks.
+
+## Git Workflow
+
+- **Always use feature branches** — never commit directly to main.
+- Branch naming: `feat/`, `fix/`, `perf/`, `chore/` prefixes.
+- Create PRs via `gh pr create` and merge via `gh pr merge --merge`.
+- GitHub Actions free-tier quota is limited — CI may fail when exhausted.
 
 ## Code Style
 
