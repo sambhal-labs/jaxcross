@@ -118,13 +118,17 @@ def run_multi_chain_with_diagnostics(data, column_types, *, n_chains=4, n_sweeps
     init_states = initialize(key, data, column_types, n_chains=n_chains)
     all_diagnostics = []
     final_states = []
+    diag_interval = max(1, n_sweeps // 5)
     for i, state in enumerate(init_states):
         chain_diags = []
         packed = pack_state(state)
         k = jax.random.fold_in(key, i + 1000)
-        for _s in range(n_sweeps):
+        done = 0
+        while done < n_sweeps:
+            batch = min(diag_interval, n_sweeps - done)
             k, subkey = jax.random.split(k)
-            packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=1)
+            packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=batch)
+            done += batch
             state = unpack_state(packed, column_types, data=data)
             chain_diags.append(collect_diagnostics(state, data))
         final_states.append(state)
