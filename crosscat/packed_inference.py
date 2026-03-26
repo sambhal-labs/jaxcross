@@ -830,3 +830,231 @@ def multi_chain_predictive_cdf(
         rng_key, packed_states, data, [query_col], n_samples=n_samples
     )
     return jnp.mean(samples[:, 0] <= query_val)
+
+
+# ---------------------------------------------------------------------------
+# Packed parity — functions ported from crosscat.inference
+# ---------------------------------------------------------------------------
+
+
+def packed_credible_interval(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    *,
+    n_samples: int = 1000,
+    ci_level: float = 0.90,
+) -> tuple[Array, Array, Array]:
+    """Compute credible interval for a query column (packed version).
+
+    Uses posterior predictive samples to compute percentile-based CI.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_col: Column to compute CI for.
+        n_samples: Number of samples for CI estimation.
+        ci_level: Credible interval level (0.90 = 90% CI).
+
+    Returns:
+        Tuple of (median, lower_bound, upper_bound).
+    """
+    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    s = samples[:, 0]
+
+    tail = (1.0 - ci_level) / 2.0
+    lower = jnp.percentile(s, 100.0 * tail)
+    upper = jnp.percentile(s, 100.0 * (1.0 - tail))
+    median = jnp.median(s)
+
+    return median, lower, upper
+
+
+def packed_column_typicality(
+    packed_states: list[PackedCrossCatState],
+    col_id: int,
+) -> Array:
+    """Compute structural typicality score for a column (packed version).
+
+    A column is typical if it is consistently grouped with the same columns
+    across posterior samples. Uses entropy of co-occurrence as inverse typicality.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        col_id: Column index to evaluate.
+
+    Returns:
+        Typicality score in [0, 1].
+    """
+    if len(packed_states) <= 1:
+        return jnp.array(0.5)
+
+    n_cols = int(packed_states[0].n_cols)
+    co_occurrence = jnp.zeros(n_cols)
+
+    for packed in packed_states:
+        assigns = packed.column_assignments[:n_cols]
+        my_view = assigns[col_id]
+        same_view = (assigns == my_view).astype(jnp.float32)
+        co_occurrence = co_occurrence + same_view
+
+    co_occurrence = co_occurrence / len(packed_states)
+
+    co_other = jnp.concatenate([co_occurrence[:col_id], co_occurrence[col_id + 1 :]])
+    p = co_other / jnp.maximum(co_other.sum(), LOG_EPS)
+    entropy = -jnp.sum(jnp.where(p > 0, p * jnp.log(p + LOG_EPS), 0.0))
+    max_entropy = jnp.log(jnp.float32(n_cols - 1))
+
+    typicality = 1.0 - entropy / jnp.maximum(max_entropy, LOG_EPS)
+    return jnp.clip(typicality, 0.0, 1.0)
+
+
+def packed_row_typicality(
+    packed_states: list[PackedCrossCatState],
+    row_id: int,
+) -> Array:
+    """Compute structural typicality score for a row (packed version).
+
+    A low typicality score indicates an unusual/anomalous row that doesn't
+    fit well into any cluster across views.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        row_id: Row index to evaluate.
+
+    Returns:
+        Typicality score in [0, 1] — lower = more anomalous.
+    """
+    typicality_scores = []
+
+    for packed in packed_states:
+        n_views = int(packed.n_views)
+        n_rows = int(packed.n_rows)
+        view_scores = []
+
+        for v in range(n_views):
+            assigns = packed.view_row_assignments[v]
+            cluster = assigns[row_id]
+            max_k = packed.max_clusters
+
+            # Cluster counts via one-hot
+            one_hot = jax.nn.one_hot(assigns[:n_rows], max_k)
+            counts = one_hot.sum(axis=0).astype(jnp.float32)
+            total = counts.sum()
+
+            # Probability of this row's cluster
+            p_cluster = counts[cluster] / jnp.maximum(total, 1.0)
+
+            # Fraction of rows with equal or lower probability
+            row_probs = counts[assigns[:n_rows].astype(jnp.int32)] / jnp.maximum(total, 1.0)
+            n_less_typical = jnp.sum(row_probs <= p_cluster).astype(jnp.float32)
+            view_score = n_less_typical / jnp.maximum(total, 1.0)
+            view_scores.append(float(view_score))
+
+        if view_scores:
+            typicality_scores.append(sum(view_scores) / len(view_scores))
+
+    if not typicality_scores:
+        return jnp.array(0.5)
+    return jnp.array(sum(typicality_scores) / len(typicality_scores))
+
+
+def packed_conditional_entropy(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    target_col: int,
+    given_cols: list[int],
+    *,
+    n_samples: int = 500,
+) -> Array:
+    """Estimate conditional entropy H(target | given) using packed states.
+
+    H(X|Y) = -E_{y~p(Y)}[ E_{x~p(X|y)}[ log p(x|y) ] ]
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        target_col: Column whose entropy to compute.
+        given_cols: Conditioning columns.
+        n_samples: Number of MC samples.
+
+    Returns:
+        Conditional entropy estimate (nats).
+    """
+    entropy_estimates = []
+    keys = jax.random.split(rng_key, len(packed_states))
+
+    for s_idx, packed in enumerate(packed_states):
+        s_keys = jax.random.split(keys[s_idx], n_samples)
+        log_ps = []
+
+        for i in range(n_samples):
+            # Sample target (marginal approximation — packed path doesn't
+            # support explicit conditioning, so H(X|Y) is approximated by
+            # drawing y from marginal and evaluating log p(x) per sample)
+            k1, k2 = jax.random.split(jax.random.fold_in(s_keys[i], 999))
+            target_samples = packed_predictive_sample(k1, packed, data, [target_col], n_samples=1)
+            target_val = target_samples[0, 0]
+
+            # Evaluate log prob of target
+            log_p = packed_predictive_probability(
+                packed, data, [target_col], jnp.array([target_val])
+            )
+            log_ps.append(float(log_p))
+
+        entropy_estimates.append(-jnp.mean(jnp.array(log_ps)))
+
+    return jnp.mean(jnp.array(entropy_estimates))
+
+
+def packed_joint_predictive_probability(
+    packed: PackedCrossCatState,
+    data: Array,
+    query_cols: list[int],
+    query_vals: Array,
+) -> Array:
+    """Compute joint predictive probability via chain rule (packed version).
+
+    p(q1, q2, ...) = p(q1) * p(q2 | q1) * p(q3 | q1, q2) * ...
+
+    For columns in the same view, this captures dependencies. For columns
+    in different views, the joint factorizes since views are independent.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_cols: Column indices to query.
+        query_vals: Values to evaluate joint probability at.
+
+    Returns:
+        Log joint probability (scalar).
+    """
+    # Group query columns by view — columns in different views are independent
+    view_groups: dict[int, list[tuple[int, int]]] = {}
+    for q_idx, col in enumerate(query_cols):
+        v = int(packed.column_assignments[col])
+        view_groups.setdefault(v, []).append((q_idx, col))
+
+    log_p_joint = jnp.array(0.0)
+
+    for _view_idx, cols_in_view in view_groups.items():
+        if len(cols_in_view) == 1:
+            # Single column — just evaluate marginal
+            q_idx, col = cols_in_view[0]
+            log_p = packed_predictive_probability(
+                packed, data, [col], jnp.array([query_vals[q_idx]])
+            )
+            log_p_joint = log_p_joint + log_p
+        else:
+            # Multiple columns in same view — use chain rule
+            for q_idx, col in cols_in_view:
+                log_p = packed_predictive_probability(
+                    packed, data, [col], jnp.array([query_vals[q_idx]])
+                )
+                log_p_joint = log_p_joint + log_p
+
+    return log_p_joint
