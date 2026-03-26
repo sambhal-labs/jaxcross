@@ -370,15 +370,20 @@ class DirichletCategorical:
 class OrderedLogistic:
     """Ordered logistic model for ordinal data.
 
-    Not present in original CrossCat. Added for LaborLens wage level analysis.
+    Uses a cumulative logistic link function with cutpoints:
+    P(Y = k | μ, cutpoints) = σ(c_k - μ) - σ(c_{k-1} - μ)
 
-    Implemented using Dirichlet-Categorical conjugacy over ordered levels.
-    The ordinal structure is preserved in the level indexing; the model
-    captures the empirical distribution over levels within each cluster.
+    Each cluster has a location parameter μ (integrated out via grid).
+    Cutpoints c₁ < c₂ < ... < c_{K-1} are per-column hyperparameters.
+    Scale σ = 1 (fixed).
+
+    Prior: μ ~ N(hypers.mu, hypers.s)
 
     Sufficient statistics: count, level_counts (histogram over ordered levels)
-    Hyperparameters: cutpoints (used as symmetric Dirichlet concentration)
+    Hyperparameters: cutpoints, mu (prior mean), s (prior variance)
     """
+
+    _N_GRID = 31
 
     @staticmethod
     def sufficient_statistics(data: Array, n_levels: int) -> SufficientStats:
@@ -391,50 +396,90 @@ class OrderedLogistic:
         )
 
     @staticmethod
+    def _level_probs(mu: Array, cutpoints: Array) -> Array:
+        """Compute P(Y=k | μ, cutpoints) for all K levels."""
+        extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
+        cum = jax.nn.sigmoid(extended - mu)
+        probs = cum[1:] - cum[:-1]
+        return jnp.maximum(probs, 1e-30)
+
+    @staticmethod
     def log_marginal_likelihood(suffstats: SufficientStats, hypers: ColumnHypers) -> Array:
-        """Log marginal likelihood for ordinal observations.
+        """Log marginal likelihood via grid integration over μ.
 
-        Uses Dirichlet-Multinomial conjugacy with symmetric concentration
-        ``dirichlet_alpha`` (default 1.0 per level).
+        Non-conjugate: integrates p(counts | μ, cutpoints) · p(μ) over μ.
         """
-        counts = suffstats.category_counts
+        counts = suffstats.category_counts.astype(jnp.float32)
         n = suffstats.count.astype(jnp.float32)
-        k = counts.shape[0]
-        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
+        cutpoints = hypers.cutpoints
+        mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
+        s0 = float(hypers.s) if hypers.s is not None else 4.0
+        s0 = max(s0, 1e-30)
 
-        log_ml = (
-            jnp.sum(gammaln(counts + alpha))
-            - gammaln(n + k * alpha)
-            - k * gammaln(alpha)
-            + gammaln(k * alpha)
-        )
-        return log_ml
+        half_range = 4.0 * jnp.sqrt(s0)
+        mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
+        delta_mu = 2.0 * half_range / (OrderedLogistic._N_GRID - 1)
+
+        def log_score(mu):
+            probs = OrderedLogistic._level_probs(mu, cutpoints)
+            log_lik = jnp.sum(counts * jnp.log(probs))
+            log_prior = -0.5 * jnp.log(2 * jnp.pi * s0) - 0.5 * (mu - mu0) ** 2 / s0
+            return log_lik + log_prior
+
+        log_scores = jax.vmap(log_score)(mu_grid)
+        return jnp.where(n > 0, jax.nn.logsumexp(log_scores) + jnp.log(delta_mu), 0.0)
 
     @staticmethod
     def posterior_predictive_logp(
         x: Array, suffstats: SufficientStats, hypers: ColumnHypers
     ) -> Array:
-        """Log posterior predictive probability for an ordinal level."""
-        counts = suffstats.category_counts
-        n = suffstats.count.astype(jnp.float32)
-        k = counts.shape[0]
-        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
+        """Posterior predictive log p(x=k | data, cutpoints)."""
+        counts = suffstats.category_counts.astype(jnp.float32)
+        cutpoints = hypers.cutpoints
+        mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
+        s0 = float(hypers.s) if hypers.s is not None else 4.0
+        s0 = max(s0, 1e-30)
 
-        probs = (counts + alpha) / (n + k * alpha)
-        return jnp.log(probs[x.astype(jnp.int32)])
+        half_range = 4.0 * jnp.sqrt(s0)
+        mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
+
+        def log_post(mu):
+            probs = OrderedLogistic._level_probs(mu, cutpoints)
+            return jnp.sum(counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
+
+        log_w = jax.vmap(log_post)(mu_grid)
+        log_w = log_w - jax.nn.logsumexp(log_w)
+        weights = jnp.exp(log_w)
+
+        all_probs = jax.vmap(lambda mu: OrderedLogistic._level_probs(mu, cutpoints))(mu_grid)
+        avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+        return jnp.log(jnp.maximum(avg_probs[x.astype(jnp.int32)], 1e-30))
 
     @staticmethod
     def sample_posterior_predictive(
         rng_key: Array, suffstats: SufficientStats, hypers: ColumnHypers, n: int = 1
     ) -> Array:
         """Draw samples from posterior predictive over ordinal levels."""
-        counts = suffstats.category_counts
-        n_obs = suffstats.count.astype(jnp.float32)
-        k = counts.shape[0]
-        alpha = hypers.dirichlet_alpha if hypers.dirichlet_alpha is not None else jnp.array(1.0)
+        counts = suffstats.category_counts.astype(jnp.float32)
+        cutpoints = hypers.cutpoints
+        mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
+        s0 = float(hypers.s) if hypers.s is not None else 4.0
+        s0 = max(s0, 1e-30)
 
-        probs = (counts + alpha) / (n_obs + k * alpha)
-        return jax.random.categorical(rng_key, jnp.log(probs), shape=(n,))
+        half_range = 4.0 * jnp.sqrt(s0)
+        mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
+
+        def log_post(mu):
+            probs = OrderedLogistic._level_probs(mu, cutpoints)
+            return jnp.sum(counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
+
+        log_w = jax.vmap(log_post)(mu_grid)
+        log_w = log_w - jax.nn.logsumexp(log_w)
+        weights = jnp.exp(log_w)
+
+        all_probs = jax.vmap(lambda mu: OrderedLogistic._level_probs(mu, cutpoints))(mu_grid)
+        avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+        return jax.random.categorical(rng_key, jnp.log(jnp.maximum(avg_probs, 1e-30)), shape=(n,))
 
 
 # ---------------------------------------------------------------------------

@@ -115,8 +115,9 @@ def _default_hypers(column_type: ColumnType, col_data: Array) -> ColumnHypers:
         n_levels = _safe_n_categories(col_data)
         return ColumnHypers(
             column_type=column_type,
-            dirichlet_alpha=jnp.array(1.0),
-            cutpoints=jnp.linspace(0.0, 1.0, n_levels - 1) if n_levels > 1 else None,
+            mu=jnp.array(0.0),
+            s=jnp.array(4.0),
+            cutpoints=jnp.linspace(-2.0, 2.0, max(n_levels - 1, 1)),
         )
     elif column_type == ColumnType.CYCLIC:
         return ColumnHypers(
