@@ -509,6 +509,7 @@ def test_unified_log_marginal_matches_ng(n, mu, r, s, nu):
         jnp.array(1.0),
         jnp.array(1.0),
         jnp.array(0.0),
+        jnp.full(MAX_CATS - 1, jnp.inf),
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
@@ -539,6 +540,7 @@ def test_unified_log_marginal_matches_dc(n, dir_alpha):
         jnp.array(1.0),
         jnp.array(1.0),
         jnp.array(0.0),
+        jnp.full(MAX_CATS - 1, jnp.inf),
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
@@ -570,6 +572,7 @@ def test_unified_log_marginal_matches_bb(n, alpha, beta):
         jnp.array(1.0),
         jnp.array(1.0),
         jnp.array(0.0),
+        jnp.full(MAX_CATS - 1, jnp.inf),
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
@@ -619,6 +622,7 @@ def test_unified_posterior_predictive_matches_ng(n, x, mu, r, s, nu):
         jnp.array(1.0),
         jnp.array(1.0),
         jnp.array(0.0),
+        jnp.full(MAX_CATS - 1, jnp.inf),
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
@@ -657,6 +661,7 @@ def test_unified_posterior_predictive_matches_bb(n, x, alpha, beta):
         jnp.array(1.0),
         jnp.array(1.0),
         jnp.array(0.0),
+        jnp.full(MAX_CATS - 1, jnp.inf),
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
@@ -698,3 +703,117 @@ def test_bb_log_marginal_is_finite(n, alpha, beta):
     sum_x = jnp.array(float(n) * 0.5)
     result = _bb_log_marginal(jnp.array(n), sum_x, jnp.array(alpha), jnp.array(beta))
     assert jnp.isfinite(result), f"Non-finite BB log marginal: {result}"
+
+
+# ---------------------------------------------------------------------------
+# Ordered logistic property tests
+# ---------------------------------------------------------------------------
+
+
+@given(mu0=data_float, s0=pos_float)
+@settings(max_examples=50, deadline=None)
+def test_ol_log_marginal_empty_cluster_is_zero(mu0, s0):
+    """Ordered logistic log marginal for empty cluster (n=0) is 0."""
+    from crosscat.packed.components import _ol_log_marginal
+
+    cat_counts = jnp.zeros(MAX_CATS, dtype=jnp.float32)
+    cutpoints = jnp.linspace(-2.0, 2.0, MAX_CATS - 1)
+    result = _ol_log_marginal(
+        jnp.array(0),
+        cat_counts,
+        cutpoints,
+        jnp.array(mu0),
+        jnp.array(s0),
+    )
+    assert float(result) == 0.0
+
+
+@given(
+    n=count_st,
+    mu0=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    s0=pos_float,
+)
+@settings(max_examples=50, deadline=None)
+def test_ol_log_marginal_is_finite(n, mu0, s0):
+    """Ordered logistic log marginal produces finite values for valid inputs."""
+    from crosscat.packed.components import _ol_log_marginal
+
+    cat_counts = jnp.ones(MAX_CATS, dtype=jnp.float32) * (n / MAX_CATS)
+    cutpoints = jnp.linspace(-2.0, 2.0, MAX_CATS - 1)
+    result = _ol_log_marginal(
+        jnp.array(n),
+        cat_counts,
+        cutpoints,
+        jnp.array(mu0),
+        jnp.array(s0),
+    )
+    assert jnp.isfinite(result), f"Non-finite OL log marginal: {result}"
+
+
+@given(
+    n=count_st,
+    x=st.integers(min_value=0, max_value=MAX_CATS - 1),
+    mu0=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    s0=pos_float,
+)
+@settings(max_examples=50, deadline=None)
+def test_ol_posterior_predictive_finite(n, x, mu0, s0):
+    """Ordered logistic posterior predictive produces finite values."""
+    from crosscat.packed.components import _ol_posterior_predictive_logp
+
+    cat_counts = jnp.ones(MAX_CATS, dtype=jnp.float32) * (n / MAX_CATS)
+    cutpoints = jnp.linspace(-2.0, 2.0, MAX_CATS - 1)
+    result = _ol_posterior_predictive_logp(
+        jnp.array(float(x)),
+        jnp.array(n),
+        cat_counts,
+        cutpoints,
+        jnp.array(mu0),
+        jnp.array(s0),
+    )
+    assert jnp.isfinite(result), f"Non-finite OL predictive: {result}"
+
+
+@given(
+    n=count_st,
+    mu0=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    s0=pos_float,
+)
+@settings(max_examples=50, deadline=None)
+def test_unified_log_marginal_matches_ol(n, mu0, s0):
+    """unified_log_marginal with ORDINAL_ID matches _ol_log_marginal."""
+    from crosscat.packed.components import _ol_log_marginal
+    from crosscat.packed.state import ORDINAL_ID
+
+    cat_counts = jnp.ones(MAX_CATS, dtype=jnp.float32) * (n / MAX_CATS)
+    cutpoints = jnp.linspace(-2.0, 2.0, MAX_CATS - 1)
+
+    specific = _ol_log_marginal(
+        jnp.array(n),
+        cat_counts,
+        cutpoints,
+        jnp.array(mu0),
+        jnp.array(s0),
+    )
+    unified = unified_log_marginal(
+        jnp.array(ORDINAL_ID),
+        jnp.array(n),
+        jnp.array(0.0),
+        jnp.array(0.0),
+        cat_counts,
+        jnp.array(0.0),
+        jnp.array(0.0),
+        jnp.array(mu0),
+        jnp.array(1.0),
+        jnp.array(s0),
+        jnp.array(1.0),
+        jnp.array(1.0),
+        jnp.array(1.0),
+        jnp.array(1.0),
+        jnp.array(1.0),
+        jnp.array(1.0),
+        jnp.array(0.0),
+        cutpoints,
+    )
+
+    np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
