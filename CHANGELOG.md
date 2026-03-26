@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-03-26 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.9.0...v0.10.0)
+
+### Added
+- **True ordered logistic component model** with cumulative link function:
+  P(Y=k | μ, cutpoints) = σ(c_k - μ) - σ(c_{k-1} - μ). Replaces the
+  Dirichlet-Categorical stub that ignored ordinal structure. Uses 31-point
+  grid integration over latent location μ with Normal prior.
+- `hyper_cutpoints` field in `PackedCrossCatState` — per-column ordered
+  thresholds, shape (n_cols, max_categories - 1), padded with +inf
+- Cutpoint Gibbs transition kernel: sequential sampling via `lax.scan`
+  with ordering constraint, plus mu prior variance grid sampling
+- **Kernel splitting** for independent JIT compilation: `@jax.jit` on all
+  4 packed Gibbs sub-kernels + `packed_gibbs_step()` for constraint loops
+- **XLA persistent cache** auto-enabled on `crosscat.packed` import
+- `compile_kernels()` warm-up function for pre-compiling sub-kernels
+- **Property-based tests** via Hypothesis (28 tests): suffstat roundtrips,
+  component scoring invariants, type dispatch parity, NaN transparency
+
+### Changed
+- `OrderedLogistic` class rewritten with cumulative link (non-conjugate,
+  grid integration) instead of Dirichlet-Categorical alias
+- Ordinal initialization: `cutpoints=linspace(-2, 2, K-1)`, `mu=0`, `s=4`
+  instead of `dirichlet_alpha=1`
+- Unified scoring functions (`unified_log_marginal`, etc.) now accept
+  `cutpoints` parameter for ordinal support
+- Ordinal columns use general scoring path (not categorical fast path)
+- Constraint enforcement uses `packed_gibbs_step` (split kernels) instead
+  of monolithic `packed_gibbs_sweep`
+
+### Fixed
+- AOT cache: `compile_and_cache()` now returns early on cache hit
+- `enable_xla_cache()` made idempotent, respects existing JAX config
+- Missing `hyper_vm_a` argument in `packed_inference.py` `_sample_one_column`
+
 ## [0.9.0] - 2026-03-24 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.8.0...v0.9.0)
 
 ### Added
