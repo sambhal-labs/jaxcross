@@ -15,6 +15,7 @@ from crosscat.packed.components import (
 from crosscat.packed.kernels import (
     multi_chain_packed_gibbs_sweep,
     packed_gibbs_sweep,
+    packed_insert_rows,
     packed_log_joint,
     packed_transition_column_assignments,
     packed_transition_column_hypers,
@@ -63,6 +64,7 @@ __all__ = [
     "multi_chain_packed_gibbs_sweep",
     "pack_state",
     "packed_gibbs_sweep",
+    "packed_insert_rows",
     "packed_log_joint",
     "packed_transition_column_assignments",
     "packed_transition_column_hypers",

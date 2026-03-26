@@ -833,6 +833,52 @@ def multi_chain_predictive_cdf(
 
 
 # ---------------------------------------------------------------------------
+# Packed sample-and-insert
+# ---------------------------------------------------------------------------
+
+
+def packed_sample_and_insert(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    partial_row: Array,
+) -> tuple[PackedCrossCatState, Array, Array]:
+    """Sample missing values for a partial row and insert into packed state.
+
+    For each NaN entry in the partial row, draws a sample from the posterior
+    predictive, then inserts the completed row using packed_insert_rows.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix, shape (n_rows, n_cols).
+        partial_row: 1D array of shape (n_cols,) with NaN for missing entries.
+
+    Returns:
+        Tuple of (updated_packed, updated_data, completed_row).
+    """
+    from crosscat.packed.kernels import packed_insert_rows
+
+    observed_mask = ~jnp.isnan(partial_row)
+    missing_cols = [int(i) for i in range(len(partial_row)) if not observed_mask[i]]
+
+    completed = jnp.array(partial_row, copy=True)
+
+    if missing_cols:
+        k1, k2 = jax.random.split(rng_key)
+        samples = packed_predictive_sample(k1, packed, data, missing_cols, n_samples=1)
+        for idx, col in enumerate(missing_cols):
+            completed = completed.at[col].set(samples[0, idx])
+    else:
+        k2 = rng_key
+
+    new_row = completed.reshape(1, -1)
+    new_packed, new_data = packed_insert_rows(k2, packed, data, new_row)
+
+    return new_packed, new_data, completed
+
+
+# ---------------------------------------------------------------------------
 # Packed parity — functions ported from crosscat.inference
 # ---------------------------------------------------------------------------
 

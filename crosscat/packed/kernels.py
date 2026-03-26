@@ -1699,3 +1699,185 @@ def multi_chain_packed_gibbs_sweep(
     scores = vmapped_score(batched_result)
 
     return batched_result, scores
+
+
+# ---------------------------------------------------------------------------
+# Row insertion — score new rows and extend packed state
+# ---------------------------------------------------------------------------
+
+
+def packed_insert_rows(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    new_rows: Array,
+) -> tuple[PackedCrossCatState, Array]:
+    """Insert new rows into a packed CrossCat state.
+
+    For each new row, in each view:
+    1. Score the row against existing clusters via CRP prior + posterior predictive
+    2. Sample a cluster assignment (may create a new cluster)
+    3. Update sufficient statistics
+
+    This function operates outside JIT since n_rows is a static field.
+    The scoring uses JIT-compiled functions for speed.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Current packed state.
+        data: Original data matrix, shape (n_rows, n_cols).
+        new_rows: New observations, shape (n_new, n_cols).
+
+    Returns:
+        Tuple of (updated_packed_state, updated_data).
+
+    Raises:
+        ValueError: If inserting rows would exceed max_clusters.
+    """
+    n_new = new_rows.shape[0]
+    n_old = packed.n_rows
+    n_views = int(packed.n_views)
+    max_k = packed.max_clusters
+    max_cat = packed.max_categories
+
+    updated_data = jnp.concatenate([data, new_rows], axis=0)
+
+    # Extend row assignments array
+    new_view_row_assigns = jnp.concatenate(
+        [packed.view_row_assignments, jnp.zeros((packed.max_views, n_new), dtype=jnp.int32)],
+        axis=1,
+    )
+
+    # Copy suffstats (will be updated incrementally)
+    ss_c = packed.ss_counts.copy()
+    ss_sx = packed.ss_sum_x.copy()
+    ss_sxsq = packed.ss_sum_x_sq.copy()
+    ss_cat = packed.ss_cat_counts.copy()
+    ss_sin = packed.ss_sum_sin.copy()
+    ss_cos = packed.ss_sum_cos.copy()
+
+    view_n_clusters = packed.view_n_clusters.copy()
+
+    keys = jax.random.split(rng_key, n_new)
+
+    for row_i in range(n_new):
+        row_data = new_rows[row_i]
+        row_keys = jax.random.split(keys[row_i], n_views)
+
+        for v in range(n_views):
+            col_indices = packed.view_column_indices[v]
+            n_columns = packed.view_n_columns[v]
+            n_clusters_v = int(view_n_clusters[v])
+
+            # Cluster counts for this view (from current assignments including prior new rows)
+            assigns_v = new_view_row_assigns[v, : n_old + row_i]
+            cluster_counts = jnp.zeros(max_k, dtype=jnp.float32)
+            one_hot = jax.nn.one_hot(assigns_v, max_k)
+            cluster_counts = one_hot.sum(axis=0).astype(jnp.float32)
+
+            # Score row against all clusters using packed scoring
+            log_scores = _score_row_all_clusters(
+                row_data,
+                col_indices,
+                n_columns,
+                packed.col_type_ids,
+                cluster_counts,
+                ss_c[v],
+                ss_sx[v],
+                ss_sxsq[v],
+                ss_cat[v],
+                ss_sin[v],
+                ss_cos[v],
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_a,
+                packed.hyper_vm_mu,
+                packed.view_row_crp_alpha[v],
+                max_k,
+            )
+
+            # log_scores has shape (max_clusters + 1,) — last entry is new cluster
+            # Mask out impossible entries (beyond current clusters + 1 new)
+            valid_mask = jnp.arange(max_k + 1) <= n_clusters_v
+            log_scores = jnp.where(valid_mask, log_scores, -jnp.inf)
+
+            # Sample cluster
+            log_scores = log_scores - jnp.max(log_scores)
+            chosen = int(jax.random.categorical(row_keys[v], log_scores))
+
+            # If new cluster chosen
+            if chosen >= n_clusters_v:
+                if n_clusters_v >= max_k:
+                    # Can't create new cluster — assign to largest existing
+                    chosen = int(jnp.argmax(cluster_counts))
+                else:
+                    chosen = n_clusters_v
+                    view_n_clusters = view_n_clusters.at[v].set(n_clusters_v + 1)
+
+            # Assign row
+            new_view_row_assigns = new_view_row_assigns.at[v, n_old + row_i].set(chosen)
+
+            # Update suffstats incrementally
+            ss_c_v, ss_sx_v, ss_sxsq_v, ss_cat_v, ss_sin_v, ss_cos_v = _add_row_to_suffstats(
+                ss_c[v],
+                ss_sx[v],
+                ss_sxsq[v],
+                ss_cat[v],
+                ss_sin[v],
+                ss_cos[v],
+                jnp.int32(chosen),
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                max_cat,
+            )
+            ss_c = ss_c.at[v].set(ss_c_v)
+            ss_sx = ss_sx.at[v].set(ss_sx_v)
+            ss_sxsq = ss_sxsq.at[v].set(ss_sxsq_v)
+            ss_cat = ss_cat.at[v].set(ss_cat_v)
+            ss_sin = ss_sin.at[v].set(ss_sin_v)
+            ss_cos = ss_cos.at[v].set(ss_cos_v)
+
+    # Build new packed state with extended rows
+    new_packed = PackedCrossCatState(
+        column_assignments=packed.column_assignments,
+        column_crp_alpha=packed.column_crp_alpha,
+        n_views=packed.n_views,
+        view_mask=packed.view_mask,
+        col_type_ids=packed.col_type_ids,
+        hyper_mu=packed.hyper_mu,
+        hyper_r=packed.hyper_r,
+        hyper_s=packed.hyper_s,
+        hyper_nu=packed.hyper_nu,
+        hyper_dirichlet_alpha=packed.hyper_dirichlet_alpha,
+        hyper_alpha=packed.hyper_alpha,
+        hyper_beta=packed.hyper_beta,
+        hyper_kappa=packed.hyper_kappa,
+        hyper_vm_a=packed.hyper_vm_a,
+        hyper_vm_mu=packed.hyper_vm_mu,
+        view_column_indices=packed.view_column_indices,
+        view_n_columns=packed.view_n_columns,
+        view_row_assignments=new_view_row_assigns,
+        view_n_clusters=view_n_clusters,
+        view_row_crp_alpha=packed.view_row_crp_alpha,
+        ss_counts=ss_c,
+        ss_sum_x=ss_sx,
+        ss_sum_x_sq=ss_sxsq,
+        ss_cat_counts=ss_cat,
+        ss_sum_sin=ss_sin,
+        ss_sum_cos=ss_cos,
+        n_rows=n_old + n_new,
+        n_cols=packed.n_cols,
+        max_views=packed.max_views,
+        max_clusters=packed.max_clusters,
+        max_categories=packed.max_categories,
+        max_cols_per_view=packed.max_cols_per_view,
+    )
+
+    return new_packed, updated_data
