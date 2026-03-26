@@ -882,7 +882,74 @@ def transition_column_hypers(
                 column_type=col_type, kappa=new_kappa, vm_a=new_a, vm_mu=new_mu
             )
 
-        # Ordinal: keep hypers as-is (symmetric Dirichlet with alpha=1)
+        elif col_type == ColumnType.ORDINAL:
+            # Sequential cutpoint Gibbs + mu prior variance sampling
+            hypers = state.column_hypers[j]
+            cutpoints = hypers.cutpoints
+            mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
+            s0 = float(hypers.s) if hypers.s is not None else 4.0
+
+            view_idx = int(state.column_assignments[j])
+            view = state.views[view_idx]
+            local_idx = int(jnp.argwhere(view.column_indices == j, size=1)[0, 0])
+
+            suffstats_list = view.suffstats
+            n_cl = len(suffstats_list)
+
+            def _score_ordinal_hypers(
+                test_cutpoints,
+                test_s,
+                _ss=suffstats_list,
+                _li=local_idx,
+                _ct=col_type,
+                _m0=mu0,
+                _ncl=n_cl,
+            ):
+                score = 0.0
+                for c_idx in range(_ncl):
+                    ss = _ss[c_idx][_li]
+                    test_h = ColumnHypers(
+                        column_type=_ct,
+                        mu=jnp.array(_m0),
+                        s=jnp.array(test_s),
+                        cutpoints=test_cutpoints,
+                    )
+                    score += float(OrderedLogistic.log_marginal_likelihood(ss, test_h))
+                return score
+
+            # Sample each cutpoint sequentially
+            rng_key, *cp_keys = jax.random.split(rng_key, len(cutpoints) + 1)
+            new_cutpoints = jnp.array(cutpoints)
+            for k_idx in range(len(cutpoints)):
+                lower = float(new_cutpoints[k_idx - 1]) if k_idx > 0 else -10.0
+                upper = float(new_cutpoints[k_idx + 1]) if k_idx < len(cutpoints) - 1 else 10.0
+                grid = jnp.linspace(lower + 0.01, upper - 0.01, 31)
+                scores = jnp.array(
+                    [
+                        _score_ordinal_hypers(new_cutpoints.at[k_idx].set(float(gv)), s0)
+                        for gv in grid
+                    ]
+                )
+                scores = scores - jnp.max(scores)
+                new_cutpoints = new_cutpoints.at[k_idx].set(
+                    float(grid[jax.random.categorical(cp_keys[k_idx], scores)])
+                )
+
+            # Sample mu prior variance
+            rng_key, k_s = jax.random.split(rng_key)
+            s_grid = jnp.exp(jnp.linspace(jnp.log(0.1), jnp.log(100.0), 31))
+            s_scores = jnp.array(
+                [_score_ordinal_hypers(new_cutpoints, float(sv)) for sv in s_grid]
+            )
+            s_scores = s_scores - jnp.max(s_scores)
+            new_s = float(s_grid[jax.random.categorical(k_s, s_scores)])
+
+            new_hypers[j] = ColumnHypers(
+                column_type=col_type,
+                mu=jnp.array(mu0),
+                s=jnp.array(new_s),
+                cutpoints=new_cutpoints,
+            )
 
     return CrossCatState(
         column_assignments=state.column_assignments,

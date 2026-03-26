@@ -99,6 +99,90 @@ def _bb_log_marginal(n, sum_x, alpha, beta):
     return jnp.where(n > 0, log_ml, 0.0)
 
 
+def _ol_level_probs(mu, cutpoints):
+    """Compute P(Y=k | μ, cutpoints) for all K levels.
+
+    Uses the cumulative logistic link: P(Y=k) = σ(c_k - μ) - σ(c_{k-1} - μ).
+    Cutpoints padded with +inf produce probability 0 for padded levels.
+    """
+    extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
+    cum = jax.nn.sigmoid(extended - mu)
+    probs = cum[1:] - cum[:-1]
+    return jnp.maximum(probs, LOG_EPS)
+
+
+_OL_N_GRID = 31  # grid points for μ integration, matches hyper grid size
+
+
+def _ol_log_marginal(n, cat_counts, cutpoints, mu0, s0):
+    """Ordered logistic log marginal likelihood via grid integration over μ.
+
+    Non-conjugate: integrates p(counts | μ, cutpoints) · p(μ) over a μ grid.
+    Prior: μ ~ N(mu0, s0). Returns 0.0 for empty clusters (n=0).
+    """
+    n = n.astype(jnp.float32)
+    s0 = jnp.maximum(s0, LOG_EPS)
+    half_range = 4.0 * jnp.sqrt(s0)
+    mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, _OL_N_GRID)
+    delta_mu = 2.0 * half_range / (_OL_N_GRID - 1)
+
+    def log_score_at_mu(mu):
+        probs = _ol_level_probs(mu, cutpoints)
+        log_lik = jnp.sum(cat_counts * jnp.log(probs))
+        log_prior = -0.5 * jnp.log(2.0 * jnp.pi * s0) - 0.5 * (mu - mu0) ** 2 / s0
+        return log_lik + log_prior
+
+    log_scores = jax.vmap(log_score_at_mu)(mu_grid)
+    log_marginal = jax.nn.logsumexp(log_scores) + jnp.log(delta_mu)
+    return jnp.where(n > 0, log_marginal, 0.0)
+
+
+def _ol_posterior_predictive_logp(x, n, cat_counts, cutpoints, mu0, s0):
+    """Ordered logistic posterior predictive log p(x=k | data, cutpoints).
+
+    Integrates P(Y=k | μ) · p(μ | data) over μ grid.
+    """
+    s0 = jnp.maximum(s0, LOG_EPS)
+    half_range = 4.0 * jnp.sqrt(s0)
+    mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, _OL_N_GRID)
+
+    def log_unnorm_posterior(mu):
+        probs = _ol_level_probs(mu, cutpoints)
+        return jnp.sum(cat_counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
+
+    log_weights = jax.vmap(log_unnorm_posterior)(mu_grid)
+    log_weights = log_weights - jax.nn.logsumexp(log_weights)
+    weights = jnp.exp(log_weights)
+
+    all_probs = jax.vmap(lambda mu: _ol_level_probs(mu, cutpoints))(mu_grid)
+    avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+
+    x_int = jnp.clip(x.astype(jnp.int32), 0, cat_counts.shape[-1] - 1)
+    return jnp.log(jnp.maximum(avg_probs[x_int], LOG_EPS))
+
+
+def _ol_sample(rng_key, n, cat_counts, cutpoints, mu0, s0):
+    """Sample from ordered logistic posterior predictive."""
+    s0 = jnp.maximum(s0, LOG_EPS)
+    half_range = 4.0 * jnp.sqrt(s0)
+    mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, _OL_N_GRID)
+
+    def log_unnorm_posterior(mu):
+        probs = _ol_level_probs(mu, cutpoints)
+        return jnp.sum(cat_counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
+
+    log_weights = jax.vmap(log_unnorm_posterior)(mu_grid)
+    log_weights = log_weights - jax.nn.logsumexp(log_weights)
+    weights = jnp.exp(log_weights)
+
+    all_probs = jax.vmap(lambda mu: _ol_level_probs(mu, cutpoints))(mu_grid)
+    avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+
+    return jax.random.categorical(rng_key, jnp.log(jnp.maximum(avg_probs, LOG_EPS))).astype(
+        jnp.float32
+    )
+
+
 def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """Von Mises log marginal likelihood (exact conjugate).
 
@@ -138,6 +222,7 @@ def unified_log_marginal(
     kappa,
     vm_a,
     vm_mu,
+    cutpoints,
 ):
     """Compute log marginal likelihood for any column type without Python branching.
 
@@ -147,7 +232,7 @@ def unified_log_marginal(
     continuous_score = _ng_log_marginal(count, sum_x, sum_x_sq, mu, r, s, nu)
     cat_score = _dc_log_marginal(count, cat_counts, dir_alpha)
     binary_score = _bb_log_marginal(count, sum_x, alpha, beta)
-    ordinal_score = _dc_log_marginal(count, cat_counts, dir_alpha)
+    ordinal_score = _ol_log_marginal(count, cat_counts, cutpoints, mu, s)
     cyclic_score = _vm_log_marginal(count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
@@ -253,12 +338,13 @@ def unified_posterior_predictive_logp(
     kappa,
     vm_a,
     vm_mu,
+    cutpoints,
 ):
     """Compute posterior predictive logp for any column type without Python branching."""
     cont = _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu, r, s, nu)
     cat = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
     binary = _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta)
-    ordinal = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
+    ordinal = _ol_posterior_predictive_logp(x, count, cat_counts, cutpoints, mu, s)
     cyclic = _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
 
     return jnp.where(
@@ -381,6 +467,7 @@ def unified_sample_posterior_predictive(
     kappa,
     vm_a,
     vm_mu,
+    cutpoints,
 ):
     """Sample from posterior predictive for any column type without Python branching.
 
@@ -392,17 +479,18 @@ def unified_sample_posterior_predictive(
         type_id: Integer column type ID.
         count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos: Sufficient statistics.
         mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_a, vm_mu: Hyperparameters.
+        cutpoints: (max_categories - 1,) ordered thresholds for ordinal.
 
     Returns:
         Scalar sample from the posterior predictive distribution.
     """
-    k1, k2, k3, k4 = jax.random.split(rng_key, 4)
+    k1, k2, k3, k4, k5 = jax.random.split(rng_key, 5)
 
     cont_sample = _ng_sample(k1, count, sum_x, sum_x_sq, mu, r, s, nu)
     cat_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
     binary_sample = _bb_sample(k3, count, sum_x, alpha, beta)
     cyclic_sample = _vm_sample(k4, count, sum_sin, sum_cos, kappa, vm_a, vm_mu)
-    ordinal_sample = _dc_sample(k2, count, cat_counts, dir_alpha)
+    ordinal_sample = _ol_sample(k5, count, cat_counts, cutpoints, mu, s)
 
     return jnp.where(
         type_id == CONTINUOUS_ID,

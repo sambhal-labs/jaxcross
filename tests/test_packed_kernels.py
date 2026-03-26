@@ -131,6 +131,7 @@ def test_score_row_all_clusters_produces_valid_scores(mixed_packed_state):
                 packed.hyper_kappa,
                 packed.hyper_vm_a,
                 packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
                 alpha,
                 max_c,
             )
@@ -380,6 +381,7 @@ def test_unified_sampler_continuous(mixed_packed_state):
         packed.hyper_kappa[cont_col],
         packed.hyper_vm_a[cont_col],
         packed.hyper_vm_mu[cont_col],
+        packed.hyper_cutpoints[cont_col],
     )
 
     assert jnp.isfinite(sample), f"Sample is not finite: {sample}"
