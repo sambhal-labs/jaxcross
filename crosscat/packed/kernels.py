@@ -1921,6 +1921,7 @@ def packed_insert_rows(
                 packed.hyper_kappa,
                 packed.hyper_vm_a,
                 packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
                 packed.view_row_crp_alpha[v],
                 max_k,
             )
@@ -1984,6 +1985,7 @@ def packed_insert_rows(
         hyper_kappa=packed.hyper_kappa,
         hyper_vm_a=packed.hyper_vm_a,
         hyper_vm_mu=packed.hyper_vm_mu,
+        hyper_cutpoints=packed.hyper_cutpoints,
         view_column_indices=packed.view_column_indices,
         view_n_columns=packed.view_n_columns,
         view_row_assignments=new_view_row_assigns,
