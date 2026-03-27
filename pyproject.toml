@@ -53,11 +53,18 @@ benchmark = [
     "pandas>=2.0",
     "seaborn>=0.13",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+    "mike>=2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/sambhal-labs/jaxcross"
 Repository = "https://github.com/sambhal-labs/jaxcross"
 Issues = "https://github.com/sambhal-labs/jaxcross/issues"
+Documentation = "https://sambhal-labs.github.io/jaxcross/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["crosscat"]

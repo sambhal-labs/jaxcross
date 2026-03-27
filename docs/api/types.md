@@ -1,0 +1,77 @@
+# Types & State
+
+::: crosscat.types
+    options:
+      show_source: false
+
+## Overview
+
+Core dataclasses and types for all CrossCat state.
+
+## `ColumnType`
+
+Enum specifying column data types.
+
+| Value | Description | Component Model |
+|-------|-------------|-----------------|
+| `CONTINUOUS` | Real-valued data | NormalGamma (Normal-Inverse-Gamma) |
+| `CATEGORICAL` | Unordered integer labels | DirichletCategorical |
+| `BINARY` | 0 or 1 | BetaBernoulli |
+| `ORDINAL` | Ordered integer levels | OrderedLogistic (cumulative link) |
+| `CYCLIC` | Angles in [0, 2*pi) | VonMises |
+
+## `CrossCatState`
+
+Full model state containing column partition, row clusterings, hyperparameters, and sufficient statistics.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `column_assignments` | `Array (n_cols,)` | Column-to-view mapping |
+| `column_crp_alpha` | `Array (scalar)` | Outer DP concentration |
+| `column_hypers` | `list[ColumnHypers]` | Per-column hyperparameters |
+| `column_types` | `list[ColumnType]` | Per-column type |
+| `views` | `list[ViewState]` | View states |
+| `n_rows` | `int` | Number of data rows |
+| `n_cols` | `int` | Number of data columns |
+| `n_views` | `int` (property) | Number of active views |
+
+## `ViewState`
+
+State for a single view (column group).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `column_indices` | `Array (n_cols_in_view,)` | Which columns belong to this view |
+| `row_assignments` | `Array (n_rows,)` | Row-to-cluster mapping |
+| `row_crp_alpha` | `Array (scalar)` | Inner DP concentration |
+| `suffstats` | `list[list[SufficientStats]]` | `suffstats[cluster][col_in_view]` |
+
+## `ColumnHypers`
+
+Per-column hyperparameters. Fields vary by column type.
+
+| Field | Type | Used by |
+|-------|------|---------|
+| `column_type` | `ColumnType` | All |
+| `mu`, `r`, `s`, `nu` | `Array \| None` | CONTINUOUS (Normal-Gamma) |
+| `dirichlet_alpha` | `Array \| None` | CATEGORICAL |
+| `alpha`, `beta` | `Array \| None` | BINARY (Beta-Bernoulli) |
+| `cutpoints` | `Array \| None` | ORDINAL (Ordered Logistic) |
+| `kappa`, `vm_a`, `vm_mu` | `Array \| None` | CYCLIC (Von Mises) |
+
+## `SufficientStats`
+
+Sufficient statistics for a (cluster, column) pair.
+
+| Field | Type | Used by |
+|-------|------|---------|
+| `column_type` | `ColumnType` | All |
+| `count` | `Array` | All |
+| `sum_x` | `Array \| None` | CONTINUOUS, ORDINAL |
+| `sum_x_sq` | `Array \| None` | CONTINUOUS |
+| `category_counts` | `Array \| None` | CATEGORICAL, BINARY, ORDINAL |
+| `sum_sin`, `sum_cos` | `Array \| None` | CYCLIC |
+
+## Constants
+
+- `LOG_EPS = 1e-30` — Numerical stability constant used throughout for underflow protection in `log()` and division operations.

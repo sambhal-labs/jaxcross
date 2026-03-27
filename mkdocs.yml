@@ -1,0 +1,142 @@
+site_name: JAX-CrossCat
+site_description: GPU-accelerated Bayesian cross-categorization in JAX
+site_url: https://sambhal-labs.github.io/jaxcross/
+repo_url: https://github.com/sambhal-labs/jaxcross
+repo_name: sambhal-labs/jaxcross
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            docstring_style: google
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ['.']
+  - pymdownx.arithmatex:
+      generic: true
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/sambhal-labs/jaxcross
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - Feature Guides:
+    - guides/index.md
+    - Data Loading & Column Types: guides/data-loading.md
+    - Model Initialization: guides/initialization.md
+    - Running Inference: guides/inference.md
+    - GPU Acceleration (Packed Path): guides/gpu-packed.md
+    - Querying the Posterior:
+      - Conditional Sampling: guides/queries/sampling.md
+      - Anomaly Detection: guides/queries/anomaly-detection.md
+      - Dependence Discovery: guides/queries/dependence.md
+      - Imputation: guides/queries/imputation.md
+      - Mutual Information: guides/queries/mutual-information.md
+      - Row Similarity: guides/queries/row-similarity.md
+      - Predictive CDF & Probability: guides/queries/predictive-probability.md
+    - Constraint Enforcement: guides/constraints.md
+    - Missing Data Handling: guides/missing-data.md
+    - Serialization & Checkpointing: guides/serialization.md
+    - Multi-Chain Inference: guides/multi-chain.md
+    - Convergence Diagnostics: guides/diagnostics.md
+    - Online Learning (Row Insertion): guides/online-learning.md
+    - XLA Compilation Caching: guides/xla-cache.md
+    - Streamlit Dashboard: guides/dashboard.md
+  - API Reference:
+    - api/index.md
+    - Types & State: api/types.md
+    - Model: api/model.md
+    - Component Models: api/components.md
+    - Gibbs Sampling: api/gibbs.md
+    - Inference Queries: api/inference.md
+    - Constraints: api/constraints.md
+    - Diagnostics: api/diagnostics.md
+    - Data Utilities: api/data-utils.md
+    - Serialization: api/serialization.md
+    - Synthetic Data: api/synthetic.md
+    - Validation: api/validation.md
+    - Packed State: api/packed-state.md
+    - Packed Kernels: api/packed-kernels.md
+    - Packed Components: api/packed-components.md
+    - Packed Inference: api/packed-inference.md
+    - Packed Suffstats: api/packed-suffstats.md
+    - AOT Cache: api/aot-cache.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - The CrossCat Model: architecture/model.md
+    - Gibbs Kernels in Detail: architecture/gibbs-kernels.md
+    - Packed State Design: architecture/packed-state.md
+    - Performance Optimizations: architecture/performance.md
+    - JAX Design Patterns: architecture/jax-patterns.md
+  - Examples:
+    - MNIST Benchmark: examples/mnist.md
+    - CSV End-to-End Workflow: examples/csv-workflow.md
+  - Changelog: changelog.md
+  - Contributing: contributing.md
