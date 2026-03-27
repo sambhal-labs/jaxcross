@@ -43,7 +43,8 @@ After initializing a model, inference is how the model learns from data.
 from crosscat import log_joint
 
 for batch in range(10):
-    packed = packed_gibbs_sweep(key, packed, data, n_sweeps=10)
+    key, subkey = jax.random.split(key)
+    packed = packed_gibbs_sweep(subkey, packed, data, n_sweeps=10)
     state = unpack_state(packed, col_types, data=data)
     score = log_joint(state, data)
     print(f"Sweep {(batch+1)*10}: log_joint={score:.1f}, views={state.n_views}")

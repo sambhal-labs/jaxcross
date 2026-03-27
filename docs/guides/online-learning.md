@@ -52,7 +52,7 @@ print(f"Completed: {completed_row}")
 
 - Row insertion uses the **current** cluster structure — it doesn't update existing assignments
 - For best results, run a few more Gibbs sweeps after inserting many new rows
-- Insertion is fast (no JIT compilation needed)
+- Unpacked `insert_rows` is fast (pure Python, no JIT). Packed `packed_insert_rows` triggers JIT compilation on first call
 
 ## API Reference
 

@@ -95,7 +95,7 @@ Posterior probability that two columns are dependent (share a view). Fraction of
 ### `dependence_matrix`
 
 ```python
-dependence_matrix(states, columns=None) -> Array
+dependence_matrix(states) -> Array
 ```
 
 Full dependence probability matrix (Z-matrix). `Z[i,j]` = fraction of posterior samples where columns i and j share a view. Diagonal is always 1.0. Symmetric.
@@ -180,7 +180,7 @@ impute_and_confidence(
 ) -> tuple[Array, Array]
 ```
 
-Impute a missing value with confidence. Continuous: median + IQR-based confidence. Discrete: mode + mode frequency.
+Impute a missing value with confidence. Continuous: median + std-based confidence `1 / (1 + std)`. Discrete: mode + mode frequency.
 
 **Returns**: `(point_estimate, confidence_score)`.
 

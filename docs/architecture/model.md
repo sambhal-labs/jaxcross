@@ -59,7 +59,7 @@ Each column type uses a conjugate Bayesian model:
 |------|-------|------------|----------------------|
 | CONTINUOUS | Normal-Gamma | Yes | count, sum_x, sum_x_sq |
 | CATEGORICAL | Dirichlet-Categorical | Yes | count, category_counts |
-| BINARY | Beta-Bernoulli | Yes | count, category_counts |
+| BINARY | Beta-Bernoulli | Yes | count, sum_x |
 | ORDINAL | Ordered Logistic | No (grid integration) | count, category_counts |
 | CYCLIC | Von Mises | Yes | count, sum_sin, sum_cos |
 

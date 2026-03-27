@@ -136,7 +136,7 @@ from crosscat import predictive_anomalousness
 
 key, subkey = jax.random.split(key)
 score = predictive_anomalousness(subkey, state, data, query_row=42)
-print(f"Anomaly score: {score:.3f}")  # 0=normal, 1=anomalous
+print(f"Anomaly score: {score:.3f}")  # closer to 0=normal, closer to 1=anomalous
 ```
 
 ### Dependence Discovery

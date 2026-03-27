@@ -12,7 +12,7 @@ Identify unusual rows using two complementary approaches: predictive anomaly sco
 
 ## Predictive Anomaly Score
 
-Compares each row's predictive probability against Monte Carlo samples. High score = anomalous.
+Computes the average log predictive probability of each column value in the row under the posterior, then transforms to a [0, 1] anomaly scale via sigmoid. High score = anomalous.
 
 ```python
 from crosscat import predictive_anomalousness
