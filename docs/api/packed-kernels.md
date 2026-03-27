@@ -23,12 +23,11 @@ All Gibbs kernels are fully JIT-compiled using `jax.lax.scan` and `jax.vmap`. Su
 ```python
 packed_gibbs_sweep(
     rng_key, packed, data, *,
-    n_sweeps=1,
-    kernels=("row_assignments", "column_assignments", "column_hypers", "crp_alphas")
+    n_sweeps=1
 ) -> PackedCrossCatState
 ```
 
-Run full Gibbs sweeps on packed state using `lax.scan` for maximum throughput. Each sweep runs all specified kernels.
+Run full Gibbs sweeps on packed state using `lax.scan` for maximum throughput. Each sweep runs all 4 kernels (row assignments, column assignments, column hypers, CRP alphas). To run individual kernels selectively, call the sub-kernel functions directly.
 
 **Returns**: Updated `PackedCrossCatState`.
 

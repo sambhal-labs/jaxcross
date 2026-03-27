@@ -38,7 +38,7 @@ print(f"Initialized {len(states)} chains")
 
 ```python
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
-from crosscat.packed.kernels import packed_log_joint
+from crosscat import packed_log_joint
 from crosscat.packed.aot_cache import enable_xla_cache
 
 # Enable compilation caching

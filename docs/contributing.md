@@ -82,5 +82,5 @@ GitHub Actions runs lint + format + type check only (~1 min). No pytest in CI (G
 
 ```bash
 uv sync --extra docs
-mkdocs serve  # local preview at localhost:8000
+uv run mkdocs serve  # local preview at localhost:8000
 ```
