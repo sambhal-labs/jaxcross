@@ -18,9 +18,12 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import jax
+from jax import Array
 
 from crosscat.packed.state import _STATIC_FIELDS, PackedCrossCatState
 
@@ -47,11 +50,11 @@ def _meta_path(fn_name: str, sig: str, cache_dir: Path) -> Path:
 
 
 def compile_and_cache(
-    fn,
+    fn: Callable,
     fn_name: str,
-    *example_args,
+    *example_args: Any,
     cache_dir: Path | None = None,
-):
+) -> Callable:
     """Compile a function via JAX and cache the compiled executable.
 
     Uses jax.jit().lower().compile() to get a compiled function, then
@@ -134,7 +137,7 @@ def enable_xla_cache(cache_dir: Path | None = None):
     logger.info("XLA persistent cache enabled at %s", cache_dir)
 
 
-def compile_kernels(packed: PackedCrossCatState, data) -> None:
+def compile_kernels(packed: PackedCrossCatState, data: Array) -> None:
     """Pre-compile all Gibbs sub-kernels for the given state shape.
 
     Call this after packing state to trigger compilation upfront rather than

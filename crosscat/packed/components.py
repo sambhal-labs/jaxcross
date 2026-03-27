@@ -205,29 +205,52 @@ def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_a, vm_mu):
 
 
 def unified_log_marginal(
-    type_id,
-    count,
-    sum_x,
-    sum_x_sq,
-    cat_counts,
-    sum_sin,
-    sum_cos,
-    mu,
-    r,
-    s,
-    nu,
-    dir_alpha,
-    alpha,
-    beta,
-    kappa,
-    vm_a,
-    vm_mu,
-    cutpoints,
-):
+    type_id: Array,
+    count: Array,
+    sum_x: Array,
+    sum_x_sq: Array,
+    cat_counts: Array,
+    sum_sin: Array,
+    sum_cos: Array,
+    mu: Array,
+    r: Array,
+    s: Array,
+    nu: Array,
+    dir_alpha: Array,
+    alpha: Array,
+    beta: Array,
+    kappa: Array,
+    vm_a: Array,
+    vm_mu: Array,
+    cutpoints: Array,
+) -> Array:
     """Compute log marginal likelihood for any column type without Python branching.
 
     Computes ALL type results and selects the correct one via jnp.where.
     This wastes trivial compute but enables full JIT compilation.
+
+    Args:
+        type_id: Integer column type ID (CONTINUOUS_ID, CATEGORICAL_ID, etc.).
+        count: Observation count in cluster.
+        sum_x: Sum of values (continuous).
+        sum_x_sq: Sum of squared values (continuous).
+        cat_counts: Category count vector (categorical/binary/ordinal).
+        sum_sin: Sum of sin(x) (cyclic).
+        sum_cos: Sum of cos(x) (cyclic).
+        mu: Normal-Gamma prior mean.
+        r: Normal-Gamma prior count.
+        s: Normal-Gamma prior sum-of-squares.
+        nu: Normal-Gamma prior degrees of freedom.
+        dir_alpha: Dirichlet concentration.
+        alpha: Beta-Bernoulli prior successes.
+        beta: Beta-Bernoulli prior failures.
+        kappa: Von Mises likelihood concentration.
+        vm_a: Von Mises prior concentration.
+        vm_mu: Von Mises prior mean direction.
+        cutpoints: Ordered thresholds for ordinal (max_categories - 1,).
+
+    Returns:
+        Scalar log marginal likelihood for the column type indicated by type_id.
     """
     continuous_score = _ng_log_marginal(count, sum_x, sum_x_sq, mu, r, s, nu)
     cat_score = _dc_log_marginal(count, cat_counts, dir_alpha)
@@ -320,27 +343,54 @@ def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu
 
 
 def unified_posterior_predictive_logp(
-    x,
-    type_id,
-    count,
-    sum_x,
-    sum_x_sq,
-    cat_counts,
-    sum_sin,
-    sum_cos,
-    mu,
-    r,
-    s,
-    nu,
-    dir_alpha,
-    alpha,
-    beta,
-    kappa,
-    vm_a,
-    vm_mu,
-    cutpoints,
-):
-    """Compute posterior predictive logp for any column type without Python branching."""
+    x: Array,
+    type_id: Array,
+    count: Array,
+    sum_x: Array,
+    sum_x_sq: Array,
+    cat_counts: Array,
+    sum_sin: Array,
+    sum_cos: Array,
+    mu: Array,
+    r: Array,
+    s: Array,
+    nu: Array,
+    dir_alpha: Array,
+    alpha: Array,
+    beta: Array,
+    kappa: Array,
+    vm_a: Array,
+    vm_mu: Array,
+    cutpoints: Array,
+) -> Array:
+    """Compute posterior predictive logp for any column type without Python branching.
+
+    Computes ALL type results and selects the correct one via jnp.where.
+
+    Args:
+        x: New observation value to score.
+        type_id: Integer column type ID (CONTINUOUS_ID, CATEGORICAL_ID, etc.).
+        count: Observation count in cluster.
+        sum_x: Sum of values (continuous).
+        sum_x_sq: Sum of squared values (continuous).
+        cat_counts: Category count vector (categorical/binary/ordinal).
+        sum_sin: Sum of sin(x) (cyclic).
+        sum_cos: Sum of cos(x) (cyclic).
+        mu: Normal-Gamma prior mean.
+        r: Normal-Gamma prior count.
+        s: Normal-Gamma prior sum-of-squares.
+        nu: Normal-Gamma prior degrees of freedom.
+        dir_alpha: Dirichlet concentration.
+        alpha: Beta-Bernoulli prior successes.
+        beta: Beta-Bernoulli prior failures.
+        kappa: Von Mises likelihood concentration.
+        vm_a: Von Mises prior concentration.
+        vm_mu: Von Mises prior mean direction.
+        cutpoints: Ordered thresholds for ordinal (max_categories - 1,).
+
+    Returns:
+        Scalar log predictive probability for the column type indicated by type_id.
+    """
     cont = _ng_posterior_predictive_logp(x, count, sum_x, sum_x_sq, mu, r, s, nu)
     cat = _dc_posterior_predictive_logp(x, count, cat_counts, dir_alpha)
     binary = _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta)
@@ -449,26 +499,26 @@ def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
 
 
 def unified_sample_posterior_predictive(
-    rng_key,
-    type_id,
-    count,
-    sum_x,
-    sum_x_sq,
-    cat_counts,
-    sum_sin,
-    sum_cos,
-    mu,
-    r,
-    s,
-    nu,
-    dir_alpha,
-    alpha,
-    beta,
-    kappa,
-    vm_a,
-    vm_mu,
-    cutpoints,
-):
+    rng_key: Array,
+    type_id: Array,
+    count: Array,
+    sum_x: Array,
+    sum_x_sq: Array,
+    cat_counts: Array,
+    sum_sin: Array,
+    sum_cos: Array,
+    mu: Array,
+    r: Array,
+    s: Array,
+    nu: Array,
+    dir_alpha: Array,
+    alpha: Array,
+    beta: Array,
+    kappa: Array,
+    vm_a: Array,
+    vm_mu: Array,
+    cutpoints: Array,
+) -> Array:
     """Sample from posterior predictive for any column type without Python branching.
 
     Computes ALL type samples and selects the correct one via jnp.where.
@@ -476,10 +526,24 @@ def unified_sample_posterior_predictive(
 
     Args:
         rng_key: PRNG key for sampling.
-        type_id: Integer column type ID.
-        count, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos: Sufficient statistics.
-        mu, r, s, nu, dir_alpha, alpha, beta, kappa, vm_a, vm_mu: Hyperparameters.
-        cutpoints: (max_categories - 1,) ordered thresholds for ordinal.
+        type_id: Integer column type ID (CONTINUOUS_ID, CATEGORICAL_ID, etc.).
+        count: Observation count in cluster.
+        sum_x: Sum of values (continuous).
+        sum_x_sq: Sum of squared values (continuous).
+        cat_counts: Category count vector (categorical/binary/ordinal).
+        sum_sin: Sum of sin(x) (cyclic).
+        sum_cos: Sum of cos(x) (cyclic).
+        mu: Normal-Gamma prior mean.
+        r: Normal-Gamma prior count.
+        s: Normal-Gamma prior sum-of-squares.
+        nu: Normal-Gamma prior degrees of freedom.
+        dir_alpha: Dirichlet concentration.
+        alpha: Beta-Bernoulli prior successes.
+        beta: Beta-Bernoulli prior failures.
+        kappa: Von Mises likelihood concentration.
+        vm_a: Von Mises prior concentration.
+        vm_mu: Von Mises prior mean direction.
+        cutpoints: Ordered thresholds for ordinal (max_categories - 1,).
 
     Returns:
         Scalar sample from the posterior predictive distribution.
