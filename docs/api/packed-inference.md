@@ -103,7 +103,7 @@ Posterior probability that two columns are dependent.
 ### `packed_dependence_matrix`
 
 ```python
-packed_dependence_matrix(packed_states, columns=None) -> Array
+packed_dependence_matrix(packed_states) -> Array
 ```
 
 Full Z-matrix from packed states.
