@@ -51,16 +51,29 @@ for batch in range(10):
 
 ## Kernel Selection
 
-You can run a subset of kernels per sweep:
+The **unpacked** `gibbs_sweep` supports selecting which kernels to run:
 
 ```python
-# Only resample row assignments (fastest)
-packed = packed_gibbs_sweep(key, packed, data, n_sweeps=10,
-                            kernels=("row_assignments",))
+# Unpacked path: run a subset of kernels
+state = gibbs_sweep(key, state, data, n_sweeps=10,
+                    kernels=("row_assignments",))
+```
 
-# Skip column reassignment (useful when structure is known)
-packed = packed_gibbs_sweep(key, packed, data, n_sweeps=10,
-                            kernels=("row_assignments", "column_hypers", "crp_alphas"))
+The **packed** path always runs all 4 kernels per sweep. To run individual kernels selectively, call the sub-kernels directly:
+
+```python
+from crosscat.packed.kernels import (
+    packed_transition_row_assignments,
+    packed_transition_column_hypers,
+    packed_transition_crp_alphas,
+)
+
+# Only resample row assignments
+packed = packed_transition_row_assignments(key, packed, data)
+
+# Or use packed_gibbs_step for all 4 kernels once (used by constraints)
+from crosscat.packed.kernels import packed_gibbs_step
+packed = packed_gibbs_step(key, packed, data)
 ```
 
 | Kernel | What It Does | Cost |
