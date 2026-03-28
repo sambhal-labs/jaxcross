@@ -547,7 +547,7 @@ def packed_impute_and_confidence(
 ) -> tuple[Array, Array]:
     """Impute a value with confidence score using packed state.
 
-    For continuous columns: returns median, confidence from exp(-IQR/std).
+    For continuous columns: returns median, confidence = 1/(1+std).
     For discrete columns: returns mode, confidence = mode frequency.
 
     Args:

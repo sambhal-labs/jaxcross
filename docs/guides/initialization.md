@@ -68,6 +68,21 @@ state = initialize(key, data, col_types,
 !!! tip
     These are prior parameters, not hard constraints. The Gibbs sampler will adjust the actual number of views and clusters during inference.
 
+## Column Type-Specific Hyperparameter Defaults
+
+Hyperparameters are initialized automatically from the data:
+
+| Type | Hyperparameters | Default Initialization |
+|------|----------------|----------------------|
+| CONTINUOUS | `mu`, `r`, `s`, `nu` | `mu=mean(data)`, `r=1`, `s=var(data)`, `nu=1` |
+| CATEGORICAL | `dirichlet_alpha` | `dirichlet_alpha=1.0` |
+| BINARY | `alpha`, `beta` | `alpha=1.0`, `beta=1.0` |
+| ORDINAL | `cutpoints`, `mu`, `s` | `cutpoints=linspace(-2, 2, K-1)`, `mu=0`, `s=4` |
+| CYCLIC | `kappa`, `vm_a`, `vm_mu` | Data-driven MLE estimates |
+
+!!! info "Ordinal columns are non-conjugate"
+    The OrderedLogistic model uses grid integration (31-point grid over latent location), which is slower than conjugate models. This is expected and correct.
+
 ## Tips
 
 - **Always use multi-chain** for any serious analysis (4+ chains)
