@@ -375,11 +375,15 @@ def unpack_state(
                 column_type=ct, alpha=packed.hyper_alpha[j], beta=packed.hyper_beta[j]
             )
         elif ct == ColumnType.ORDINAL:
+            # Trim padded cutpoints (+inf) to actual number of levels
+            raw_cp = packed.hyper_cutpoints[j]
+            n_real = int(jnp.sum(jnp.isfinite(raw_cp)))
+            trimmed_cp = raw_cp[: max(n_real, 1)]
             h = ColumnHypers(
                 column_type=ct,
                 mu=packed.hyper_mu[j],
                 s=packed.hyper_s[j],
-                cutpoints=packed.hyper_cutpoints[j],
+                cutpoints=trimmed_cp,
             )
         elif ct == ColumnType.CYCLIC:
             h = ColumnHypers(
