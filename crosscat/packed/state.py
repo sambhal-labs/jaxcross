@@ -375,10 +375,17 @@ def unpack_state(
                 column_type=ct, alpha=packed.hyper_alpha[j], beta=packed.hyper_beta[j]
             )
         elif ct == ColumnType.ORDINAL:
-            # Trim padded cutpoints (+inf) to actual number of levels
+            # Determine actual level count from data (padded cutpoints may
+            # have been sampled to finite values during Gibbs sweeps)
             raw_cp = packed.hyper_cutpoints[j]
-            n_real = int(jnp.sum(jnp.isfinite(raw_cp)))
-            trimmed_cp = raw_cp[: max(n_real, 1)]
+            if data is not None:
+                col_data = data[:, j]
+                valid = col_data[~jnp.isnan(col_data)]
+                n_levels = int(jnp.max(valid)) + 1 if valid.size > 0 else 2
+            else:
+                n_levels = int(jnp.sum(jnp.isfinite(raw_cp))) + 1
+                n_levels = max(n_levels, 2)
+            trimmed_cp = raw_cp[: n_levels - 1]
             h = ColumnHypers(
                 column_type=ct,
                 mu=packed.hyper_mu[j],
