@@ -130,3 +130,51 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 - Python 3.11+, ruff for linting (rules: E, F, I, W, UP, B, SIM), line length 99
 - Type hints throughout
 - Private functions prefixed with `_`
+
+## Docs Index
+
+IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before making changes to related code.
+
+|root: ./docs
+|getting-started:{installation.md,quickstart.md,concepts.md}
+|architecture:{overview.md,model.md,gibbs-kernels.md,packed-state.md,jax-patterns.md,performance.md}
+|guides:{data-loading.md,initialization.md,inference.md,gpu-packed.md,multi-chain.md,constraints.md,serialization.md,xla-cache.md,missing-data.md,online-learning.md,diagnostics.md,dashboard.md}
+|guides/queries:{predictive-probability.md,sampling.md,anomaly-detection.md,dependence.md,imputation.md,mutual-information.md,row-similarity.md}
+|api:{types.md,components.md,model.md,gibbs.md,inference.md,packed-state.md,packed-components.md,packed-kernels.md,packed-inference.md,packed-suffstats.md,aot-cache.md,serialization.md,synthetic.md,constraints.md,diagnostics.md,data-utils.md,validation.md}
+|examples:{csv-workflow.md,mnist.md}
+
+## Common Workflows
+
+### Adding a new component model
+Read: docs/architecture/model.md, docs/api/components.md
+1. `crosscat/components.py` — add class with `sufficient_statistics`, `log_marginal_likelihood`, `posterior_predictive_logp`, `sample_posterior_predictive`
+2. `crosscat/packed/components.py` — add `_XX_log_marginal`, `_XX_posterior_predictive_logp`, `_XX_sample`; update 3 `unified_*` functions with new branch
+3. `crosscat/packed/state.py` — add any new hyper fields to `PackedCrossCatState` + `_ARRAY_FIELDS`; update `pack_state`/`unpack_state`
+4. `crosscat/packed/kernels.py` — thread new hypers through all scoring functions; add hyper transition in `packed_transition_column_hypers`; update `packed_insert_rows` constructor
+5. `crosscat/model.py` — add initialization in `_default_hypers`
+6. `crosscat/gibbs.py` — add hyper transition
+7. `crosscat/packed_inference.py` — thread new hypers through inference calls
+8. `tests/test_property.py` — add empty=0, finite, dispatch parity tests
+9. `crosscat/serialization.py` — bump `_SCHEMA_VERSION`, add migration in `load_packed_state`
+
+### Adding a new inference query
+Read: docs/guides/inference.md, docs/api/inference.md
+1. `crosscat/inference.py` — add unpacked implementation
+2. `crosscat/packed_inference.py` — add packed implementation
+3. `crosscat/__init__.py` — export both
+4. `tests/` — add unit test + parity test (see `test_packed_inference_parity.py`)
+
+### Debugging numerical issues
+Read: docs/architecture/performance.md
+- Check `LOG_EPS` guards: grep for `jnp.log` without `jnp.maximum`
+- Check NaN propagation: run with `jax.config.update("jax_debug_nans", True)`
+- Verify suffstat roundtrip: `test_property.py::test_suffstat_add_remove_roundtrip_*`
+- Compare packed vs unpacked: `test_packed_inference_parity.py`
+
+## Common Pitfalls
+
+- **JAX evaluates both branches of `jnp.where`** — padded values (+inf, NaN) flow through "unused" branches. Always clamp inputs to finite range before `linspace`/`vmap`.
+- **`@jax.jit` on sub-functions is inlined** inside `lax.scan`/`vmap` — decorators only take effect when called from Python.
+- **`PackedCrossCatState` constructor requires ALL fields** — when adding a new field, update EVERY place that constructs the state (`kernels.py` has 2+ sites, `packed_insert_rows` has its own constructor).
+- **Serialization schema version** — bump `_SCHEMA_VERSION` and add migration in `load_packed_state` when adding new array fields.
+- **Ordinal cutpoints are padded with +inf** — kernel must mask updates to only real cutpoints (determined from `cat_counts`, not `isfinite`).
