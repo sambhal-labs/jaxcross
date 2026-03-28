@@ -961,6 +961,12 @@ def packed_transition_column_hypers(
         nc = packed.view_n_clusters[v_idx]
         counts_col_cat = packed.ss_cat_counts[v_idx, :, local_idx]  # (max_c, max_cats)
 
+        # Determine actual number of ordinal levels from cat_counts.
+        # Padded levels have zero counts across all clusters.
+        level_has_obs = jnp.any(counts_col_cat > 0, axis=0)  # (max_cats,)
+        max_level_idx = jnp.max(jnp.where(level_has_obs, jnp.arange(max_cats), 0))
+        n_real_cutpoints = max_level_idx  # K levels → K-1 cutpoints
+
         def _update_one_cutpoint(carry, k_idx):
             cutpts, key = carry
             k_cp, key = jax.random.split(key)
@@ -984,7 +990,9 @@ def packed_transition_column_hypers(
             scores = jax.vmap(score_candidate)(grid)
             scores = scores - jnp.max(scores)
             chosen = grid[jax.random.categorical(k_cp, scores)]
-            new_cutpts = cutpts.at[k_idx].set(chosen)
+            # Only update real cutpoints; padded ones stay at +inf
+            is_real = k_idx < n_real_cutpoints
+            new_cutpts = jnp.where(is_real, cutpts.at[k_idx].set(chosen), cutpts)
             return (new_cutpts, key), None
 
         (new_cutpoints_val, _), _ = jax.lax.scan(
