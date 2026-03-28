@@ -33,6 +33,8 @@ PackedCrossCatState(
     view_n_clusters=jnp.array([2, 3, 0, ...]),     # (max_views,)
     ss_counts=jnp.zeros((16, 32, 8)),              # (max_views, max_clusters, max_cols)
     ss_sum_x=jnp.zeros((16, 32, 8)),
+    hyper_mu=jnp.zeros(4),                         # (n_cols,) per-column hyperparams
+    hyper_cutpoints=jnp.full((4, 15), jnp.inf),   # (n_cols, max_categories-1) ordinal cutpoints
     ...
 )
 ```

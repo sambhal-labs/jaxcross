@@ -91,6 +91,8 @@ packed = packed_gibbs_step(key, packed, data)
 | `packed_gibbs_sweep` | Uses `lax.scan` — one large compiled kernel | Production: multi-sweep batch inference |
 | `packed_gibbs_step` | Calls 4 independent `@jax.jit` sub-kernels | Interactive: constraint enforcement, debugging |
 
+**When to choose which:** `packed_gibbs_sweep` compiles the entire multi-sweep loop into a single XLA program — maximum throughput, but the first compilation is slower. `packed_gibbs_step` compiles each sub-kernel independently (4 smaller compilations), so it starts faster and allows inspecting intermediate state between kernels. Use `packed_gibbs_step` when you need to check constraints after each sweep or want faster iteration during development.
+
 ## Tips
 
 - **More sweeps = better** but with diminishing returns after convergence

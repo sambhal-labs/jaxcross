@@ -63,4 +63,18 @@ Each column type uses a conjugate Bayesian model:
 | ORDINAL | Ordered Logistic | No (grid integration) | count, category_counts |
 | CYCLIC | Von Mises | Yes | count, sum_sin, sum_cos |
 
-The Ordered Logistic model is the exception — it uses 31-point grid integration over a latent location parameter instead of conjugate updates.
+### Ordered Logistic: Non-Conjugate Component
+
+The Ordered Logistic model is the exception — it uses a **cumulative link function** instead of conjugate updates:
+
+$$P(Y = k \mid \mu, \mathbf{c}) = \sigma(c_k - \mu) - \sigma(c_{k-1} - \mu)$$
+
+where \\( \sigma \\) is the logistic sigmoid, \\( \mu \\) is a latent location parameter, and \\( \mathbf{c} \\) are ordered cutpoints (\\( c_0 = -\infty, c_K = +\infty \\)).
+
+Since this model has no conjugate prior, inference uses:
+
+- **Grid integration** over \\( \mu \\) with a 31-point grid and Normal prior (variance \\( s \\))
+- **Cutpoint Gibbs sampling** via sequential `lax.scan` with ordering constraints
+- **Hyperparameter grid** for prior variance \\( s \\)
+
+This makes ordinal columns slower to process than conjugate types, but correctly captures the ordinal structure that a Dirichlet-Categorical model would ignore.

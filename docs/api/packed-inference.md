@@ -63,7 +63,7 @@ Imputation with confidence on packed state.
 ### `packed_anomaly_score`
 
 ```python
-packed_anomaly_score(rng_key, packed, data, query_row, *, n_samples=500) -> Array
+packed_anomaly_score(rng_key, packed, data, query_row) -> Array
 ```
 
 Anomaly score for a row on packed state.
@@ -123,7 +123,7 @@ MI and Linfoot correlation from packed states.
 ### `packed_row_similarity`
 
 ```python
-packed_row_similarity(packed_states, row_a, row_b, *, target_columns=None) -> Array
+packed_row_similarity(packed_states, column_types, row_a, row_b, *, target_columns=None) -> Array
 ```
 
 Row co-clustering probability on packed states.
