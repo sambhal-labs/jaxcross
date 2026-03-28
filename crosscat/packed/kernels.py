@@ -970,8 +970,12 @@ def packed_transition_column_hypers(
         def _update_one_cutpoint(carry, k_idx):
             cutpts, key = carry
             k_cp, key = jax.random.split(key)
-            lower = jnp.where(k_idx > 0, cutpts[k_idx - 1], jnp.float32(-10.0))
-            upper = jnp.where(k_idx < n_cutpoints - 1, cutpts[k_idx + 1], jnp.float32(10.0))
+            # Clamp to finite range — padded cutpoints are +inf which would
+            # produce NaN in linspace. JAX evaluates both branches of where.
+            prev = jnp.where(k_idx > 0, cutpts[k_idx - 1], jnp.float32(-10.0))
+            nxt = jnp.where(k_idx < n_cutpoints - 1, cutpts[k_idx + 1], jnp.float32(10.0))
+            lower = jnp.clip(prev, -10.0, 10.0)
+            upper = jnp.clip(nxt, -10.0, 10.0)
             grid = jnp.linspace(lower + 0.01, upper - 0.01, 31)
 
             def score_candidate(c_val):
