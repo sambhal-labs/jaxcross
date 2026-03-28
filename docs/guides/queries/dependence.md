@@ -70,7 +70,7 @@ print(f"Column assignments: {state.column_assignments}")
 ```python
 from crosscat import packed_dependence_probability, packed_dependence_matrix
 
-dp = packed_dependence_probability([packed], col_a=0, col_b=1)
+dp = packed_dependence_probability([packed], col_i=0, col_j=1)
 z = packed_dependence_matrix([packed])
 ```
 

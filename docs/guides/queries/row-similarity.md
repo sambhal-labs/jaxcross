@@ -47,7 +47,7 @@ for i in range(n):
 ```python
 from crosscat import packed_row_similarity
 
-sim = packed_row_similarity([packed], row_a=10, row_b=20)
+sim = packed_row_similarity([packed], col_types, row_a=10, row_b=20)
 ```
 
 ## API Reference
