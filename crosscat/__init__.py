@@ -3,7 +3,9 @@
 __version__ = "0.10.0"
 
 from crosscat.constraints import (
+    check_all_column_constraints,
     check_column_dep_constraint,
+    check_row_dep_constraint,
     ensure_col_dep_constraints,
     ensure_row_dep_constraint,
 )
@@ -99,7 +101,7 @@ from crosscat.types import (
     SufficientStats,
     ViewState,
 )
-from crosscat.validate import assert_valid_state, validate_state
+from crosscat.validate import ValidationError, assert_valid_state, validate_state
 
 __all__ = [
     # Types
@@ -133,7 +135,9 @@ __all__ = [
     "row_typicality",
     "sample_and_insert",
     # Constraints
+    "check_all_column_constraints",
     "check_column_dep_constraint",
+    "check_row_dep_constraint",
     "ensure_col_dep_constraints",
     "ensure_row_dep_constraint",
     # Diagnostics
@@ -155,6 +159,7 @@ __all__ = [
     "add_missing_data",
     "generate_crosscat_data",
     # Validation
+    "ValidationError",
     "assert_valid_state",
     "validate_state",
     # Serialization
