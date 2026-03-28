@@ -16,14 +16,14 @@ Unified scoring functions that dispatch across all 5 column types using `jnp.whe
 
 ```python
 unified_log_marginal(
-    col_type_id, count, sum_x, sum_x_sq, cat_counts,
-    sum_sin, sum_cos, hyper_mu, hyper_r, hyper_s, hyper_nu,
-    hyper_dirichlet_alpha, hyper_alpha, hyper_beta,
-    hyper_kappa, hyper_vm_a, hyper_vm_mu, hyper_cutpoints
+    type_id, count, sum_x, sum_x_sq, cat_counts,
+    sum_sin, sum_cos, mu, r, s, nu,
+    dir_alpha, alpha, beta,
+    kappa, vm_a, vm_mu, cutpoints
 ) -> Array
 ```
 
-Compute log marginal likelihood for any column type. Uses `jnp.where` to select the correct formula based on `col_type_id`.
+Compute log marginal likelihood for any column type. Uses `jnp.where` to select the correct formula based on `type_id`.
 
 **Returns**: Scalar log probability.
 
@@ -31,10 +31,10 @@ Compute log marginal likelihood for any column type. Uses `jnp.where` to select 
 
 ```python
 unified_posterior_predictive_logp(
-    x, col_type_id, count, sum_x, sum_x_sq, cat_counts,
-    sum_sin, sum_cos, hyper_mu, hyper_r, hyper_s, hyper_nu,
-    hyper_dirichlet_alpha, hyper_alpha, hyper_beta,
-    hyper_kappa, hyper_vm_a, hyper_vm_mu, hyper_cutpoints
+    x, type_id, count, sum_x, sum_x_sq, cat_counts,
+    sum_sin, sum_cos, mu, r, s, nu,
+    dir_alpha, alpha, beta,
+    kappa, vm_a, vm_mu, cutpoints
 ) -> Array
 ```
 
@@ -46,16 +46,16 @@ Compute posterior predictive log probability for a new observation. Dispatches t
 
 ```python
 unified_sample_posterior_predictive(
-    rng_key, col_type_id, count, sum_x, sum_x_sq, cat_counts,
-    sum_sin, sum_cos, hyper_mu, hyper_r, hyper_s, hyper_nu,
-    hyper_dirichlet_alpha, hyper_alpha, hyper_beta,
-    hyper_kappa, hyper_vm_a, hyper_vm_mu, hyper_cutpoints, n=1
+    rng_key, type_id, count, sum_x, sum_x_sq, cat_counts,
+    sum_sin, sum_cos, mu, r, s, nu,
+    dir_alpha, alpha, beta,
+    kappa, vm_a, vm_mu, cutpoints
 ) -> Array
 ```
 
-Draw samples from the posterior predictive distribution for any column type.
+Draw a sample from the posterior predictive distribution for any column type.
 
-**Returns**: `Array (n,)` of samples.
+**Returns**: Scalar sample value.
 
 ## Type-Specialized Batch Functions
 
@@ -66,3 +66,6 @@ For homogeneous-type views, these batch functions skip the 5-way `jnp.where` dis
 - `batch_dc_posterior_predictive_logp` — DirichletCategorical batch scoring
 
 These are used automatically by the row scoring kernel when all columns in a view share the same type.
+
+!!! note "Ordinal and Cyclic types"
+    There are no type-specialized batch functions for `OrderedLogistic` or `VonMises`. Ordinal columns always use the general `unified_posterior_predictive_logp` dispatch path (the grid integration makes batch specialization impractical). Cyclic columns also use the general path.

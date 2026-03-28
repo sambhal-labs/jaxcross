@@ -30,10 +30,13 @@ The packed kernels were optimized for **12x speedup** in v0.9.0 via three techni
 
 JIT compilation time also dropped from 20+ minutes to ~23 seconds for 257 columns because the XLA graph is much smaller (single vmap vs 257-step unrolled scan).
 
-## Benchmark Results (P100 GPU)
+## Benchmark Results (P100 GPU, v0.10.0)
 
 | Dataset | Rows x Cols | Per Sweep | 100 Sweeps |
 |---------|-------------|-----------|------------|
 | Small (mixed types) | 50 x 11 | 4.5s | 7.5 min |
 | Medium (binary+cat) | 100 x 65 | 4.8s | 8 min |
 | MNIST 16x16 | 1000 x 257 | 12s | 20 min |
+
+!!! note
+    The Combined Effect table above shows v0.9.0 per-sweep times (20s for MNIST). The v0.10.0 kernel splitting and XLA persistent cache further reduced per-sweep time to ~12s.
