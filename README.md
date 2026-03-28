@@ -1,105 +1,264 @@
 <p align="center">
-  <strong>jax-crosscat</strong>
+  <img src="docs/diagrams/two-level-dp.svg" alt="JAX-CrossCat" width="720" />
 </p>
 
+<h1 align="center">jax-crosscat</h1>
+
 <p align="center">
-  <em>GPU-accelerated Bayesian cross-categorization in JAX</em>
+  <strong>GPU-accelerated Bayesian structure discovery for tabular data</strong>
 </p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Documentation"></a>
+  <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
+  <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
+  <img src="https://img.shields.io/badge/version-0.10.0-orange.svg" alt="Version">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="notebooks/intro_tutorial.ipynb">Interactive Tutorial</a> &middot;
+  <a href="https://sambhal-labs.github.io/jaxcross/">Documentation</a> &middot;
+  <a href="benchmarks/">Benchmarks</a>
 </p>
 
 ---
 
-**jax-crosscat** is a modern reimplementation of [probcomp/crosscat](https://github.com/probcomp/crosscat) — the Bayesian nonparametric model that simultaneously discovers which columns are related and how rows cluster within each group. Built on [JAX](https://github.com/jax-ml/jax) for hardware-accelerated inference on CPU, GPU, and TPU.
+**jax-crosscat** automatically discovers hidden structure in your data — which columns are related, how rows cluster, and how to predict missing values — all without manual feature engineering or model selection.
 
-> **[Read the full documentation](https://sambhal-labs.github.io/jaxcross/)**
+Built on [JAX](https://github.com/jax-ml/jax) for hardware-accelerated inference on GPU and TPU. A modern reimplementation of [probcomp/crosscat](https://github.com/probcomp/crosscat) (Mansinghka et al., JMLR 2016).
 
-## Why CrossCat?
+## The Problem
 
-Most clustering methods force a single partition over all columns. CrossCat discovers that *different subsets of columns may cluster rows differently*. A dataset of employees might cluster by `(salary, experience)` into seniority tiers, but independently cluster by `(commute_distance, zip_code)` into geographic regions — with no alignment between the two.
+Most clustering methods force a single partition over all columns. Real data doesn't work that way.
 
-<p align="center">
-  <img src="docs/diagrams/two-level-dp.svg" alt="Two-Level Dirichlet Process Mixture Model" width="800" />
-</p>
+An employee dataset might cluster by `(salary, experience)` into seniority tiers, but independently by `(commute_distance, zip_code)` into geographic regions — with no alignment between the two. CrossCat discovers these **multiple overlapping structures** automatically.
 
-## Features
+## Key Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| **5 column types** | Continuous (Normal-Gamma), Categorical (Dirichlet-Categorical), Binary (Beta-Bernoulli), Ordinal (Ordered Logistic), Cyclic (Von Mises) |
-| **Collapsed Gibbs** | All parameters integrated out via conjugacy — only cluster assignments are sampled |
-| **Full query API** | Predictive probability, sampling, CDF, mutual information, anomaly detection, imputation, row similarity |
-| **Missing data** | NaN values handled transparently — skipped during sufficient statistic computation |
-| **Constraints** | Enforce column/row dependency constraints during inference |
-| **Multi-chain** | Initialize multiple independent chains, select best by log-joint |
-| **GPU acceleration** | JIT-compiled packed state with vectorized kernels — 12x speedup |
-| **Convergence diagnostics** | Adjusted Rand Index, log-joint tracking, held-out likelihood |
+<table>
+<tr>
+<td width="50%">
+
+**Automatic Structure Discovery**
+- Discovers which columns are statistically related
+- Finds independent clustering structures per column group
+- Infers the number of clusters automatically — no k to tune
+
+</td>
+<td width="50%">
+
+**Rich Query API**
+- Predictive probability, sampling, and CDF
+- Anomaly detection and row similarity
+- Mutual information and dependence discovery
+- Missing value imputation with confidence scores
+
+</td>
+</tr>
+<tr>
+<td>
+
+**Production-Ready**
+- 5 column types: continuous, categorical, binary, ordinal, cyclic
+- Transparent NaN handling — no preprocessing needed
+- Serialization, checkpointing, and convergence diagnostics
+- Constraint enforcement for domain knowledge
+
+</td>
+<td>
+
+**GPU-Accelerated**
+- JIT-compiled packed state with vectorized Gibbs kernels
+- 12x speedup over sequential scoring via `vmap`
+- Multi-chain inference with automatic best-chain selection
+- XLA persistent compilation cache for instant restarts
+
+</td>
+</tr>
+</table>
 
 ## Quick Start
 
+```bash
+pip install jax-crosscat               # CPU
+pip install "jax-crosscat[gpu]"        # GPU (NVIDIA CUDA)
+```
+
 ```python
 import jax
-from crosscat import initialize, read_csv, guess_column_types, predictive_sample
+from crosscat import initialize, predictive_sample, dependence_matrix
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.types import ColumnType
 
-# 1. Load your CSV data
-data, col_names = read_csv("data.csv")
-col_types = guess_column_types(data)
+# Load and configure
+data, col_types = your_data, [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL, ...]
 
-# 2. Initialize and run GPU-accelerated inference
+# Initialize → Pack → Infer → Unpack → Query
 key = jax.random.key(42)
 state = initialize(key, data, col_types)
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)
 
-# 3. Query the posterior
+# Discover column relationships
+z_matrix = dependence_matrix([state])  # which columns are related?
+
+# Predict missing values
 samples = predictive_sample(jax.random.key(2), state, data, query_cols=[0])
 ```
 
-See the **[Quick Start Guide](https://sambhal-labs.github.io/jaxcross/getting-started/quickstart/)** for a complete walkthrough.
+> **Want the full walkthrough?** Open the **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** — covers synthetic data, inference, and 7 query types end-to-end.
 
-## Installation
+## Column Types
 
-```bash
-uv pip install jax-crosscat            # CPU
-uv pip install "jax-crosscat[gpu]"     # GPU (NVIDIA CUDA 13)
+CrossCat natively handles mixed-type data — no encoding or preprocessing required:
+
+| Type | Statistical Model | Example Data |
+|------|-------------------|-------------|
+| `CONTINUOUS` | Normal-Gamma (conjugate) | Salary, temperature, sensor readings |
+| `CATEGORICAL` | Dirichlet-Categorical | Department, country code, product category |
+| `BINARY` | Beta-Bernoulli | Yes/no flags, presence/absence |
+| `ORDINAL` | Ordered Logistic (cumulative link) | Star ratings, education level, severity |
+| `CYCLIC` | Von Mises | Wind direction, time of day, compass bearing |
+
+## Query API
+
+After inference, ask questions about your data:
+
+```python
+from crosscat import (
+    predictive_probability,     # P(col=value | context)
+    predictive_sample,          # Draw from posterior predictive
+    impute_and_confidence,      # Fill missing values with confidence
+    mutual_information,         # Information shared between columns
+    dependence_matrix,          # Full pairwise column dependency matrix
+    predictive_anomalousness,   # Detect unusual rows
+    row_similarity,             # How similar are two rows?
+    credible_interval,          # Bayesian credible intervals
+    conditional_entropy,        # Remaining uncertainty in a column
+)
 ```
 
-From source:
-```bash
-git clone https://github.com/sambhal-labs/jaxcross.git && cd jaxcross
-uv sync --extra dev
+All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](docs/guides/queries/) for detailed examples.
+
+## Performance
+
+| Dataset | Rows x Cols | Per Sweep | 100 Sweeps |
+|---------|-------------|-----------|------------|
+| Small (mixed types) | 50 x 11 | 4.5s | 7.5 min |
+| Medium (binary+cat) | 100 x 65 | 4.8s | 8 min |
+| MNIST 16x16 | 1,000 x 257 | 12s | 20 min |
+
+Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction scripts including the [MNIST paper benchmark](benchmarks/mnist_paper_colab.ipynb).
+
+## Architecture
+
+<p align="center">
+  <img src="docs/diagrams/architecture-pipeline.svg" alt="Architecture Pipeline" width="720" />
+</p>
+
+CrossCat uses a **two-level Dirichlet Process** mixture model:
+1. **Outer DP** partitions columns into views (column groups)
+2. **Inner DP** per view clusters rows independently
+
+All component parameters are collapsed out via conjugate priors — only cluster assignments and hyperparameters are sampled via Gibbs.
+
+The **packed path** converts variable-size Python state into fixed-size JAX arrays for JIT compilation with `lax.scan` and `vmap`, enabling GPU-accelerated inference.
+
+```
+CrossCatState  ──pack_state()──▸  PackedCrossCatState  ──packed_gibbs_sweep()──▸  ...  ──unpack_state()──▸  CrossCatState
+  (Python)                          (JAX arrays, JIT)                                                        (query-friendly)
+```
+
+See [docs/architecture/](docs/architecture/) for deep dives into the model, kernels, and JAX patterns.
+
+## Project Structure
+
+```
+crosscat/
+├── types.py              # Core dataclasses: CrossCatState, ViewState, ColumnType
+├── components.py         # 5 Bayesian component models
+├── model.py              # Initialization, scoring, row insertion
+├── gibbs.py              # Collapsed Gibbs MCMC kernels
+├── inference.py          # 15 posterior predictive queries
+├── packed/               # JIT-compiled packed state path
+│   ├── state.py          #   Pack/unpack, batching, multi-chain
+│   ├── components.py     #   Unified type-dispatched scoring
+│   ├── kernels.py        #   Vectorized Gibbs kernels
+│   └── suffstats.py      #   Batched sufficient statistics
+├── packed_inference.py   # 15 packed queries + 5 multi-chain wrappers
+├── constraints.py        # Column/row dependency enforcement
+├── diagnostics.py        # ARI, log-joint, held-out likelihood
+├── serialization.py      # Save/load in .jxc format
+├── synthetic.py          # Synthetic data generation
+└── data_utils.py         # CSV I/O, type detection
+
+notebooks/
+├── intro_tutorial.ipynb  # Start here — full beginner walkthrough
+└── run_tests.ipynb       # Test runner for Kaggle/Colab GPU
+
+benchmarks/
+├── mnist_paper_colab.ipynb          # MNIST paper reproduction (Section 3.2)
+├── wdi_macroeconomic_benchmark.ipynb # Real-world macroeconomic data
+├── paper_synthetic_benchmark.py     # Figure 7 synthetic recovery
+└── jit_benchmark.py                 # Per-sweep timing
+
+docs/
+├── getting-started/      # Installation, quickstart, concepts
+├── guides/               # Feature guides + 7 query-specific guides
+├── api/                  # Complete API reference (18 modules)
+├── architecture/         # Model design, kernels, JAX patterns
+└── examples/             # End-to-end workflows
 ```
 
 ## Documentation
 
-- **[Getting Started](https://sambhal-labs.github.io/jaxcross/getting-started/quickstart/)** — installation, quick start, core concepts
-- **[Feature Guides](https://sambhal-labs.github.io/jaxcross/guides/)** — end-to-end guides for every feature
-- **[API Reference](https://sambhal-labs.github.io/jaxcross/api/)** — complete function documentation
-- **[Architecture](https://sambhal-labs.github.io/jaxcross/architecture/overview/)** — internal design and JAX patterns
-- **[Examples](https://sambhal-labs.github.io/jaxcross/examples/csv-workflow/)** — full workflows including MNIST benchmark
-- **[Changelog](https://sambhal-labs.github.io/jaxcross/changelog/)** — release history
+| Resource | Description |
+|----------|-------------|
+| **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** | Hands-on notebook: data generation, inference, 7 query types |
+| **[Getting Started](docs/getting-started/)** | Installation, quickstart, core concepts |
+| **[Feature Guides](docs/guides/)** | Deep dives into every capability |
+| **[Query Guides](docs/guides/queries/)** | Dedicated guides for each query type |
+| **[API Reference](docs/api/)** | Complete function documentation (88+ functions) |
+| **[Architecture](docs/architecture/)** | Internal design, JAX patterns, performance |
+| **[Benchmarks](benchmarks/)** | MNIST, synthetic recovery, JIT timing |
+| **[Full Docs Site](https://sambhal-labs.github.io/jaxcross/)** | Searchable hosted documentation |
 
-## Performance
+## From Source
 
-| Dataset | Rows × Cols | Per Sweep | 100 Sweeps |
-|---------|-------------|-----------|------------|
-| Small (mixed types) | 50 × 11 | 4.5s | 7.5 min |
-| Medium (binary+cat) | 100 × 65 | 4.8s | 8 min |
-| MNIST 16×16 | 1000 × 257 | 12s | 20 min |
+```bash
+git clone https://github.com/sambhal-labs/jaxcross.git && cd jaxcross
+uv sync --extra dev                    # CPU
+uv sync --extra dev --extra gpu        # GPU (NVIDIA CUDA)
 
-Benchmarked on NVIDIA P100 GPU. See the [MNIST Benchmark](https://sambhal-labs.github.io/jaxcross/examples/mnist/) for the full paper reproduction.
+uv run pytest                          # Run tests
+uv run ruff check . && uv run ruff format .  # Lint & format
+```
 
-## References
+## Citation
 
-- Mansinghka, V., Shafto, P., Jonas, E., Petschulat, C., Gasner, M., & Tenenbaum, J. B. (2016). *CrossCat: A Fully Bayesian Nonparametric Method for Analyzing Heterogeneous, High Dimensional Data.* JMLR, 17(138), 1-49.
-- Original implementation: [probcomp/crosscat](https://github.com/probcomp/crosscat)
+If you use jax-crosscat in your research, please cite the original CrossCat paper:
+
+```bibtex
+@article{mansinghka2016crosscat,
+  title={CrossCat: A Fully Bayesian Nonparametric Method for Analyzing
+         Heterogeneous, High Dimensional Data},
+  author={Mansinghka, Vikash and Shafto, Patrick and Jonas, Eric and
+          Petschulat, Cap and Gasner, Max and Tenenbaum, Joshua B},
+  journal={Journal of Machine Learning Research},
+  volume={17},
+  number={138},
+  pages={1--49},
+  year={2016}
+}
+```
+
+## Contributing
+
+We welcome contributions. See [docs/contributing.md](docs/contributing.md) for guidelines.
 
 ## License
 
