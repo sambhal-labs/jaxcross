@@ -68,7 +68,7 @@ logp = BetaBernoulli.log_marginal_likelihood(ss, hypers)
 
 ## `OrderedLogistic` (Ordinal)
 
-For ordered categorical data (1, 2, 3, ...). Uses a cumulative link function with grid integration over a latent location parameter. **Non-conjugate** — uses 31-point grid integration.
+For ordered categorical data (1, 2, 3, ...). Uses a cumulative link function with grid integration over a latent location parameter. **Non-conjugate** — uses grid integration (default 31 points, configurable via `crosscat.types.ORDINAL_N_GRID`).
 
 **Hyperparameters:** `cutpoints` (ordered thresholds), `mu` (latent location), `s` (prior variance)
 
@@ -85,7 +85,7 @@ logp = OrderedLogistic.log_marginal_likelihood(ss, hypers)
 
 ## `VonMises` (Cyclic)
 
-For angular/circular data in [0, 2*pi). Uses a Von Mises likelihood with conjugate prior.
+For angular/circular data in [0, 2*pi). Uses a Von Mises likelihood with conjugate prior. Sampling uses the Best-Fisher algorithm (acceptance rate > 50% for all kappa).
 
 **Hyperparameters:** `kappa` (likelihood concentration), `vm_a` (prior concentration), `vm_mu` (prior mean direction)
 

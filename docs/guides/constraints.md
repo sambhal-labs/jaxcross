@@ -76,6 +76,23 @@ print(f"Constraint satisfied: {satisfied}")
 
 Constraint enforcement uses **rejection sampling**: it runs Gibbs sweeps and checks whether all constraints are satisfied. If not, it tries again with a new random seed. Returns `None` if `max_rejections` is exceeded.
 
+### Diagnostics
+
+Pass `return_diagnostics=True` to get detailed information about the enforcement attempt:
+
+```python
+result, diags = ensure_col_dep_constraints(
+    key, state, data,
+    constraints=[(0, 1, True), (2, 3, False)],
+    return_diagnostics=True,
+)
+
+if not diags['success']:
+    print(f"Failed after {diags['n_attempts']} attempts")
+    print(f"Best: {diags['best_n_satisfied']}/{len(constraints)} satisfied")
+    print(f"Failed constraints: {diags['constraint_failures']}")
+```
+
 !!! tip
     If constraints frequently fail, try increasing `n_sweeps_per_attempt` or `max_rejections`. Very tight constraints may be incompatible with the data.
 
