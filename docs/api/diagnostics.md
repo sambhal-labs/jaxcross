@@ -66,6 +66,16 @@ Create a random boolean mask for held-out evaluation.
 evaluate_imputation(state, data, mask, col_types, *, rng_key=None) -> dict
 ```
 
-Evaluate imputation accuracy on held-out cells. Computes MAE (continuous), accuracy (discrete), and log-likelihood.
+Evaluate imputation accuracy on held-out cells using the unpacked inference path. Computes MAE (continuous), accuracy (discrete), and log-likelihood.
 
 **Returns**: Dict with per-type metrics.
+
+## `packed_evaluate_imputation`
+
+```python
+packed_evaluate_imputation(packed, data, mask, col_types, *, rng_key=None, n_samples=200) -> dict
+```
+
+Drop-in replacement for `evaluate_imputation` that uses the packed inference path (`packed_predictive_probability`, `packed_impute_and_confidence`) for significantly faster evaluation. Accepts a `PackedCrossCatState` instead of `CrossCatState`.
+
+**Returns**: Dict with per-type metrics (same format as `evaluate_imputation`).
