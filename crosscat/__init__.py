@@ -23,6 +23,7 @@ from crosscat.diagnostics import (
     column_partition_ari,
     evaluate_imputation,
     mean_test_log_likelihood,
+    packed_evaluate_imputation,
     random_holdout_mask,
     row_partition_ari,
 )
@@ -146,6 +147,7 @@ __all__ = [
     "column_partition_ari",
     "evaluate_imputation",
     "mean_test_log_likelihood",
+    "packed_evaluate_imputation",
     "random_holdout_mask",
     "row_partition_ari",
     # Data utilities
