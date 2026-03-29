@@ -351,10 +351,15 @@ def _packed_estimate_mi_sample(
     """MC MI estimation for two columns in the same view (packed version).
 
     Maps to original inference_utils.estimate_MI_sample().
+
+    Precomputes all cluster suffstats once and vectorizes the per-cluster
+    scoring via vmap, reducing complexity from O(n_samples * n_clusters)
+    likelihood evaluations to O(n_clusters) precompute + O(n_samples) vmap calls.
     """
     cluster_weights = _cluster_weights_packed(packed, view_idx)
     log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, LOG_EPS))
     n_clusters = int(packed.view_n_clusters[view_idx])
+    max_k = packed.max_clusters
 
     local_i = int(_find_local_col_index(packed, view_idx, col_i))
     local_j = int(_find_local_col_index(packed, view_idx, col_j))
@@ -380,15 +385,56 @@ def _packed_estimate_mi_sample(
     hypers_i = _get_hypers(col_i)
     hypers_j = _get_hypers(col_j)
 
-    def _get_ss(local_col: int, cluster: int):
-        return (
-            packed.ss_counts[view_idx, cluster, local_col].astype(jnp.float32),
-            packed.ss_sum_x[view_idx, cluster, local_col],
-            packed.ss_sum_x_sq[view_idx, cluster, local_col],
-            packed.ss_cat_counts[view_idx, cluster, local_col],
-            packed.ss_sum_sin[view_idx, cluster, local_col],
-            packed.ss_sum_cos[view_idx, cluster, local_col],
-        )
+    # Precompute all cluster suffstats as (max_clusters,) arrays — avoids
+    # repeated per-cluster indexing inside the sample loop.
+    ss_counts_i = packed.ss_counts[view_idx, :, local_i].astype(jnp.float32)
+    ss_sum_x_i = packed.ss_sum_x[view_idx, :, local_i]
+    ss_sum_x_sq_i = packed.ss_sum_x_sq[view_idx, :, local_i]
+    ss_cat_counts_i = packed.ss_cat_counts[view_idx, :, local_i]
+    ss_sum_sin_i = packed.ss_sum_sin[view_idx, :, local_i]
+    ss_sum_cos_i = packed.ss_sum_cos[view_idx, :, local_i]
+
+    ss_counts_j = packed.ss_counts[view_idx, :, local_j].astype(jnp.float32)
+    ss_sum_x_j = packed.ss_sum_x[view_idx, :, local_j]
+    ss_sum_x_sq_j = packed.ss_sum_x_sq[view_idx, :, local_j]
+    ss_cat_counts_j = packed.ss_cat_counts[view_idx, :, local_j]
+    ss_sum_sin_j = packed.ss_sum_sin[view_idx, :, local_j]
+    ss_sum_cos_j = packed.ss_sum_cos[view_idx, :, local_j]
+
+    # Vectorized logp across all clusters for a given value
+    def _logp_all_clusters_i(x):
+        def _one(c):
+            return unified_posterior_predictive_logp(
+                x,
+                type_id_i,
+                ss_counts_i[c],
+                ss_sum_x_i[c],
+                ss_sum_x_sq_i[c],
+                ss_cat_counts_i[c],
+                ss_sum_sin_i[c],
+                ss_sum_cos_i[c],
+                *hypers_i,
+            )
+
+        logps = jax.vmap(_one)(jnp.arange(max_k))
+        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
+
+    def _logp_all_clusters_j(y):
+        def _one(c):
+            return unified_posterior_predictive_logp(
+                y,
+                type_id_j,
+                ss_counts_j[c],
+                ss_sum_x_j[c],
+                ss_sum_x_sq_j[c],
+                ss_cat_counts_j[c],
+                ss_sum_sin_j[c],
+                ss_sum_cos_j[c],
+                *hypers_j,
+            )
+
+        logps = jax.vmap(_one)(jnp.arange(max_k))
+        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
 
     mi_samples = []
     keys = jax.random.split(rng_key, n_samples)
@@ -400,28 +446,33 @@ def _packed_estimate_mi_sample(
         cluster = int(jax.random.categorical(k1, log_cluster_weights))
 
         # Sample x from col_i, y from col_j in this cluster
-        ss_i = _get_ss(local_i, cluster)
+        ss_i = (
+            ss_counts_i[cluster],
+            ss_sum_x_i[cluster],
+            ss_sum_x_sq_i[cluster],
+            ss_cat_counts_i[cluster],
+            ss_sum_sin_i[cluster],
+            ss_sum_cos_i[cluster],
+        )
         x = unified_sample_posterior_predictive(k2, type_id_i, *ss_i, *hypers_i)
 
-        ss_j = _get_ss(local_j, cluster)
+        ss_j = (
+            ss_counts_j[cluster],
+            ss_sum_x_j[cluster],
+            ss_sum_x_sq_j[cluster],
+            ss_cat_counts_j[cluster],
+            ss_sum_sin_j[cluster],
+            ss_sum_cos_j[cluster],
+        )
         y = unified_sample_posterior_predictive(k3, type_id_j, *ss_j, *hypers_j)
 
-        # Compute log p(x), log p(y), log p(x,y) across all clusters
-        log_px = -jnp.inf
-        log_py = -jnp.inf
-        log_pxy = -jnp.inf
+        # Vectorized log p(x), log p(y) across all clusters
+        lp_x_all = _logp_all_clusters_i(x)
+        lp_y_all = _logp_all_clusters_j(y)
 
-        for c in range(n_clusters):
-            ss_ic = _get_ss(local_i, c)
-            ss_jc = _get_ss(local_j, c)
-            lw = log_cluster_weights[c]
-
-            lp_x_c = unified_posterior_predictive_logp(x, type_id_i, *ss_ic, *hypers_i)
-            lp_y_c = unified_posterior_predictive_logp(y, type_id_j, *ss_jc, *hypers_j)
-
-            log_px = jnp.logaddexp(log_px, lw + lp_x_c)
-            log_py = jnp.logaddexp(log_py, lw + lp_y_c)
-            log_pxy = jnp.logaddexp(log_pxy, lw + lp_x_c + lp_y_c)
+        log_px = jnp.logsumexp(log_cluster_weights + lp_x_all)
+        log_py = jnp.logsumexp(log_cluster_weights + lp_y_all)
+        log_pxy = jnp.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
 
         mi_samples.append(float(log_pxy - log_px - log_py))
 
