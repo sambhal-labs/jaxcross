@@ -20,6 +20,24 @@ def rng_key():
 
 
 @pytest.fixture
+def simple_state(rng_key):
+    """A simple 2-view state for testing queries.
+
+    Returns (state, data, column_types) with 100 rows and 4 continuous columns.
+    """
+    n_rows = 100
+    k1, k2, k3, k4 = jax.random.split(rng_key, 4)
+    col0 = jnp.where(jnp.arange(n_rows) < 50, 0.0, 5.0) + jax.random.normal(k1, (n_rows,))
+    col1 = jnp.where(jnp.arange(n_rows) < 50, -2.0, 3.0) + jax.random.normal(k2, (n_rows,))
+    col2 = jnp.where(jnp.arange(n_rows) < 50, 10.0, 20.0) + jax.random.normal(k3, (n_rows,))
+    col3 = jnp.where(jnp.arange(n_rows) < 50, -5.0, 5.0) + jax.random.normal(k4, (n_rows,))
+    data = jnp.column_stack([col0, col1, col2, col3])
+    column_types = [ColumnType.CONTINUOUS] * 4
+    state = initialize(rng_key, data, column_types)
+    return state, data, column_types
+
+
+@pytest.fixture
 def synthetic_continuous_data(rng_key):
     """Synthetic continuous data with known cluster structure.
 

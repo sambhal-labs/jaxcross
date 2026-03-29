@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 from crosscat.model import initialize, log_joint
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
@@ -31,6 +32,7 @@ def test_single_row_initializes():
     assert jnp.isfinite(log_joint(state, data))
 
 
+@pytest.mark.slow
 def test_single_row_packed_sweep():
     """Packed sweep on a single-row dataset should not crash.
 
@@ -81,6 +83,7 @@ def test_all_nan_column():
     # (all-NaN column produces NaN log marginal, which propagates)
 
 
+@pytest.mark.slow
 def test_partial_nan_column():
     """A column with some NaN values should initialize and run inference."""
     key = jax.random.key(4)
@@ -118,7 +121,7 @@ def test_single_column():
     state = initialize(key, data, types)
 
     assert state.n_cols == 1
-    assert state.n_views == 1  # single column → single view
+    assert state.n_views == 1  # single column -> single view
     assert jnp.isfinite(log_joint(state, data))
 
 
@@ -147,6 +150,7 @@ def test_single_view_initialization():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_binary_only_dataset():
     """A dataset with only binary columns should work."""
     key = jax.random.key(7)

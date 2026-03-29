@@ -208,6 +208,7 @@ def test_packed_crp_alphas_valid(continuous_state_and_data):
         assert float(packed_new.view_row_crp_alpha[v]) > 0
 
 
+@pytest.mark.slow
 def test_packed_gibbs_sweep_valid(continuous_state_and_data):
     """Full packed Gibbs sweep produces valid state."""
     state, data, column_types = continuous_state_and_data

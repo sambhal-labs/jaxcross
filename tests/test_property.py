@@ -817,3 +817,95 @@ def test_unified_log_marginal_matches_ol(n, mu0, s0):
     )
 
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# Serialization roundtrip property tests
+# ---------------------------------------------------------------------------
+
+
+@given(seed=st.integers(min_value=0, max_value=2**31 - 1))
+@settings(max_examples=10, deadline=None)
+def test_serialize_deserialize_roundtrip(seed, tmp_path_factory):
+    """Serializing then deserializing a packed state preserves all fields."""
+    from crosscat.model import initialize
+    from crosscat.packed.state import pack_state
+    from crosscat.serialization import load_packed_state, save_packed_state
+    from crosscat.types import ColumnType
+
+    key = jax.random.key(seed)
+    data = jax.random.normal(key, (30, 3))
+    column_types = [ColumnType.CONTINUOUS, ColumnType.BINARY, ColumnType.CONTINUOUS]
+    data = data.at[:, 1].set(jnp.where(data[:, 1] > 0, 1.0, 0.0))
+
+    state = initialize(key, data, column_types)
+    packed = pack_state(state)
+
+    path = tmp_path_factory.mktemp("ser") / f"test_{seed}.jxc"
+    save_packed_state(packed, path, column_types=column_types)
+    loaded, _ = load_packed_state(path)
+
+    for field in [
+        "view_row_assignments",
+        "column_assignments",
+        "view_row_crp_alpha",
+        "column_crp_alpha",
+    ]:
+        orig = getattr(packed, field)
+        rec = getattr(loaded, field)
+        np.testing.assert_array_equal(np.array(orig), np.array(rec))
+
+
+# ---------------------------------------------------------------------------
+# Initialize invariant property tests
+# ---------------------------------------------------------------------------
+
+
+@given(seed=st.integers(min_value=0, max_value=2**31 - 1))
+@settings(max_examples=15, deadline=None)
+def test_initialize_valid_assignments(seed):
+    """initialize() always produces valid row/column assignments."""
+    from crosscat.model import initialize
+    from crosscat.types import ColumnType
+
+    key = jax.random.key(seed)
+    data = jax.random.normal(key, (20, 4))
+    column_types = [ColumnType.CONTINUOUS] * 4
+
+    state = initialize(key, data, column_types)
+
+    # Column assignments cover all views
+    assert state.n_views == len(state.views)
+    for view in state.views:
+        assert view.row_assignments.shape[0] == 20
+        # All row assignments are valid cluster indices
+        assert int(jnp.max(view.row_assignments)) < len(view.suffstats)
+
+
+@given(seed=st.integers(min_value=0, max_value=2**31 - 1))
+@settings(max_examples=15, deadline=None)
+def test_pack_unpack_preserves_assignments(seed):
+    """Pack then unpack preserves row and column assignments exactly."""
+    from crosscat.model import initialize
+    from crosscat.packed.state import pack_state, unpack_state
+    from crosscat.types import ColumnType
+
+    key = jax.random.key(seed)
+    data = jax.random.normal(key, (25, 3))
+    column_types = [ColumnType.CONTINUOUS] * 3
+
+    state = initialize(key, data, column_types)
+    packed = pack_state(state)
+    recovered = unpack_state(packed, column_types, data=data)
+
+    # Column assignments preserved
+    np.testing.assert_array_equal(
+        np.array(state.column_assignments),
+        np.array(recovered.column_assignments),
+    )
+    # Row assignments preserved per view
+    for v_orig, v_rec in zip(state.views, recovered.views, strict=True):
+        np.testing.assert_array_equal(
+            np.array(v_orig.row_assignments),
+            np.array(v_rec.row_assignments),
+        )
