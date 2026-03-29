@@ -35,11 +35,9 @@ def adjusted_rand_index(assignments_true: Array, assignments_pred: Array) -> Arr
     n_true = int(jnp.max(assignments_true)) + 1
     n_pred = int(jnp.max(assignments_pred)) + 1
 
-    contingency = jnp.zeros((n_true, n_pred), dtype=jnp.float32)
-    for i in range(n):
-        t = int(assignments_true[i])
-        p = int(assignments_pred[i])
-        contingency = contingency.at[t, p].add(1.0)
+    contingency = jax.nn.one_hot(assignments_true, n_true).T @ jax.nn.one_hot(
+        assignments_pred, n_pred
+    )
 
     # Row sums and column sums
     a = contingency.sum(axis=1)  # shape (n_true,)

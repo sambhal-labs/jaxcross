@@ -14,7 +14,7 @@ Convergence metrics, partition comparison, and held-out evaluation.
 adjusted_rand_index(assignments_true, assignments_pred) -> Array
 ```
 
-ARI between two partitions. 1 = perfect, 0 = random, <0 = anti-correlated.
+ARI between two partitions. 1 = perfect, 0 = random, <0 = anti-correlated. Uses vectorized one-hot matrix multiplication for the contingency table, making it efficient for large datasets.
 
 ## `column_partition_ari`
 
