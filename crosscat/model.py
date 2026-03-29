@@ -139,30 +139,69 @@ def _compute_suffstats_for_view(
 ) -> list[list[SufficientStats]]:
     """Compute sufficient statistics for each (cluster, column) in a view.
 
+    Delegates to ``compute_suffstats_vectorized`` (the canonical vectorized
+    implementation) and converts the packed arrays back to dataclass lists.
+
     Returns:
         Nested list: suffstats[cluster_idx][col_idx_in_view]
     """
+    from crosscat.packed.state import _TYPE_TO_ID
+    from crosscat.packed.suffstats import compute_suffstats_vectorized
+
+    col_indices_arr = jnp.asarray(column_indices, dtype=jnp.int32)
+    col_type_ids = jnp.array([_TYPE_TO_ID[ct] for ct in column_types], dtype=jnp.int32)
+    max_categories = (
+        max(int(jnp.nanmax(data[:, c])) + 1 for c in column_indices)
+        if len(column_indices) > 0
+        else 2
+    )
+    max_categories = max(max_categories, 2)
+
+    counts, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos = compute_suffstats_vectorized(
+        data,
+        col_indices_arr,
+        col_type_ids,
+        jnp.asarray(row_assignments, dtype=jnp.int32),
+        n_clusters,
+        max_clusters=n_clusters,
+        max_categories=max_categories,
+    )
+
+    # Convert packed arrays back to nested SufficientStats dataclass lists
     all_suffstats = []
     for c in range(n_clusters):
-        cluster_mask = row_assignments == c
         cluster_stats = []
         for local_idx in range(len(column_indices)):
             col_idx = int(column_indices[local_idx])
             col_type = column_types[col_idx]
-            col_data = data[cluster_mask, col_idx]
+            count = counts[c, local_idx]
 
             if col_type == ColumnType.CONTINUOUS:
-                ss = NormalGamma.sufficient_statistics(col_data)
-            elif col_type == ColumnType.CATEGORICAL:
-                n_cats = _safe_n_categories(data[:, col_idx])
-                ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
+                ss = SufficientStats(
+                    column_type=col_type,
+                    count=count,
+                    sum_x=sum_x[c, local_idx],
+                    sum_x_sq=sum_x_sq[c, local_idx],
+                )
+            elif col_type in (ColumnType.CATEGORICAL, ColumnType.ORDINAL):
+                ss = SufficientStats(
+                    column_type=col_type,
+                    count=count,
+                    category_counts=cat_counts[c, local_idx],
+                )
             elif col_type == ColumnType.BINARY:
-                ss = BetaBernoulli.sufficient_statistics(col_data)
-            elif col_type == ColumnType.ORDINAL:
-                n_levels = _safe_n_categories(data[:, col_idx])
-                ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
+                ss = SufficientStats(
+                    column_type=col_type,
+                    count=count,
+                    sum_x=sum_x[c, local_idx],
+                )
             elif col_type == ColumnType.CYCLIC:
-                ss = VonMises.sufficient_statistics(col_data)
+                ss = SufficientStats(
+                    column_type=col_type,
+                    count=count,
+                    sum_sin=sum_sin[c, local_idx],
+                    sum_cos=sum_cos[c, local_idx],
+                )
             else:
                 raise ValueError(f"Unknown column type: {col_type}")
             cluster_stats.append(ss)
