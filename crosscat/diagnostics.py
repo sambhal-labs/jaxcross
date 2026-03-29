@@ -313,7 +313,9 @@ def packed_evaluate_imputation(
         packed: Packed CrossCat state.
         data: Full observation matrix, shape (n_rows, n_cols).
         mask: Boolean mask, shape (n_rows, n_cols). True = held-out.
-        col_types: Column type per column.
+        col_types: Column type per column. Accepted for API parity with
+            ``evaluate_imputation`` but unused — type IDs are read from
+            ``packed.col_type_ids`` instead.
         rng_key: JAX PRNG key (needed for imputation sampling).
         n_samples: Number of posterior predictive samples per held-out cell.
 

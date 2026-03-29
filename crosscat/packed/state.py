@@ -169,8 +169,10 @@ def pack_state(
         max_cols_per_view: Maximum columns per view. Defaults to ``n_cols``
             (safe for any column assignment). For large datasets (>100 columns),
             setting this to a smaller value (e.g., ``max(32, n_cols // max_views)``)
-            reduces memory by up to 10x and speeds up inner scans, but columns
-            will be silently dropped if a view exceeds this limit during inference.
+            reduces memory by up to 10x and speeds up inner scans. A ValueError
+            is raised if any view already exceeds this limit at pack time.
+            However, during Gibbs column transitions columns may silently be
+            truncated if a view grows beyond this limit at runtime.
 
     Returns:
         Padded, JIT-compatible state.
@@ -197,6 +199,8 @@ def pack_state(
     # merge into a single view). For large datasets, users can override.
     if max_cols_per_view is None:
         max_cols_per_view = n_cols
+    if max_cols_per_view < 1:
+        raise ValueError(f"max_cols_per_view must be >= 1, got {max_cols_per_view}.")
     for v_idx, view in enumerate(state.views):
         n_view_cols = len(view.column_indices)
         if n_view_cols > max_cols_per_view:
