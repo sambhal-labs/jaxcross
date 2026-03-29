@@ -179,6 +179,16 @@ def load_state(path: str | Path, data: Array | None = None) -> CrossCatState:
         ValueError: If column_types were not saved (required for unpacking).
     """
     packed, column_types = load_packed_state(path)
+    if data is None:
+        import warnings
+
+        warnings.warn(
+            "Loading state without data: sufficient statistics are reconstructed "
+            "from saved arrays, which may lose precision due to float32 storage. "
+            "Pass data=... for exact reconstruction.",
+            UserWarning,
+            stacklevel=2,
+        )
     if column_types is None:
         raise ValueError(
             "Cannot load CrossCatState: column_types not found in metadata. "
