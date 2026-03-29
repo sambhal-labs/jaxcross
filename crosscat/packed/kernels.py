@@ -1649,7 +1649,7 @@ def packed_gibbs_sweep(
     def one_sweep(carry, _):
         state, rng = carry
         k1, k2, k3, k4, rng = jax.random.split(rng, 5)
-        state = packed_transition_row_assignments(k1, state, data)
+        state = packed_transition_row_assignments(k1, state, data, recompute_suffstats=False)
         state = packed_transition_column_assignments(k2, state, data)
         state = packed_transition_column_hypers(k3, state, data)
         state = packed_transition_crp_alphas(k4, state)
@@ -1683,7 +1683,7 @@ def packed_gibbs_step(
         Updated PackedCrossCatState after one sweep.
     """
     k1, k2, k3, k4, _ = jax.random.split(rng_key, 5)
-    packed = packed_transition_row_assignments(k1, packed, data)
+    packed = packed_transition_row_assignments(k1, packed, data, recompute_suffstats=False)
     packed = packed_transition_column_assignments(k2, packed, data)
     packed = packed_transition_column_hypers(k3, packed, data)
     packed = packed_transition_crp_alphas(k4, packed)

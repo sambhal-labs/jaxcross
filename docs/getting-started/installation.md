@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.11+
-- JAX 0.4+
+- JAX >=0.4, <1.0
 
 ## Install with pip or uv
 
