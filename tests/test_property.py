@@ -843,9 +843,14 @@ def test_serialize_deserialize_roundtrip(seed, tmp_path_factory):
 
     path = tmp_path_factory.mktemp("ser") / f"test_{seed}.jxc"
     save_packed_state(packed, path, column_types=column_types)
-    loaded = load_packed_state(path)
+    loaded, _ = load_packed_state(path)
 
-    for field in ["row_assignments", "column_assignments", "view_alphas", "column_crp_alpha"]:
+    for field in [
+        "view_row_assignments",
+        "column_assignments",
+        "view_row_crp_alpha",
+        "column_crp_alpha",
+    ]:
         orig = getattr(packed, field)
         rec = getattr(loaded, field)
         np.testing.assert_array_equal(np.array(orig), np.array(rec))
@@ -874,7 +879,7 @@ def test_initialize_valid_assignments(seed):
     for view in state.views:
         assert view.row_assignments.shape[0] == 20
         # All row assignments are valid cluster indices
-        assert int(jnp.max(view.row_assignments)) < view.n_clusters
+        assert int(jnp.max(view.row_assignments)) < len(view.suffstats)
 
 
 @given(seed=st.integers(min_value=0, max_value=2**31 - 1))
@@ -895,8 +900,8 @@ def test_pack_unpack_preserves_assignments(seed):
 
     # Column assignments preserved
     np.testing.assert_array_equal(
-        np.array(state.column_assignment),
-        np.array(recovered.column_assignment),
+        np.array(state.column_assignments),
+        np.array(recovered.column_assignments),
     )
     # Row assignments preserved per view
     for v_orig, v_rec in zip(state.views, recovered.views, strict=True):
