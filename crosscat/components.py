@@ -31,7 +31,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import gammaln
 
-from crosscat.types import LOG_EPS, ColumnHypers, ColumnType, SufficientStats
+from crosscat.types import LOG_EPS, ColumnHypers, ColumnType, SufficientStats, log_bessel_i0
 
 
 def _filter_nan(data: Array) -> Array:
@@ -573,28 +573,8 @@ class BetaBernoulli:
 # ---------------------------------------------------------------------------
 
 
-def _log_bessel_i0(x: Array) -> Array:
-    """Log of modified Bessel function of the first kind, order 0.
-
-    Uses the polynomial approximation from Abramowitz & Stegun,
-    matching the original CrossCat numerics.cpp::log_bessel_0().
-    """
-    # For small x, use series; for large x, asymptotic
-    # Approximation: I_0(x) ≈ exp(x) / sqrt(2*pi*x) for large x
-    # For numerical stability, compute log directly
-    return jnp.where(
-        x < 3.75,
-        jnp.log(
-            1.0
-            + 3.5156229 * (x / 3.75) ** 2
-            + 3.0899424 * (x / 3.75) ** 4
-            + 1.2067492 * (x / 3.75) ** 6
-            + 0.2659732 * (x / 3.75) ** 8
-            + 0.0360768 * (x / 3.75) ** 10
-            + 0.0045813 * (x / 3.75) ** 12
-        ),
-        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, LOG_EPS)),
-    )
+# Alias for backward compatibility with internal callers
+_log_bessel_i0 = log_bessel_i0
 
 
 class VonMises:

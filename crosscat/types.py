@@ -29,6 +29,27 @@ from jax import Array
 LOG_EPS: float = 1e-30
 
 
+def log_bessel_i0(x: Array) -> Array:
+    """Log of modified Bessel function of the first kind, order 0.
+
+    Uses the polynomial approximation from Abramowitz & Stegun,
+    matching the original CrossCat numerics.cpp::log_bessel_0().
+    """
+    return jnp.where(
+        x < 3.75,
+        jnp.log(
+            1.0
+            + 3.5156229 * (x / 3.75) ** 2
+            + 3.0899424 * (x / 3.75) ** 4
+            + 1.2067492 * (x / 3.75) ** 6
+            + 0.2659732 * (x / 3.75) ** 8
+            + 0.0360768 * (x / 3.75) ** 10
+            + 0.0045813 * (x / 3.75) ** 12
+        ),
+        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, LOG_EPS)),
+    )
+
+
 class ColumnType(enum.Enum):
     """Supported column data types.
 

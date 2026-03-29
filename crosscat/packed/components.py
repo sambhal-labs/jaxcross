@@ -13,28 +13,14 @@ from jax import Array
 from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
-from crosscat.types import LOG_EPS
+from crosscat.types import LOG_EPS, log_bessel_i0
+
+# Alias for internal callers
+_log_bessel_i0 = log_bessel_i0
 
 # ---------------------------------------------------------------------------
 # JIT-compatible scoring functions (unified type dispatch)
 # ---------------------------------------------------------------------------
-
-
-def _log_bessel_i0(x: Array) -> Array:
-    """Log of modified Bessel function I_0(x)."""
-    return jnp.where(
-        x < 3.75,
-        jnp.log(
-            1.0
-            + 3.5156229 * (x / 3.75) ** 2
-            + 3.0899424 * (x / 3.75) ** 4
-            + 1.2067492 * (x / 3.75) ** 6
-            + 0.2659732 * (x / 3.75) ** 8
-            + 0.0360768 * (x / 3.75) ** 10
-            + 0.0045813 * (x / 3.75) ** 12
-        ),
-        x - 0.5 * jnp.log(2.0 * jnp.pi * jnp.maximum(x, LOG_EPS)),
-    )
 
 
 def _ng_log_marginal(n, sum_x, sum_x_sq, mu0, r, s, nu):
