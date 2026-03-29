@@ -82,8 +82,20 @@ value, conf = packed_impute_and_confidence(key, packed, data, query_col=0)
 packed_new, data_new, row = packed_sample_and_insert(key, packed, data, partial_row)
 ```
 
+## Packed Imputation Evaluation
+
+Use `packed_evaluate_imputation` for significantly faster held-out evaluation on packed state:
+
+```python
+from crosscat.diagnostics import random_holdout_mask, packed_evaluate_imputation
+
+mask = random_holdout_mask(key, data.shape[0], data.shape[1], holdout_fraction=0.1)
+metrics = packed_evaluate_imputation(packed, data, mask, col_types, rng_key=key)
+```
+
 ## API Reference
 
 - [`impute_and_confidence`](../../api/inference.md#impute_and_confidence)
 - [`sample_and_insert`](../../api/inference.md#sample_and_insert)
 - [`evaluate_imputation`](../../api/diagnostics.md#evaluate_imputation)
+- [`packed_evaluate_imputation`](../../api/diagnostics.md#packed_evaluate_imputation)
