@@ -76,3 +76,16 @@ Padding dimensions directly control memory usage:
 | `max_views=16, max_clusters=32` | `ss_counts`: 16 x 32 x n_cols |
 
 For 257 columns (MNIST), the difference is ~4x memory. Choose the smallest padding that exceeds your data's actual complexity.
+
+### `max_cols_per_view`
+
+By default, `pack_state()` sets `max_cols_per_view = n_cols` — the safe worst case where all columns merge into a single view. For wide datasets (>100 columns), this creates significant padding overhead in the suffstat arrays, which have shape `(max_views, max_clusters, max_cols_per_view)`.
+
+You can override this to reduce memory:
+
+```python
+packed = pack_state(state, max_cols_per_view=max(32, n_cols // 4))
+```
+
+!!! warning "Risk of column loss"
+    If a view accumulates more columns than `max_cols_per_view` during Gibbs sweeps, excess columns are silently dropped. Only reduce this if you have domain knowledge about your data's view structure.
