@@ -29,7 +29,8 @@ from jax import Array
 LOG_EPS: float = 1e-30
 
 # Grid points for ordinal logistic μ integration. Override to trade accuracy
-# for speed. Changing this value triggers JIT recompilation on the packed path.
+# for speed. Note: this is captured at import time, so changes require
+# restarting the Python process to take effect.
 ORDINAL_N_GRID: int = 31
 
 
