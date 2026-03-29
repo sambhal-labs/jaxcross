@@ -31,7 +31,14 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import gammaln
 
-from crosscat.types import LOG_EPS, ColumnHypers, ColumnType, SufficientStats, log_bessel_i0
+from crosscat.types import (
+    LOG_EPS,
+    ORDINAL_N_GRID,
+    ColumnHypers,
+    ColumnType,
+    SufficientStats,
+    log_bessel_i0,
+)
 
 
 def _filter_nan(data: Array) -> Array:
@@ -383,7 +390,7 @@ class OrderedLogistic:
     Hyperparameters: cutpoints, mu (prior mean), s (prior variance)
     """
 
-    _N_GRID = 31
+    _N_GRID = ORDINAL_N_GRID
 
     @staticmethod
     def sufficient_statistics(data: Array, n_levels: int) -> SufficientStats:

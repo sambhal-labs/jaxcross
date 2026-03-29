@@ -14,6 +14,7 @@ from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
 from crosscat.types import LOG_EPS, log_bessel_i0
+from crosscat.types import ORDINAL_N_GRID as _OL_N_GRID
 
 # Alias for internal callers
 _log_bessel_i0 = log_bessel_i0
@@ -95,9 +96,6 @@ def _ol_level_probs(mu, cutpoints):
     cum = jax.nn.sigmoid(extended - mu)
     probs = cum[1:] - cum[:-1]
     return jnp.maximum(probs, LOG_EPS)
-
-
-_OL_N_GRID = 31  # grid points for μ integration, matches hyper grid size
 
 
 def _ol_log_marginal(n, cat_counts, cutpoints, mu0, s0):
