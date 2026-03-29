@@ -148,6 +148,7 @@ def test_component_posterior_predictive(rng_key):
     assert abs(float(samples.mean()) - 5.0) < 2.0
 
 
+@pytest.mark.slow
 def test_single_gibbs_sweep(rng_key, synthetic_continuous_data):
     """Verify that a single Gibbs sweep runs without error and produces valid state."""
     from crosscat.gibbs import gibbs_sweep

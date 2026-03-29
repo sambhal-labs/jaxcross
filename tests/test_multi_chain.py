@@ -77,6 +77,7 @@ def test_packed_log_joint_matches_original(multi_chain_setup):
     assert abs(plj - olj) < 1.0, f"packed_log_joint={plj}, log_joint={olj}, gap={abs(plj - olj)}"
 
 
+@pytest.mark.slow
 def test_vmap_multi_chain_runs(multi_chain_setup):
     """multi_chain_packed_gibbs_sweep runs and returns correct shapes."""
     packed_list, data, column_types = multi_chain_setup
@@ -98,6 +99,7 @@ def test_vmap_multi_chain_runs(multi_chain_setup):
     assert batched_result.column_assignments.shape[0] == n_chains
 
 
+@pytest.mark.slow
 def test_multi_chain_selects_best(multi_chain_setup):
     """select_best_chain picks the chain with highest score."""
     packed_list, data, column_types = multi_chain_setup
@@ -120,6 +122,7 @@ def test_multi_chain_selects_best(multi_chain_setup):
     )
 
 
+@pytest.mark.slow
 def test_multi_chain_deterministic(multi_chain_setup):
     """Same key gives same result."""
     packed_list, data, _ = multi_chain_setup

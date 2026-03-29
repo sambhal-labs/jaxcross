@@ -280,6 +280,7 @@ def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_full_packed_sweep_vectorized_valid(mixed_packed_state):
     """packed_gibbs_sweep produces a valid unpacked state after 2 sweeps."""
     packed, data, column_types = mixed_packed_state
@@ -293,6 +294,7 @@ def test_full_packed_sweep_vectorized_valid(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after sweep: {lj}"
 
 
+@pytest.mark.slow
 def test_packed_sweep_vectorized_deterministic(mixed_packed_state):
     """packed_gibbs_sweep with same key gives same result."""
     packed, data, column_types = mixed_packed_state
@@ -317,6 +319,7 @@ def test_packed_sweep_vectorized_deterministic(mixed_packed_state):
     )
 
 
+@pytest.mark.slow
 def test_packed_sweep_vectorized_jit_compiles(mixed_packed_state):
     """packed_gibbs_sweep works under jax.jit with n_sweeps=1."""
     packed, data, column_types = mixed_packed_state
@@ -683,6 +686,7 @@ def test_column_assignments_vectorized_multiple_runs_differ(mixed_packed_state):
     assert diff1 >= 0 and diff2 >= 0  # always true, just verifies no crash
 
 
+@pytest.mark.slow
 def test_mixed_column_types_full_sweep():
     """Full sweep with all 5 column types produces valid state."""
     key = jax.random.key(600)
