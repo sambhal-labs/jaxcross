@@ -157,6 +157,7 @@ def pack_state(
     max_views: int = 16,
     max_clusters: int = 32,
     max_categories: int = 16,
+    max_cols_per_view: int | None = None,
 ) -> PackedCrossCatState:
     """Convert a CrossCatState (Python lists) into a PackedCrossCatState (padded arrays).
 
@@ -165,6 +166,11 @@ def pack_state(
         max_views: Maximum number of views (padding dimension).
         max_clusters: Maximum clusters per view.
         max_categories: Maximum categories for categorical/ordinal columns.
+        max_cols_per_view: Maximum columns per view. Defaults to ``n_cols``
+            (safe for any column assignment). For large datasets (>100 columns),
+            setting this to a smaller value (e.g., ``max(32, n_cols // max_views)``)
+            reduces memory by up to 10x and speeds up inner scans, but columns
+            will be silently dropped if a view exceeds this limit during inference.
 
     Returns:
         Padded, JIT-compatible state.
@@ -187,12 +193,10 @@ def pack_state(
                 f"View {v_idx} has {n_clusters} clusters but max_clusters={max_clusters}. "
                 f"Increase max_clusters to at least {n_clusters}."
             )
-    # Use n_cols as max_cols_per_view to handle worst case where all columns
-    # merge into a single view during column assignment transitions.
-    # NOTE: This is conservative. For large n_cols (>100), reducing this value
-    # via the max_cols_per_view parameter can significantly speed up inner scans,
-    # but risks silent column loss if a view exceeds the limit during inference.
-    max_cols_per_view = n_cols
+    # Default: n_cols (safe for any column assignment — worst case all columns
+    # merge into a single view). For large datasets, users can override.
+    if max_cols_per_view is None:
+        max_cols_per_view = n_cols
 
     # Column assignments and CRP alpha
     col_assignments = jnp.array(state.column_assignments, dtype=jnp.int32)
