@@ -197,6 +197,14 @@ def pack_state(
     # merge into a single view). For large datasets, users can override.
     if max_cols_per_view is None:
         max_cols_per_view = n_cols
+    for v_idx, view in enumerate(state.views):
+        n_view_cols = len(view.column_indices)
+        if n_view_cols > max_cols_per_view:
+            raise ValueError(
+                f"View {v_idx} has {n_view_cols} columns but max_cols_per_view="
+                f"{max_cols_per_view}. Increase max_cols_per_view to at least "
+                f"{n_view_cols}."
+            )
 
     # Column assignments and CRP alpha
     col_assignments = jnp.array(state.column_assignments, dtype=jnp.int32)

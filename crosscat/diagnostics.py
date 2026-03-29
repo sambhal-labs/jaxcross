@@ -298,9 +298,16 @@ def packed_evaluate_imputation(
 ) -> dict:
     """Evaluate imputation accuracy on held-out cells using packed inference.
 
-    Drop-in replacement for ``evaluate_imputation`` that uses the packed
+    Faster alternative to ``evaluate_imputation`` that uses the packed
     inference path (``packed_predictive_probability``,
-    ``packed_impute_and_confidence``) for significantly faster evaluation.
+    ``packed_impute_and_confidence``).
+
+    .. note::
+        Log-likelihood (``mean_log_lik``) uses ``row_id`` conditioning and
+        matches the unpacked path exactly. However, point-estimate metrics
+        (``mae``, ``accuracy``) may differ slightly because
+        ``packed_impute_and_confidence`` uses marginal cluster weights
+        rather than row-conditioned weights.
 
     Args:
         packed: Packed CrossCat state.
