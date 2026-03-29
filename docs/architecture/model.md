@@ -36,7 +36,7 @@ The full state contains:
 - **Per-view row assignments** — which cluster each row belongs to (independent per view)
 - **CRP concentration parameters** — controls how many groups to expect
 - **Column hyperparameters** — a few scalars per column type
-- **Sufficient statistics** — derived from data + assignments (count, sum, sum-of-squares, etc.)
+- **Sufficient statistics** — derived from data + assignments (count, sum, sum-of-squares, etc.). The canonical computation lives in `packed/suffstats.py:compute_suffstats_vectorized()`; the unpacked path in `model.py` delegates to it.
 
 ## Collapsed Inference
 

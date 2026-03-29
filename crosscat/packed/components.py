@@ -14,6 +14,7 @@ from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
 from crosscat.types import LOG_EPS, log_bessel_i0
+from crosscat.types import ORDINAL_N_GRID as _OL_N_GRID
 
 # Alias for internal callers
 _log_bessel_i0 = log_bessel_i0
@@ -95,9 +96,6 @@ def _ol_level_probs(mu, cutpoints):
     cum = jax.nn.sigmoid(extended - mu)
     probs = cum[1:] - cum[:-1]
     return jnp.maximum(probs, LOG_EPS)
-
-
-_OL_N_GRID = 31  # grid points for μ integration, matches hyper grid size
 
 
 def _ol_log_marginal(n, cat_counts, cutpoints, mu0, s0):
@@ -452,36 +450,18 @@ def _bb_sample(rng_key, count, sum_x, alpha, beta):
 
 
 def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
-    """Sample from von Mises posterior predictive via rejection sampling.
+    """Sample from von Mises posterior predictive using Best-Fisher algorithm.
 
-    Matches original CyclicComponentModel::get_draw_constrained():
-    uniform proposal on [0, 2*pi), accept/reject against predictive logp.
+    Best & Fisher (1979): acceptance rate > 50% for all kappa. Replaces the
+    previous uniform rejection sampler that degraded for small kappa.
     """
+    from crosscat.components import _von_mises_sample_best_fisher
+
     total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
     total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
 
-    # Mode logp (envelope for rejection sampling)
-    log_M = kappa - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
-
-    max_iters = 1000
-
-    def _cond(state):
-        return state[0] & (state[1] < max_iters)
-
-    def _body(state):
-        _, itr, sample, key_loop = state
-        k1, k2, k3 = jax.random.split(key_loop, 3)
-        x = jax.random.uniform(k1) * 2.0 * jnp.pi
-        log_u = jnp.log(jax.random.uniform(k2)) + log_M
-        log_target = kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
-        accepted = log_u < log_target
-        return (~accepted, itr + 1, jnp.where(accepted, x, sample), k3)
-
-    _, _, sample, _ = jax.lax.while_loop(
-        _cond, _body, (jnp.bool_(True), jnp.int32(0), 0.0, rng_key)
-    )
-    return sample % (2.0 * jnp.pi)
+    return _von_mises_sample_best_fisher(rng_key, mu_post, kappa)
 
 
 def unified_sample_posterior_predictive(

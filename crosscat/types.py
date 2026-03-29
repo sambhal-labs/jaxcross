@@ -28,6 +28,11 @@ from jax import Array
 # against log(0) and division-by-zero in posterior computations.
 LOG_EPS: float = 1e-30
 
+# Grid points for ordinal logistic μ integration. Override to trade accuracy
+# for speed. Note: this is captured at import time, so changes require
+# restarting the Python process to take effect.
+ORDINAL_N_GRID: int = 31
+
 
 def log_bessel_i0(x: Array) -> Array:
     """Log of modified Bessel function of the first kind, order 0.
