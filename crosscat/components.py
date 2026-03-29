@@ -587,12 +587,16 @@ _log_bessel_i0 = log_bessel_i0
 def _von_mises_sample_best_fisher(key: Array, mu: Array, kappa: Array) -> Array:
     """Sample from von Mises(mu, kappa) using the Best-Fisher algorithm.
 
-    Best & Fisher (1979): acceptance rate > 50% for all kappa.
-    This is the standard algorithm used by NumPy/SciPy for von Mises sampling.
+    Best & Fisher (1979): acceptance rate > 50% for all kappa > 0.
+    Falls back to uniform on [0, 2*pi) when kappa ~ 0 (uninformative).
     """
+    # Guard against kappa=0 (division by zero in Best-Fisher parameters).
+    # Use a safe kappa for computation; select uniform sample at the end.
+    safe_kappa = jnp.maximum(kappa, 1e-10)
+
     # Best-Fisher parameters
-    tau = 1.0 + jnp.sqrt(1.0 + 4.0 * kappa**2)
-    rho = (tau - jnp.sqrt(2.0 * tau)) / (2.0 * kappa)
+    tau = 1.0 + jnp.sqrt(1.0 + 4.0 * safe_kappa**2)
+    rho = (tau - jnp.sqrt(2.0 * tau)) / (2.0 * safe_kappa)
     r = (1.0 + rho**2) / (2.0 * rho)
 
     max_iters = 1000
@@ -607,7 +611,7 @@ def _von_mises_sample_best_fisher(key: Array, mu: Array, kappa: Array) -> Array:
         u1 = jax.random.uniform(k1)
         z = jnp.cos(jnp.pi * u1)
         f = (1.0 + r * z) / (r + z)
-        c = kappa * (r - f)
+        c = safe_kappa * (r - f)
 
         u2 = jax.random.uniform(k2)
         accepted = (c * (2.0 - c) > u2) | (jnp.log(c / u2) + 1.0 >= c)
@@ -623,7 +627,11 @@ def _von_mises_sample_best_fisher(key: Array, mu: Array, kappa: Array) -> Array:
     # Random sign and shift to mu
     key, subkey = jax.random.split(key)
     sign = 2.0 * jax.random.bernoulli(subkey).astype(jnp.float32) - 1.0
-    return (mu + sign * theta) % (2.0 * jnp.pi)
+    bf_sample = (mu + sign * theta) % (2.0 * jnp.pi)
+
+    # For kappa ~ 0 (uniform distribution), return uniform sample
+    uniform_sample = jax.random.uniform(key) * 2.0 * jnp.pi
+    return jnp.where(kappa < 1e-8, uniform_sample, bf_sample)
 
 
 class VonMises:

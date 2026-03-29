@@ -150,11 +150,18 @@ def _compute_suffstats_for_view(
 
     col_indices_arr = jnp.asarray(column_indices, dtype=jnp.int32)
     col_type_ids = jnp.array([_TYPE_TO_ID[ct] for ct in column_types], dtype=jnp.int32)
-    max_categories = (
-        max(int(jnp.nanmax(data[:, c])) + 1 for c in column_indices)
-        if len(column_indices) > 0
-        else 2
-    )
+
+    # Only compute max_categories from categorical/ordinal columns to avoid
+    # massive one-hot arrays from continuous column values.
+    cat_ord_cols = [
+        int(c)
+        for c in column_indices
+        if column_types[int(c)] in (ColumnType.CATEGORICAL, ColumnType.ORDINAL)
+    ]
+    if cat_ord_cols:
+        max_categories = max(_safe_n_categories(data[:, c]) for c in cat_ord_cols)
+    else:
+        max_categories = 2
     max_categories = max(max_categories, 2)
 
     counts, sum_x, sum_x_sq, cat_counts, sum_sin, sum_cos = compute_suffstats_vectorized(
