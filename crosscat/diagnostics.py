@@ -12,6 +12,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from crosscat.model import log_joint
+from crosscat.packed.state import PackedCrossCatState
 from crosscat.types import LOG_EPS, ColumnType, CrossCatState
 
 
@@ -248,6 +249,130 @@ def evaluate_imputation(
         per_column[col_idx]["log_liks"].append(float(log_p))
 
         if col_type == ColumnType.CONTINUOUS or col_type == ColumnType.CYCLIC:
+            error = float(jnp.abs(true_val - point_est))
+            continuous_errors.append(error)
+            per_column[col_idx]["errors"].append(error)
+        else:
+            correct = int(true_val) == int(point_est)
+            if correct:
+                discrete_correct += 1
+                per_column[col_idx]["correct"] += 1
+            discrete_total += 1
+            per_column[col_idx]["total"] += 1
+
+    # Aggregate
+    mae = sum(continuous_errors) / max(len(continuous_errors), 1)
+    accuracy = discrete_correct / max(discrete_total, 1)
+    mean_ll = total_ll / max(n_scored, 1)
+
+    # Summarize per-column
+    per_column_summary = {}
+    for col_idx, metrics in per_column.items():
+        col_summary: dict = {
+            "mean_log_lik": sum(metrics["log_liks"]) / max(len(metrics["log_liks"]), 1),
+            "n_held_out": len(metrics["log_liks"]),
+        }
+        if metrics["errors"]:
+            col_summary["mae"] = sum(metrics["errors"]) / len(metrics["errors"])
+        if metrics["total"] > 0:
+            col_summary["accuracy"] = metrics["correct"] / metrics["total"]
+        per_column_summary[col_idx] = col_summary
+
+    return {
+        "mae": mae,
+        "accuracy": accuracy,
+        "mean_log_lik": mean_ll,
+        "n_held_out": n_scored,
+        "per_column": per_column_summary,
+    }
+
+
+def packed_evaluate_imputation(
+    packed: PackedCrossCatState,
+    data: Array,
+    mask: Array,
+    col_types: list[ColumnType],
+    *,
+    rng_key: Array | None = None,
+    n_samples: int = 200,
+) -> dict:
+    """Evaluate imputation accuracy on held-out cells using packed inference.
+
+    Faster alternative to ``evaluate_imputation`` that uses the packed
+    inference path (``packed_predictive_probability``,
+    ``packed_impute_and_confidence``).
+
+    .. note::
+        Log-likelihood (``mean_log_lik``) uses ``row_id`` conditioning and
+        matches the unpacked path exactly. However, point-estimate metrics
+        (``mae``, ``accuracy``) may differ slightly because
+        ``packed_impute_and_confidence`` uses marginal cluster weights
+        rather than row-conditioned weights.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Full observation matrix, shape (n_rows, n_cols).
+        mask: Boolean mask, shape (n_rows, n_cols). True = held-out.
+        col_types: Column type per column. Accepted for API parity with
+            ``evaluate_imputation`` but unused — type IDs are read from
+            ``packed.col_type_ids`` instead.
+        rng_key: JAX PRNG key (needed for imputation sampling).
+        n_samples: Number of posterior predictive samples per held-out cell.
+
+    Returns:
+        Dictionary with:
+            'mae': mean absolute error (continuous columns only)
+            'accuracy': fraction correct (categorical/binary/ordinal columns only)
+            'mean_log_lik': mean predictive log-likelihood across all held-out cells
+            'n_held_out': total number of held-out cells evaluated
+            'per_column': dict mapping column index to per-column metrics
+    """
+    from crosscat.packed.state import CONTINUOUS_ID, CYCLIC_ID
+    from crosscat.packed_inference import (
+        packed_impute_and_confidence,
+        packed_predictive_probability,
+    )
+
+    if rng_key is None:
+        rng_key = jax.random.key(0)
+
+    total_ll = 0.0
+    n_scored = 0
+    continuous_errors: list[float] = []
+    discrete_correct = 0
+    discrete_total = 0
+    per_column: dict[int, dict] = {}
+
+    held_out_rows, held_out_cols = jnp.where(mask)
+
+    for idx in range(len(held_out_rows)):
+        row_idx = int(held_out_rows[idx])
+        col_idx = int(held_out_cols[idx])
+        true_val = data[row_idx, col_idx]
+
+        if jnp.isnan(true_val):
+            continue
+
+        # Predictive log-likelihood via packed path
+        log_p = packed_predictive_probability(
+            packed, data, [col_idx], jnp.array([true_val]), row_id=row_idx
+        )
+        total_ll += float(log_p)
+        n_scored += 1
+
+        # Point estimate via packed imputation
+        rng_key, subkey = jax.random.split(rng_key)
+        point_est, _conf = packed_impute_and_confidence(
+            subkey, packed, data, col_idx, n_samples=n_samples
+        )
+
+        type_id = int(packed.col_type_ids[col_idx])
+        if col_idx not in per_column:
+            per_column[col_idx] = {"errors": [], "correct": 0, "total": 0, "log_liks": []}
+
+        per_column[col_idx]["log_liks"].append(float(log_p))
+
+        if type_id in (CONTINUOUS_ID, CYCLIC_ID):
             error = float(jnp.abs(true_val - point_est))
             continuous_errors.append(error)
             per_column[col_idx]["errors"].append(error)

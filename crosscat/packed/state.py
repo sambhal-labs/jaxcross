@@ -157,6 +157,7 @@ def pack_state(
     max_views: int = 16,
     max_clusters: int = 32,
     max_categories: int = 16,
+    max_cols_per_view: int | None = None,
 ) -> PackedCrossCatState:
     """Convert a CrossCatState (Python lists) into a PackedCrossCatState (padded arrays).
 
@@ -165,6 +166,13 @@ def pack_state(
         max_views: Maximum number of views (padding dimension).
         max_clusters: Maximum clusters per view.
         max_categories: Maximum categories for categorical/ordinal columns.
+        max_cols_per_view: Maximum columns per view. Defaults to ``n_cols``
+            (safe for any column assignment). For large datasets (>100 columns),
+            setting this to a smaller value (e.g., ``max(32, n_cols // max_views)``)
+            reduces memory by up to 10x and speeds up inner scans. A ValueError
+            is raised if any view already exceeds this limit at pack time.
+            However, during Gibbs column transitions columns may silently be
+            truncated if a view grows beyond this limit at runtime.
 
     Returns:
         Padded, JIT-compatible state.
@@ -187,12 +195,20 @@ def pack_state(
                 f"View {v_idx} has {n_clusters} clusters but max_clusters={max_clusters}. "
                 f"Increase max_clusters to at least {n_clusters}."
             )
-    # Use n_cols as max_cols_per_view to handle worst case where all columns
-    # merge into a single view during column assignment transitions.
-    # NOTE: This is conservative. For large n_cols (>100), reducing this value
-    # via the max_cols_per_view parameter can significantly speed up inner scans,
-    # but risks silent column loss if a view exceeds the limit during inference.
-    max_cols_per_view = n_cols
+    # Default: n_cols (safe for any column assignment — worst case all columns
+    # merge into a single view). For large datasets, users can override.
+    if max_cols_per_view is None:
+        max_cols_per_view = n_cols
+    if max_cols_per_view < 1:
+        raise ValueError(f"max_cols_per_view must be >= 1, got {max_cols_per_view}.")
+    for v_idx, view in enumerate(state.views):
+        n_view_cols = len(view.column_indices)
+        if n_view_cols > max_cols_per_view:
+            raise ValueError(
+                f"View {v_idx} has {n_view_cols} columns but max_cols_per_view="
+                f"{max_cols_per_view}. Increase max_cols_per_view to at least "
+                f"{n_view_cols}."
+            )
 
     # Column assignments and CRP alpha
     col_assignments = jnp.array(state.column_assignments, dtype=jnp.int32)

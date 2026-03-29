@@ -28,15 +28,20 @@ def _get_view_for_column(state: CrossCatState, col: int) -> int:
     return int(state.column_assignments[col])
 
 
-def _cluster_weights(view, n_rows: int) -> Array:
+def _cluster_counts(view) -> Array:
+    """Cluster membership counts for a view, shape (n_clusters,)."""
+    n_clusters = int(jnp.max(view.row_assignments)) + 1
+    return jnp.array([jnp.sum(view.row_assignments == c) for c in range(n_clusters)]).astype(
+        jnp.float32
+    )
+
+
+def _cluster_weights(view) -> Array:
     """CRP-based cluster assignment probabilities for a view.
 
     Returns normalized weights proportional to cluster counts.
     """
-    n_clusters = int(jnp.max(view.row_assignments)) + 1
-    counts = jnp.array([jnp.sum(view.row_assignments == c) for c in range(n_clusters)]).astype(
-        jnp.float32
-    )
+    counts = _cluster_counts(view)
     return counts / counts.sum()
 
 
@@ -52,10 +57,8 @@ def _cluster_weights_conditioned(
 
     p(cluster=c | conditions) proportional to p(cluster=c) * p(conditions | cluster=c)
     """
-    n_clusters = int(jnp.max(view.row_assignments)) + 1
-    counts = jnp.array([jnp.sum(view.row_assignments == c) for c in range(n_clusters)]).astype(
-        jnp.float32
-    )
+    counts = _cluster_counts(view)
+    n_clusters = counts.shape[0]
 
     log_weights = jnp.log(counts + LOG_EPS)
 
@@ -155,7 +158,7 @@ def predictive_probability(
                 state, view, view_idx, condition_cols, condition_vals, data
             )
         else:
-            weights = _cluster_weights(view, state.n_rows)
+            weights = _cluster_weights(view)
 
         # Find local index of query column in this view
         local_idx = None
@@ -233,7 +236,7 @@ def predictive_sample(
                     state, view, view_idx, condition_cols, condition_vals, data
                 )
             else:
-                weights = _cluster_weights(view, state.n_rows)
+                weights = _cluster_weights(view)
 
             # Sample cluster
             k1, k2 = jax.random.split(sample_keys[q_idx])
@@ -390,7 +393,7 @@ def _estimate_mi_sample(
     with importance weighting by p(x, y).
     """
     n_clusters = int(jnp.max(view.row_assignments)) + 1
-    cluster_weights = _cluster_weights(view, state.n_rows)
+    cluster_weights = _cluster_weights(view)
     log_cluster_weights = jnp.log(cluster_weights + LOG_EPS)
 
     # Find local column indices in the view
@@ -887,7 +890,7 @@ def predictive_cdf(
                 state, view, view_idx, condition_cols or [], condition_vals, data
             )
         else:
-            weights = _cluster_weights(view, state.n_rows)
+            weights = _cluster_weights(view)
 
         # Find local index
         local_idx = None
