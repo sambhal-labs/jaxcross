@@ -46,6 +46,12 @@ load_state(path, data=None) -> CrossCatState
 
 Load an unpacked `CrossCatState`. When `data` is provided, sufficient statistics are recomputed for exact fidelity.
 
+!!! warning "Always pass `data` for exact reconstruction"
+    When `data` is not provided, sufficient statistics are reconstructed from saved float32 arrays, which may lose precision. A `UserWarning` is emitted in this case. Always pass the original data matrix for exact fidelity:
+    ```python
+    state = load_state("model.jxc", data=data)
+    ```
+
 **Returns**: `CrossCatState`.
 
 ## `save_checkpoint`

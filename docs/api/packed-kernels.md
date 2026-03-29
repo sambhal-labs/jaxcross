@@ -49,6 +49,9 @@ packed_transition_row_assignments(rng_key, packed, data, *, recompute_suffstats=
 
 Resample row cluster assignments. Uses nested `lax.scan` (outer over views, inner over rows) with `vmap` over clusters for scoring.
 
+!!! tip "recompute_suffstats"
+    The `recompute_suffstats` parameter controls whether sufficient statistics are recomputed from scratch after the sweep. Set to `False` when a subsequent kernel (e.g., `packed_transition_column_assignments`) will recompute them anyway. Both `packed_gibbs_sweep` and `packed_gibbs_step` pass `recompute_suffstats=False` internally since column assignments always recomputes suffstats.
+
 ## `packed_transition_column_assignments`
 
 ```python
