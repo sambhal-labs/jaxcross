@@ -31,7 +31,14 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import gammaln
 
-from crosscat.types import LOG_EPS, ColumnHypers, ColumnType, SufficientStats, log_bessel_i0
+from crosscat.types import (
+    LOG_EPS,
+    ORDINAL_N_GRID,
+    ColumnHypers,
+    ColumnType,
+    SufficientStats,
+    log_bessel_i0,
+)
 
 
 def _filter_nan(data: Array) -> Array:
@@ -383,7 +390,7 @@ class OrderedLogistic:
     Hyperparameters: cutpoints, mu (prior mean), s (prior variance)
     """
 
-    _N_GRID = 31
+    _N_GRID = ORDINAL_N_GRID
 
     @staticmethod
     def sufficient_statistics(data: Array, n_levels: int) -> SufficientStats:
@@ -577,6 +584,56 @@ class BetaBernoulli:
 _log_bessel_i0 = log_bessel_i0
 
 
+def _von_mises_sample_best_fisher(key: Array, mu: Array, kappa: Array) -> Array:
+    """Sample from von Mises(mu, kappa) using the Best-Fisher algorithm.
+
+    Best & Fisher (1979): acceptance rate > 50% for all kappa > 0.
+    Falls back to uniform on [0, 2*pi) when kappa ~ 0 (uninformative).
+    """
+    # Guard against kappa=0 (division by zero in Best-Fisher parameters).
+    # Use a safe kappa for computation; select uniform sample at the end.
+    safe_kappa = jnp.maximum(kappa, 1e-10)
+
+    # Best-Fisher parameters
+    tau = 1.0 + jnp.sqrt(1.0 + 4.0 * safe_kappa**2)
+    rho = (tau - jnp.sqrt(2.0 * tau)) / (2.0 * safe_kappa)
+    r = (1.0 + rho**2) / (2.0 * rho)
+
+    max_iters = 1000
+
+    def _cond(state):
+        return state[0] & (state[1] < max_iters)
+
+    def _body(state):
+        _, itr, sample, key_loop = state
+        k1, k2, key_loop = jax.random.split(key_loop, 3)
+
+        u1 = jax.random.uniform(k1)
+        z = jnp.cos(jnp.pi * u1)
+        f = (1.0 + r * z) / (r + z)
+        c = safe_kappa * (r - f)
+
+        u2 = jax.random.uniform(k2)
+        accepted = (c * (2.0 - c) > u2) | (jnp.log(c / u2) + 1.0 >= c)
+
+        # f is cos(theta), so theta = arccos(f), with random sign
+        theta = jnp.arccos(jnp.clip(f, -1.0, 1.0))
+        return (~accepted, itr + 1, jnp.where(accepted, theta, sample), key_loop)
+
+    _, _, theta, _ = jax.lax.while_loop(
+        _cond, _body, (jnp.bool_(True), jnp.int32(0), jnp.float32(0.0), key)
+    )
+
+    # Random sign and shift to mu
+    key, subkey = jax.random.split(key)
+    sign = 2.0 * jax.random.bernoulli(subkey).astype(jnp.float32) - 1.0
+    bf_sample = (mu + sign * theta) % (2.0 * jnp.pi)
+
+    # For kappa ~ 0 (uniform distribution), return uniform sample
+    uniform_sample = jax.random.uniform(key) * 2.0 * jnp.pi
+    return jnp.where(kappa < 1e-8, uniform_sample, bf_sample)
+
+
 class VonMises:
     """Von Mises conjugate model for circular/directional data.
 
@@ -667,10 +724,12 @@ class VonMises:
     def sample_posterior_predictive(
         rng_key: Array, suffstats: SufficientStats, hypers: ColumnHypers, n: int = 1
     ) -> Array:
-        """Draw samples from posterior predictive von Mises via rejection sampling.
+        """Draw samples from posterior predictive von Mises.
 
-        Matches original CyclicComponentModel::get_draw_constrained():
-        uniform proposal on [0, 2*pi), accept/reject against predictive logp.
+        Uses the Best-Fisher algorithm (Best & Fisher, 1979) which has
+        acceptance rate > 50% for all kappa, replacing the previous uniform
+        rejection sampler that degraded badly for small kappa and silently
+        fell back to 0.0 after 1000 iterations.
         """
         kappa = hypers.kappa
         a = hypers.vm_a
@@ -679,32 +738,8 @@ class VonMises:
         total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
 
-        # Mode logp (envelope for rejection sampling)
-        log_M = kappa * jnp.cos(0.0) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
-
-        def _logp_at(x):
-            return kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
-
         def _sample_one(key):
-            max_iters = 1000
-
-            def _cond(state):
-                return state[0] & (state[1] < max_iters)
-
-            def _body(state):
-                _, itr, sample, key_loop = state
-                k1, k2, k3 = jax.random.split(key_loop, 3)
-                x = jax.random.uniform(k1) * 2.0 * jnp.pi
-                log_u = jnp.log(jax.random.uniform(k2)) + log_M
-                log_target = _logp_at(x)
-                accepted = log_u < log_target
-                return (~accepted, itr + 1, jnp.where(accepted, x, sample), k3)
-
-            _, _, sample, _ = jax.lax.while_loop(
-                _cond, _body, (jnp.bool_(True), jnp.int32(0), 0.0, key)
-            )
-            # Fallback to uniform if max iterations reached
-            return sample % (2.0 * jnp.pi)
+            return _von_mises_sample_best_fisher(key, mu_post, kappa)
 
         keys = jax.random.split(rng_key, n)
         samples = jax.vmap(_sample_one)(keys)
