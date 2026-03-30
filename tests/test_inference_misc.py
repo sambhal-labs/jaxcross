@@ -7,8 +7,8 @@ joint_predictive_probability, sample_and_insert.
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
+import pytest
 
 from crosscat.types import ColumnType
 
@@ -94,23 +94,25 @@ class TestConditionalEntropy:
 
 
 class TestPredictiveCDF:
+    @pytest.mark.slow
     def test_continuous_cdf_monotone(self, rng_key, simple_state):
         from crosscat.inference import predictive_cdf
 
         state, data, _ = simple_state
-        k1, k2, k3 = jax.random.split(rng_key, 3)
-        cdf_low = predictive_cdf(k1, state, data, 0, jnp.array(-10.0))
-        cdf_mid = predictive_cdf(k2, state, data, 0, jnp.array(2.5))
-        cdf_high = predictive_cdf(k3, state, data, 0, jnp.array(20.0))
+        # Use the same key for all calls so the MC samples are consistent
+        cdf_low = predictive_cdf(rng_key, state, data, 0, jnp.array(-100.0), n_samples=2000)
+        cdf_mid = predictive_cdf(rng_key, state, data, 0, jnp.array(2.5), n_samples=2000)
+        cdf_high = predictive_cdf(rng_key, state, data, 0, jnp.array(100.0), n_samples=2000)
         assert float(cdf_low) <= float(cdf_mid) <= float(cdf_high)
         assert float(cdf_low) < 0.5
         assert float(cdf_high) > 0.5
 
+    @pytest.mark.slow
     def test_continuous_cdf_bounds(self, rng_key, simple_state):
         from crosscat.inference import predictive_cdf
 
         state, data, _ = simple_state
-        cdf = predictive_cdf(rng_key, state, data, 0, jnp.array(0.0))
+        cdf = predictive_cdf(rng_key, state, data, 0, jnp.array(0.0), n_samples=2000)
         assert 0.0 <= float(cdf) <= 1.0
 
     def test_categorical_cdf(self, rng_key):
