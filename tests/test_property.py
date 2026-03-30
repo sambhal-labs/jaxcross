@@ -713,6 +713,43 @@ def test_unified_posterior_predictive_matches_bb(n, x, alpha, beta):
     np.testing.assert_allclose(float(unified), float(specific), rtol=1e-5)
 
 
+@given(
+    n=count_st,
+    x=cyclic_float,
+    kappa=pos_float,
+    vm_a=pos_float,
+    vm_mu=cyclic_float,
+)
+@settings(max_examples=50, deadline=None)
+def test_batch_vm_matches_unified_vm(n, x, kappa, vm_a, vm_mu):
+    """batch_vm_posterior_predictive_logp matches unified for CYCLIC_ID."""
+    from crosscat.packed.components import batch_vm_posterior_predictive_logp
+
+    sum_sin = jnp.array(float(n) * jnp.sin(jnp.array(vm_mu)))
+    sum_cos = jnp.array(float(n) * jnp.cos(jnp.array(vm_mu)))
+
+    specific = _vm_posterior_predictive_logp(
+        jnp.array(x),
+        jnp.array(n),
+        sum_sin,
+        sum_cos,
+        jnp.array(kappa),
+        jnp.array(vm_a),
+        jnp.array(vm_mu),
+    )
+    batch = batch_vm_posterior_predictive_logp(
+        jnp.array([x]),
+        jnp.array([n], dtype=jnp.float32),
+        jnp.array([float(sum_sin)]),
+        jnp.array([float(sum_cos)]),
+        jnp.array([kappa]),
+        jnp.array([vm_a]),
+        jnp.array([vm_mu]),
+    )
+
+    np.testing.assert_allclose(float(batch[0]), float(specific), rtol=1e-5)
+
+
 # ---------------------------------------------------------------------------
 # Component scoring: log marginal is non-positive
 # ---------------------------------------------------------------------------

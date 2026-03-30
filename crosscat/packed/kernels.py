@@ -22,6 +22,7 @@ from crosscat.packed.components import (
     batch_bb_posterior_predictive_logp,
     batch_dc_posterior_predictive_logp,
     batch_ng_posterior_predictive_logp,
+    batch_vm_posterior_predictive_logp,
     unified_log_marginal,
     unified_posterior_predictive_logp,
 )
@@ -147,6 +148,21 @@ def _score_row_one_cluster_typed(
     )
     dc_score = jnp.sum(jnp.where(valid, dc_logps, 0.0))
 
+    # --- Cyclic fast path ---
+    h_kappa = hyper_kappa[safe_col_indices]
+    h_vm_a = hyper_vm_a[safe_col_indices]
+    h_vm_mu = hyper_vm_mu[safe_col_indices]
+    vm_logps = batch_vm_posterior_predictive_logp(
+        xs,
+        ss_counts_c.astype(jnp.float32),
+        ss_sum_sin_c,
+        ss_sum_cos_c,
+        h_kappa,
+        h_vm_a,
+        h_vm_mu,
+    )
+    vm_score = jnp.sum(jnp.where(valid, vm_logps, 0.0))
+
     # --- General fallback (vmap over unified dispatch) ---
     general_score = _score_row_one_cluster(
         row_data,
@@ -181,7 +197,11 @@ def _score_row_one_cluster_typed(
             jnp.where(
                 dominant_type == CATEGORICAL_ID,
                 dc_score,
-                general_score,
+                jnp.where(
+                    dominant_type == CYCLIC_ID,
+                    vm_score,
+                    general_score,
+                ),
             ),
         ),
     )
