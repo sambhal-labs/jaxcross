@@ -972,10 +972,11 @@ def packed_transition_column_hypers(
             k_cp, key = jax.random.split(key)
             # Clamp to finite range — padded cutpoints are +inf which would
             # produce NaN in linspace. JAX evaluates both branches of where.
-            prev = jnp.where(k_idx > 0, cutpts[k_idx - 1], jnp.float32(-10.0))
-            nxt = jnp.where(k_idx < n_cutpoints - 1, cutpts[k_idx + 1], jnp.float32(10.0))
-            lower = jnp.clip(prev, -10.0, 10.0)
-            upper = jnp.clip(nxt, -10.0, 10.0)
+            # Use wide bounds (±100) to support data with large ordinal ranges.
+            prev = jnp.where(k_idx > 0, cutpts[k_idx - 1], jnp.float32(-100.0))
+            nxt = jnp.where(k_idx < n_cutpoints - 1, cutpts[k_idx + 1], jnp.float32(100.0))
+            lower = jnp.clip(prev, -100.0, 100.0)
+            upper = jnp.clip(nxt, -100.0, 100.0)
             grid = jnp.linspace(lower + 0.01, upper - 0.01, 31)
 
             def score_candidate(c_val):
@@ -1998,6 +1999,7 @@ def packed_insert_rows(
         hyper_vm_a=packed.hyper_vm_a,
         hyper_vm_mu=packed.hyper_vm_mu,
         hyper_cutpoints=packed.hyper_cutpoints,
+        hyper_n_cutpoints=packed.hyper_n_cutpoints,
         view_column_indices=packed.view_column_indices,
         view_n_columns=packed.view_n_columns,
         view_row_assignments=new_view_row_assigns,
