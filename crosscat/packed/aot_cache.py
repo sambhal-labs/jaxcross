@@ -33,14 +33,6 @@ _DEFAULT_CACHE_DIR = Path.home() / ".cache" / "jaxcross" / "aot"
 _xla_cache_enabled = False
 
 
-def _shape_signature(packed: PackedCrossCatState, data_shape: tuple) -> str:
-    """Create a deterministic hash from static fields + data shape."""
-    sig = {name: getattr(packed, name) for name in _STATIC_FIELDS}
-    sig["data_shape"] = list(data_shape)
-    sig["backend"] = str(jax.default_backend())
-    return hashlib.sha256(json.dumps(sig, sort_keys=True).encode()).hexdigest()[:16]
-
-
 def _cache_path(fn_name: str, sig: str, cache_dir: Path) -> Path:
     return cache_dir / f"{fn_name}_{sig}.bin"
 

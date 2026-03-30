@@ -50,7 +50,16 @@ from crosscat.packed.suffstats import (
 )
 
 # Auto-enable XLA persistent cache so compiled kernels are reused across runs.
-enable_xla_cache()
+try:
+    enable_xla_cache()
+except Exception:  # noqa: BLE001
+    import warnings
+
+    warnings.warn(
+        "Failed to enable XLA persistent cache. JIT compilation will still work "
+        "but compiled kernels will not be cached across sessions.",
+        stacklevel=2,
+    )
 
 __all__ = [
     "BINARY_ID",
