@@ -95,7 +95,7 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 - **JAX idioms**: Uses `jax.lax.scan` for sequential loops (view/row sweeps), `jax.vmap` for parallel operations (column scoring, cluster scoring, row clustering across views), `jax.jit` for compilation. All state is immutable — operations return new arrays.
 - **Vectorized column scoring**: Row scoring in `_score_row_one_cluster` uses `jax.vmap(unified_posterior_predictive_logp)` over all columns simultaneously (not sequential `lax.scan`). This is the key optimization that gave 12x speedup in v0.9.0.
-- **Type-specialized fast paths**: `_compute_dominant_type()` detects when all columns in a view share the same type (e.g., all BINARY for MNIST). When dominant, `_score_row_one_cluster_typed` bypasses the 5-way `jnp.where` dispatch and calls type-specific batch functions directly (`batch_bb_posterior_predictive_logp`, etc.).
+- **Type-specialized fast paths**: `_compute_dominant_type()` detects when all columns in a view share the same type (e.g., all BINARY for MNIST). When dominant, `_score_row_one_cluster_typed` bypasses the 5-way `jnp.where` dispatch and calls type-specific batch functions directly (`batch_bb_posterior_predictive_logp`, `batch_ng_posterior_predictive_logp`, `batch_dc_posterior_predictive_logp`, `batch_vm_posterior_predictive_logp`).
 - **Batched suffstat updates**: `_add_row_to_suffstats` / `_remove_row_from_suffstats` use `.at[].add()` scatter operations over all columns at once instead of sequential `lax.scan`.
 - **Numerical stability**: `LOG_EPS = 1e-30` constant in `types.py` used throughout for underflow protection. All files import from `crosscat.types`.
 - **Deterministic RNG**: Always use `jax.random.key()` and `jax.random.split()` for reproducibility.
@@ -108,8 +108,8 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 - **CI (GitHub Actions)** runs lint + format + type check only (~1 min). No pytest in CI.
 - **Kaggle setup**: Use `pip install -e . --no-deps` to preserve Kaggle's pre-installed JAX+CUDA stack. Do NOT use `uv sync --extra gpu` on Kaggle (causes ptxas version mismatch).
 - **Test markers**: `@pytest.mark.slow` for GPU-heavy tests (30+ Gibbs sweeps). `@pytest.mark.xfail` for 2 known flaky tests (stochastic recovery).
-- **Test suite**: 173+ fast tests (including 28 Hypothesis property tests), 31 slow tests.
-- **Property tests**: `tests/test_property.py` uses Hypothesis to verify mathematical invariants (suffstat roundtrips, component scoring, type dispatch parity) across random inputs.
+- **Test suite**: 185+ fast tests (including 33 Hypothesis property tests), 31 slow tests.
+- **Property tests**: `tests/test_property.py` uses Hypothesis to verify mathematical invariants (suffstat roundtrips for all 5 types, component scoring, type dispatch parity, NaN safety) across random inputs.
 
 ## Benchmarks
 
@@ -177,4 +177,6 @@ Read: docs/architecture/performance.md
 - **`@jax.jit` on sub-functions is inlined** inside `lax.scan`/`vmap` — decorators only take effect when called from Python.
 - **`PackedCrossCatState` constructor requires ALL fields** — when adding a new field, update EVERY place that constructs the state (`kernels.py` has 2+ sites, `packed_insert_rows` has its own constructor).
 - **Serialization schema version** — bump `_SCHEMA_VERSION` and add migration in `load_packed_state` when adding new array fields.
-- **Ordinal cutpoints are padded with +inf** — kernel must mask updates to only real cutpoints (determined from `cat_counts`, not `isfinite`).
+- **Ordinal cutpoints are padded with +inf** — kernel must mask updates to only real cutpoints (determined from `hyper_n_cutpoints`, not `isfinite`). The `hyper_n_cutpoints` field stores the actual count per column for reliable roundtrips.
+- **`max_cols_per_view` overflow** — if a Gibbs column transition assigns more columns to a view than `max_cols_per_view`, a runtime warning is emitted via `jax.debug.callback`. Set `max_cols_per_view=n_cols` (default) to avoid this.
+- **Category values must be < `max_categories`** — pass `data=` to `pack_state()` for validation at pack time. At runtime, out-of-range values are silently clipped to `max_categories-1`.
