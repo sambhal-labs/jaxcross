@@ -191,8 +191,3 @@ class CrossCatState:
     def n_views(self) -> int:
         """Number of active views (column groups)."""
         return len(self.views)
-
-    @property
-    def view_counts(self) -> Array:
-        """Number of columns per view."""
-        return jnp.bincount(self.column_assignments, length=self.n_views)
