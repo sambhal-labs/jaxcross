@@ -2,6 +2,9 @@
 
 Verifies that chain-averaged inference queries produce valid results
 and behave consistently with single-state queries.
+
+All tests in this module require packed Gibbs sweep JIT compilation
+which exceeds 300s on GTX 1650, so the entire module is marked slow.
 """
 
 from __future__ import annotations
@@ -11,7 +14,7 @@ import jax.numpy as jnp
 import pytest
 
 from crosscat.model import initialize
-from crosscat.packed import pack_state
+from crosscat.packed import pack_state, packed_gibbs_sweep
 from crosscat.packed_inference import (
     multi_chain_anomaly_score,
     multi_chain_impute_and_confidence,
@@ -23,6 +26,8 @@ from crosscat.packed_inference import (
 )
 from crosscat.synthetic import generate_crosscat_data
 from crosscat.types import ColumnType
+
+pytestmark = pytest.mark.slow
 
 
 @pytest.fixture(scope="module")
@@ -37,14 +42,13 @@ def multi_chain_states():
     result = generate_crosscat_data(key, 50, column_types, n_views=2, n_clusters=2)
     data = result["data"]
 
-    from crosscat.gibbs import gibbs_sweep
-
     packed_list = []
     for i in range(3):
         k = jax.random.fold_in(key, i)
         state = initialize(k, data, column_types)
-        state = gibbs_sweep(jax.random.fold_in(key, i + 100), state, data, n_sweeps=2)
-        packed_list.append(pack_state(state))
+        packed = pack_state(state)
+        packed = packed_gibbs_sweep(jax.random.fold_in(key, i + 100), packed, data, n_sweeps=2)
+        packed_list.append(packed)
 
     return packed_list, data, column_types
 
