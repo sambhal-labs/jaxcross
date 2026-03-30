@@ -25,7 +25,7 @@ from crosscat.packed.state import (
 )
 from crosscat.types import ColumnType, CrossCatState
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +117,14 @@ def load_packed_state(
             n_cols = int(metadata["n_cols"])
             max_cats = int(metadata["max_categories"])
             kwargs[name] = jnp.full((n_cols, max_cats - 1), jnp.inf)
+        elif name == "hyper_n_cutpoints":
+            # Migration from schema v2: infer cutpoint counts from isfinite
+            n_cols = int(metadata["n_cols"])
+            if "hyper_cutpoints" in kwargs:
+                cp = kwargs["hyper_cutpoints"]
+                kwargs[name] = jnp.sum(jnp.isfinite(cp), axis=1).astype(jnp.int32)
+            else:
+                kwargs[name] = jnp.zeros(n_cols, dtype=jnp.int32)
         else:
             raise ValueError(f"Missing required array field '{name}' in saved state")
     for name in _STATIC_FIELDS:

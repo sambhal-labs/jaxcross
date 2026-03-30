@@ -129,3 +129,40 @@ def test_vectorized_suffstats_match_original(continuous_state_and_data):
                 assert float(sum_x[c, li]) == pytest.approx(float(orig.sum_x), abs=1e-4)
             if orig.sum_x_sq is not None:
                 assert float(sum_x_sq[c, li]) == pytest.approx(float(orig.sum_x_sq), abs=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# Ordinal cutpoints roundtrip (H2)
+# ---------------------------------------------------------------------------
+
+
+def test_ordinal_cutpoints_roundtrip():
+    """Pack/unpack preserves ordinal cutpoints exactly via hyper_n_cutpoints."""
+    from crosscat.synthetic import generate_crosscat_data
+
+    key = jax.random.key(200)
+    column_types = [ColumnType.ORDINAL, ColumnType.CONTINUOUS, ColumnType.ORDINAL]
+    result = generate_crosscat_data(key, 50, column_types, n_views=1, n_clusters=2, n_categories=5)
+    data = result["data"]
+
+    state = initialize(jax.random.key(201), data, column_types)
+    packed = pack_state(state)
+
+    # Verify hyper_n_cutpoints is stored correctly
+    for j, ct in enumerate(column_types):
+        if ct == ColumnType.ORDINAL:
+            assert int(packed.hyper_n_cutpoints[j]) > 0
+        else:
+            assert int(packed.hyper_n_cutpoints[j]) == 0
+
+    # Roundtrip without data — should use stored count
+    recovered = unpack_state(packed, column_types)
+    for j, ct in enumerate(column_types):
+        if ct == ColumnType.ORDINAL:
+            orig_cp = state.column_hypers[j].cutpoints
+            rec_cp = recovered.column_hypers[j].cutpoints
+            assert len(rec_cp) == len(orig_cp), (
+                f"Col {j}: cutpoint count mismatch: {len(rec_cp)} vs {len(orig_cp)}"
+            )
+            for k in range(len(orig_cp)):
+                assert float(rec_cp[k]) == pytest.approx(float(orig_cp[k]), abs=1e-5)
