@@ -595,6 +595,7 @@ def packed_impute_and_confidence(
     query_col: int,
     *,
     n_samples: int = 1000,
+    row_id: int | None = None,
 ) -> tuple[Array, Array]:
     """Impute a value with confidence score using packed state.
 
@@ -607,13 +608,17 @@ def packed_impute_and_confidence(
         data: Observation matrix.
         query_col: Column to impute.
         n_samples: Number of samples for estimation.
+        row_id: If provided, use observed row's cluster assignment
+            instead of marginalizing over clusters.
 
     Returns:
         Tuple of (point_estimate, confidence_score).
     """
     from crosscat.packed import CONTINUOUS_ID
 
-    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    samples = packed_predictive_sample(
+        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
     s = samples[:, 0]
 
     type_id = int(packed.col_type_ids[query_col])
@@ -821,6 +826,7 @@ def multi_chain_impute_and_confidence(
     query_col: int,
     *,
     n_samples: int = 1000,
+    row_id: int | None = None,
 ) -> tuple[Array, Array]:
     """Impute a value with confidence, mixing samples across chains.
 
@@ -833,6 +839,8 @@ def multi_chain_impute_and_confidence(
         data: Observation matrix.
         query_col: Column to impute.
         n_samples: Total samples across all chains.
+        row_id: If provided, use observed row's cluster assignment
+            instead of marginalizing over clusters.
 
     Returns:
         Tuple of (point_estimate, confidence_score).
@@ -841,7 +849,7 @@ def multi_chain_impute_and_confidence(
 
     # Pool samples across chains
     samples = multi_chain_predictive_sample(
-        rng_key, packed_states, data, [query_col], n_samples=n_samples
+        rng_key, packed_states, data, [query_col], n_samples=n_samples, row_id=row_id
     )
     s = samples[:, 0]
 
