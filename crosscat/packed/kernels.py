@@ -43,6 +43,24 @@ from crosscat.packed.suffstats import (
 from crosscat.types import LOG_EPS
 
 # ---------------------------------------------------------------------------
+# Runtime safety helpers
+# ---------------------------------------------------------------------------
+
+
+def _warn_column_overflow(view_idx, n_in_view, max_cpv):
+    """Callback to warn when a view exceeds max_cols_per_view during Gibbs."""
+    if int(n_in_view) > int(max_cpv):
+        import warnings
+
+        warnings.warn(
+            f"View {int(view_idx)} has {int(n_in_view)} columns but "
+            f"max_cols_per_view={int(max_cpv)}. Columns beyond the limit are "
+            f"silently dropped. Increase max_cols_per_view when calling pack_state().",
+            stacklevel=2,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Type specialization helpers
 # ---------------------------------------------------------------------------
 
@@ -883,8 +901,8 @@ def packed_transition_column_hypers(
         sum_x_col_bb = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
 
         # Create 2D grid: all combinations
-        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])  # (25,)
-        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])  # (25,)
+        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])  # (64,)
+        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])  # (64,)
 
         def score_bb_grid(ab_pair):
             a_val, b_val = ab_pair
@@ -1575,6 +1593,9 @@ def packed_transition_column_assignments(
     # Rebuild view_column_indices from compacted column_assignments
     def build_view_col_indices(v):
         is_in_view = compact_col_assigns == v  # (n_cols,)
+        n_in_view = jnp.sum(is_in_view.astype(jnp.int32))
+        # Guard: warn if a view has more columns than max_cols_per_view
+        jax.debug.callback(_warn_column_overflow, v, n_in_view, jnp.int32(max_cpv))
         indices = jnp.where(is_in_view, jnp.arange(n_cols), n_cols)
         sorted_indices = jnp.sort(indices)
         result = sorted_indices[:max_cpv]
