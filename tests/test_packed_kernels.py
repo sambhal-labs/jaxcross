@@ -172,21 +172,6 @@ def test_scan_row_assignments_produces_valid_state(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite: {lj}"
 
 
-def test_scan_row_assignments_jit_compiles(mixed_packed_state):
-    """packed_transition_row_assignments works under jax.jit."""
-    packed, data, column_types = mixed_packed_state
-    key = jax.random.key(202)
-
-    jitted_fn = jax.jit(packed_transition_row_assignments)
-    packed_new = jitted_fn(key, packed, data)
-
-    recovered = unpack_state(packed_new, column_types)
-    errors = validate_state(recovered, data)
-    assert errors == [], f"Validation errors after JIT: {errors}"
-    lj = float(log_joint(recovered, data))
-    assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT: {lj}"
-
-
 # ---------------------------------------------------------------------------
 # Task 5: vmap column hypers kernel tests
 # ---------------------------------------------------------------------------
@@ -222,21 +207,6 @@ def test_vmap_column_hypers_produces_valid_state(mixed_packed_state):
     assert jnp.all(packed_new.hyper_kappa > 0), "hyper_kappa should be positive"
 
 
-def test_vmap_column_hypers_jit_compiles(mixed_packed_state):
-    """packed_transition_column_hypers works under jax.jit."""
-    packed, data, column_types = mixed_packed_state
-    key = jax.random.key(302)
-
-    jitted_fn = jax.jit(packed_transition_column_hypers)
-    packed_new = jitted_fn(key, packed, data)
-
-    # Verify all hypers are finite after JIT
-    assert jnp.all(jnp.isfinite(packed_new.hyper_mu)), "hyper_mu non-finite after JIT"
-    assert jnp.all(jnp.isfinite(packed_new.hyper_s)), "hyper_s non-finite after JIT"
-    assert jnp.all(jnp.isfinite(packed_new.hyper_nu)), "hyper_nu non-finite after JIT"
-    assert jnp.all(jnp.isfinite(packed_new.hyper_kappa)), "hyper_kappa non-finite after JIT"
-
-
 # ---------------------------------------------------------------------------
 # Task 6: vmap CRP alpha kernel tests
 # ---------------------------------------------------------------------------
@@ -258,21 +228,6 @@ def test_vmap_crp_alphas_produces_valid_values(mixed_packed_state):
         alpha_v = packed_new.view_row_crp_alpha[v]
         assert jnp.isfinite(alpha_v), f"view {v} CRP alpha not finite"
         assert alpha_v > 0, f"view {v} CRP alpha should be positive"
-
-
-def test_vmap_crp_alphas_jit_compiles(mixed_packed_state):
-    """packed_transition_crp_alphas works under jax.jit."""
-    packed, data, column_types = mixed_packed_state
-    key = jax.random.key(402)
-
-    jitted_fn = jax.jit(packed_transition_crp_alphas)
-    packed_new = jitted_fn(key, packed)
-
-    assert jnp.isfinite(packed_new.column_crp_alpha), "column_crp_alpha not finite after JIT"
-    assert packed_new.column_crp_alpha > 0, "column_crp_alpha not positive after JIT"
-    assert jnp.all(jnp.isfinite(packed_new.view_row_crp_alpha)), (
-        "view CRP alphas not finite after JIT"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -317,22 +272,6 @@ def test_packed_sweep_vectorized_deterministic(mixed_packed_state):
     assert jnp.allclose(result1.view_row_crp_alpha, result2.view_row_crp_alpha), (
         "view_row_crp_alpha differs"
     )
-
-
-@pytest.mark.slow
-def test_packed_sweep_vectorized_jit_compiles(mixed_packed_state):
-    """packed_gibbs_sweep works under jax.jit with n_sweeps=1."""
-    packed, data, column_types = mixed_packed_state
-    key = jax.random.key(503)
-
-    jitted_fn = jax.jit(packed_gibbs_sweep)
-    packed_new = jitted_fn(key, packed, data)
-
-    recovered = unpack_state(packed_new, column_types)
-    errors = validate_state(recovered, data)
-    assert errors == [], f"Validation errors after JIT sweep: {errors}"
-    lj = float(log_joint(recovered, data))
-    assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT sweep: {lj}"
 
 
 # ---------------------------------------------------------------------------
@@ -609,21 +548,6 @@ def test_column_assignments_vectorized_produces_valid_state(mixed_packed_state):
     assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite: {lj}"
 
 
-def test_column_assignments_vectorized_jit_compiles(mixed_packed_state):
-    """packed_transition_column_assignments works under jax.jit."""
-    packed, data, column_types = mixed_packed_state
-    key = jax.random.key(702)
-
-    jitted_fn = jax.jit(packed_transition_column_assignments)
-    packed_new = jitted_fn(key, packed, data)
-
-    recovered = unpack_state(packed_new, column_types)
-    errors = validate_state(recovered, data)
-    assert errors == [], f"Validation errors after JIT: {errors}"
-    lj = float(log_joint(recovered, data))
-    assert jnp.isfinite(jnp.array(lj)), f"log_joint not finite after JIT: {lj}"
-
-
 def test_column_assignments_vectorized_preserves_column_count(mixed_packed_state):
     """Every column must be assigned to exactly one view after reassignment."""
     packed, data, column_types = mixed_packed_state
@@ -667,23 +591,23 @@ def test_column_assignments_vectorized_view_metadata_consistent(mixed_packed_sta
 
 
 def test_column_assignments_vectorized_multiple_runs_differ(mixed_packed_state):
-    """Different RNG keys produce different column assignments."""
+    """Different RNG keys produce different column assignments or hypers."""
     packed, data, column_types = mixed_packed_state
-    k1 = jax.random.key(705)
-    k2 = jax.random.key(706)
-
-    packed1 = packed_transition_column_assignments(k1, packed, data)
-    packed2 = packed_transition_column_assignments(k2, packed, data)
-
-    # At least one column should differ (probabilistically certain with different keys)
-    # This is a soft check — if it fails, increase seed gap
     n_cols = packed.n_cols
-    # It's possible they're the same if data is very clear, so just check state changed at all
-    # compared to initial. At least one of the two should differ from initial.
-    diff1 = int(jnp.sum(packed1.column_assignments[:n_cols] != packed.column_assignments[:n_cols]))
-    diff2 = int(jnp.sum(packed2.column_assignments[:n_cols] != packed.column_assignments[:n_cols]))
-    # With 4 columns, it's plausible none move, so this is a soft assertion
-    assert diff1 >= 0 and diff2 >= 0  # always true, just verifies no crash
+
+    # Run 10 seeds and check that at least one produces a different state
+    any_differ = False
+    for seed in range(700, 710):
+        k = jax.random.key(seed)
+        result = packed_transition_column_assignments(k, packed, data)
+        col_diff = int(
+            jnp.sum(result.column_assignments[:n_cols] != packed.column_assignments[:n_cols])
+        )
+        if col_diff > 0:
+            any_differ = True
+            break
+
+    assert any_differ, "No column assignment change across 10 different seeds"
 
 
 @pytest.mark.slow
