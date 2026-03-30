@@ -16,11 +16,6 @@ from crosscat.types import ColumnType
 
 
 @pytest.fixture
-def rng_key():
-    return jax.random.key(42)
-
-
-@pytest.fixture
 def simple_continuous_data(rng_key):
     """4-column continuous dataset with 2 correlated pairs."""
     n_rows = 80
