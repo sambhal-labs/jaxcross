@@ -23,6 +23,7 @@ from crosscat.packed import (
     unpack_state,
 )
 from crosscat.packed.kernels import _score_row_all_clusters
+from crosscat.packed.state import _ARRAY_FIELDS, _STATIC_FIELDS, PackedCrossCatState
 from crosscat.types import ColumnType
 from crosscat.validate import validate_state
 
@@ -632,3 +633,40 @@ def test_mixed_column_types_full_sweep():
     recovered = unpack_state(packed_new, column_types)
     errors = validate_state(recovered, result["data"])
     assert errors == [], f"Validation errors: {errors}"
+
+
+# ---------------------------------------------------------------------------
+# Column overflow guard (H1)
+# ---------------------------------------------------------------------------
+
+
+def test_column_overflow_warning():
+    """Column assignment kernel warns when view exceeds max_cols_per_view."""
+    import warnings
+
+    key = jax.random.key(700)
+    # Create 6 continuous columns, pack with max_cols_per_view=3
+    column_types = [ColumnType.CONTINUOUS] * 6
+    data = jax.random.normal(key, (30, 6))
+    k2 = jax.random.key(701)
+    state = initialize(k2, data, column_types)
+
+    # Pack with max_cols_per_view=3 — should warn during column transition
+    packed_small = pack_state(state, max_cols_per_view=3)
+    # Override column assignments so view 0 has 6 columns (exceeds limit of 3)
+    packed_small = PackedCrossCatState(
+        **{
+            name: (
+                jnp.zeros(6, dtype=jnp.int32)
+                if name == "column_assignments"
+                else getattr(packed_small, name)
+            )
+            for name in list(_ARRAY_FIELDS) + list(_STATIC_FIELDS)
+        }
+    )
+    k3 = jax.random.key(702)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        packed_transition_column_assignments(k3, packed_small, data)
+        overflow_warnings = [x for x in w if "max_cols_per_view" in str(x.message)]
+        assert len(overflow_warnings) > 0, "Expected column overflow warning"
