@@ -122,6 +122,7 @@ class TestSingletonViewHandling:
 
 
 class TestNormalGammaRSampling:
+    @pytest.mark.slow
     def test_r_hyperparameter_varies(self, rng_key, simple_continuous_data):
         """The r (precision scale) hyperparameter should change across iterations."""
         from crosscat.gibbs import transition_column_hypers
@@ -142,6 +143,7 @@ class TestNormalGammaRSampling:
             "Expected it to vary across MCMC iterations."
         )
 
+    @pytest.mark.slow
     def test_r_sampling_does_not_degrade_log_joint(self, rng_key, simple_continuous_data):
         """Sampling r should not systematically degrade model quality."""
         from crosscat.gibbs import gibbs_sweep

@@ -33,6 +33,7 @@ from crosscat.packed.state import (
     CATEGORICAL_ID,
     CONTINUOUS_ID,
     CYCLIC_ID,
+    ORDINAL_ID,
 )
 from crosscat.packed.suffstats import _add_row_to_suffstats, _remove_row_from_suffstats
 
@@ -174,6 +175,51 @@ def test_suffstat_add_remove_roundtrip_cyclic(values, cluster_id):
 
     for orig, recovered in zip(ss, ss_removed, strict=True):
         np.testing.assert_allclose(np.array(recovered), np.array(orig), atol=1e-5)
+
+
+@given(
+    values=st.lists(category_int, min_size=MAX_COLS, max_size=MAX_COLS),
+    cluster_id=st.integers(min_value=0, max_value=MAX_CLUSTERS - 1),
+)
+@settings(max_examples=50, deadline=None)
+def test_suffstat_add_remove_roundtrip_ordinal(values, cluster_id):
+    """Adding then removing a row recovers original suffstats (ordinal)."""
+    col_indices = jnp.arange(MAX_COLS, dtype=jnp.int32)
+    col_type_ids = jnp.full(MAX_COLS, ORDINAL_ID, dtype=jnp.int32)
+    row_data = jnp.array(values, dtype=jnp.float32)
+    cluster_id = jnp.array(cluster_id, dtype=jnp.int32)
+
+    ss = _make_empty_suffstats(MAX_COLS, MAX_CLUSTERS, MAX_CATS)
+    ss_added = _add_row_to_suffstats(
+        *ss, cluster_id, row_data, col_indices, col_type_ids, MAX_CATS
+    )
+    ss_removed = _remove_row_from_suffstats(
+        *ss_added, cluster_id, row_data, col_indices, col_type_ids, MAX_CATS
+    )
+
+    for orig, recovered in zip(ss, ss_removed, strict=True):
+        np.testing.assert_allclose(np.array(recovered), np.array(orig), atol=1e-5)
+
+
+@given(
+    cluster_id=st.integers(min_value=0, max_value=MAX_CLUSTERS - 1),
+)
+@settings(max_examples=50, deadline=None)
+def test_suffstat_nan_does_not_bias_ordinal(cluster_id):
+    """NaN values in ordinal columns should not change any suffstat."""
+    col_indices = jnp.arange(MAX_COLS, dtype=jnp.int32)
+    col_type_ids = jnp.full(MAX_COLS, ORDINAL_ID, dtype=jnp.int32)
+    row_data = jnp.full(MAX_COLS, jnp.nan, dtype=jnp.float32)
+    cluster_id = jnp.array(cluster_id, dtype=jnp.int32)
+
+    ss = _make_empty_suffstats(MAX_COLS, MAX_CLUSTERS, MAX_CATS)
+    ss_after = _add_row_to_suffstats(
+        *ss, cluster_id, row_data, col_indices, col_type_ids, MAX_CATS
+    )
+
+    # All suffstats should remain zero — NaN contributes nothing
+    for orig, after in zip(ss, ss_after, strict=True):
+        np.testing.assert_allclose(np.array(after), np.array(orig), atol=1e-10)
 
 
 @given(
@@ -783,7 +829,6 @@ def test_ol_posterior_predictive_finite(n, x, mu0, s0):
 def test_unified_log_marginal_matches_ol(n, mu0, s0):
     """unified_log_marginal with ORDINAL_ID matches _ol_log_marginal."""
     from crosscat.packed.components import _ol_log_marginal
-    from crosscat.packed.state import ORDINAL_ID
 
     cat_counts = jnp.ones(MAX_CATS, dtype=jnp.float32) * (n / MAX_CATS)
     cutpoints = jnp.linspace(-2.0, 2.0, MAX_CATS - 1)

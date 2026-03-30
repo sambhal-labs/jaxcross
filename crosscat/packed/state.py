@@ -160,6 +160,7 @@ def pack_state(
     max_clusters: int = 32,
     max_categories: int = 16,
     max_cols_per_view: int | None = None,
+    data: Array | None = None,
 ) -> PackedCrossCatState:
     """Convert a CrossCatState (Python lists) into a PackedCrossCatState (padded arrays).
 
@@ -173,14 +174,18 @@ def pack_state(
             setting this to a smaller value (e.g., ``max(32, n_cols // max_views)``)
             reduces memory by up to 10x and speeds up inner scans. A ValueError
             is raised if any view already exceeds this limit at pack time.
-            However, during Gibbs column transitions columns may silently be
-            truncated if a view grows beyond this limit at runtime.
+            During Gibbs column transitions, a warning is emitted if a view
+            grows beyond this limit at runtime.
+        data: Optional data array ``(n_rows, n_cols)``. When provided,
+            validates that categorical/ordinal column values are within
+            ``[0, max_categories)``.
 
     Returns:
         Padded, JIT-compatible state.
 
     Raises:
-        ValueError: If state dimensions exceed max_* limits.
+        ValueError: If state dimensions exceed max_* limits, or if data
+            contains category values >= max_categories.
     """
     n_rows = state.n_rows
     n_cols = state.n_cols
@@ -211,6 +216,24 @@ def pack_state(
                 f"{max_cols_per_view}. Increase max_cols_per_view to at least "
                 f"{n_view_cols}."
             )
+
+    # Validate category values in data if provided
+    if data is not None:
+        import numpy as np
+
+        data_np = np.asarray(data)
+        for j, ct in enumerate(state.column_types):
+            if ct in (ColumnType.CATEGORICAL, ColumnType.ORDINAL):
+                col_vals = data_np[:, j]
+                valid_vals = col_vals[~np.isnan(col_vals)]
+                if len(valid_vals) > 0:
+                    max_val = int(np.nanmax(valid_vals))
+                    if max_val >= max_categories:
+                        raise ValueError(
+                            f"Column {j} ({ct.name}) has value {max_val} but "
+                            f"max_categories={max_categories}. Increase "
+                            f"max_categories to at least {max_val + 1}."
+                        )
 
     # Column assignments and CRP alpha
     col_assignments = jnp.array(state.column_assignments, dtype=jnp.int32)
