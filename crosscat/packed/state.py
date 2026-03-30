@@ -57,6 +57,7 @@ _ARRAY_FIELDS = (
     "hyper_vm_a",
     "hyper_vm_mu",
     "hyper_cutpoints",
+    "hyper_n_cutpoints",
     "view_column_indices",
     "view_n_columns",
     "view_row_assignments",
@@ -110,6 +111,7 @@ class PackedCrossCatState:
     hyper_vm_a: Array  # (n_cols,) — prior concentration on mean direction
     hyper_vm_mu: Array  # (n_cols,) — prior mean direction (b)
     hyper_cutpoints: Array  # (n_cols, max_categories - 1) — ordinal cutpoints, +inf=pad
+    hyper_n_cutpoints: Array  # (n_cols,) int — actual cutpoint count per col
 
     # View data — leading (max_views,) dimension
     view_column_indices: Array  # (max_views, max_cols_per_view) int, -1=invalid
@@ -280,10 +282,12 @@ def pack_state(
 
     # Pack ordinal cutpoints — padded with +inf (sigmoid(+inf - μ) = 1 → prob 0)
     hyper_cutpoints = jnp.full((n_cols, max_categories - 1), jnp.inf)
+    hyper_n_cutpoints = jnp.zeros(n_cols, dtype=jnp.int32)
     for j, h in enumerate(state.column_hypers):
         if h.cutpoints is not None:
             n_cp = len(h.cutpoints)
             hyper_cutpoints = hyper_cutpoints.at[j, :n_cp].set(jnp.array(h.cutpoints))
+            hyper_n_cutpoints = hyper_n_cutpoints.at[j].set(n_cp)
 
     # Pack view data
     view_column_indices = jnp.full((max_views, max_cols_per_view), -1, dtype=jnp.int32)
@@ -353,6 +357,7 @@ def pack_state(
         hyper_vm_a=hyper_vm_a,
         hyper_vm_mu=hyper_vm_mu,
         hyper_cutpoints=hyper_cutpoints,
+        hyper_n_cutpoints=hyper_n_cutpoints,
         view_column_indices=view_column_indices,
         view_n_columns=view_n_columns,
         view_row_assignments=view_row_assignments,
@@ -414,17 +419,18 @@ def unpack_state(
                 column_type=ct, alpha=packed.hyper_alpha[j], beta=packed.hyper_beta[j]
             )
         elif ct == ColumnType.ORDINAL:
-            # Determine actual level count from data (padded cutpoints may
-            # have been sampled to finite values during Gibbs sweeps)
+            # Use stored cutpoint count for reliable roundtrip (avoids
+            # ambiguity when Gibbs sampler produces near-inf cutpoints).
             raw_cp = packed.hyper_cutpoints[j]
-            if data is not None:
+            n_cp = int(packed.hyper_n_cutpoints[j])
+            if n_cp == 0 and data is not None:
+                # Fallback for legacy states without hyper_n_cutpoints
                 col_data = data[:, j]
                 valid = col_data[~jnp.isnan(col_data)]
                 n_levels = int(jnp.max(valid)) + 1 if valid.size > 0 else 2
-            else:
-                n_levels = int(jnp.sum(jnp.isfinite(raw_cp))) + 1
-                n_levels = max(n_levels, 2)
-            trimmed_cp = raw_cp[: n_levels - 1]
+                n_cp = n_levels - 1
+            n_cp = max(n_cp, 1)  # at least 1 cutpoint (2 levels)
+            trimmed_cp = raw_cp[:n_cp]
             h = ColumnHypers(
                 column_type=ct,
                 mu=packed.hyper_mu[j],
