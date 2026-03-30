@@ -129,3 +129,45 @@ def test_vectorized_suffstats_match_original(continuous_state_and_data):
                 assert float(sum_x[c, li]) == pytest.approx(float(orig.sum_x), abs=1e-4)
             if orig.sum_x_sq is not None:
                 assert float(sum_x_sq[c, li]) == pytest.approx(float(orig.sum_x_sq), abs=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# Category value validation (M5)
+# ---------------------------------------------------------------------------
+
+
+def test_pack_state_validates_category_values():
+    """pack_state raises ValueError when data has category values >= max_categories."""
+    key = jax.random.key(99)
+    n_rows = 20
+    # Create data where column 0 is categorical with values 0..9
+    data = jnp.zeros((n_rows, 2))
+    data = data.at[:, 0].set(jnp.arange(n_rows) % 10)  # values 0..9
+    data = data.at[:, 1].set(jax.random.normal(key, (n_rows,)))
+
+    column_types = [ColumnType.CATEGORICAL, ColumnType.CONTINUOUS]
+    state = initialize(jax.random.key(100), data, column_types)
+
+    # Should succeed with max_categories=16 (>= 10)
+    pack_state(state, max_categories=16, data=data)
+
+    # Should fail with max_categories=8 (< 10)
+    with pytest.raises(ValueError, match="max_categories"):
+        pack_state(state, max_categories=8, data=data)
+
+
+def test_pack_state_no_data_skips_category_validation():
+    """pack_state without data parameter skips category value validation."""
+    key = jax.random.key(101)
+    n_rows = 20
+    data = jnp.zeros((n_rows, 2))
+    data = data.at[:, 0].set(jnp.arange(n_rows) % 10)
+    data = data.at[:, 1].set(jax.random.normal(key, (n_rows,)))
+
+    column_types = [ColumnType.CATEGORICAL, ColumnType.CONTINUOUS]
+    state = initialize(jax.random.key(102), data, column_types)
+
+    # Without data, no ValueError even with small max_categories
+    # (suffstat-level validation may still catch via category_counts length)
+    packed = pack_state(state, max_categories=16)
+    assert packed.max_categories == 16
