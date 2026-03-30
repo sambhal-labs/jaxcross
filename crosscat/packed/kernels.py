@@ -883,8 +883,8 @@ def packed_transition_column_hypers(
         sum_x_col_bb = packed.ss_sum_x[v_idx, :, local_idx]  # (max_c,)
 
         # Create 2D grid: all combinations
-        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])  # (25,)
-        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])  # (25,)
+        a_grid_2d = jnp.repeat(ab_grid, ab_grid.shape[0])  # (64,)
+        b_grid_2d = jnp.tile(ab_grid, ab_grid.shape[0])  # (64,)
 
         def score_bb_grid(ab_pair):
             a_val, b_val = ab_pair
