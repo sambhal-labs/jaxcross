@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-03-30 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.10.0...v0.10.1)
+
+### Added
+- **Von Mises batch fast path** (`batch_vm_posterior_predictive_logp`) for
+  cyclic-dominant views — bypasses 5-way `jnp.where` dispatch, matching the
+  existing fast paths for binary, continuous, and categorical types
+- `hyper_n_cutpoints` field in `PackedCrossCatState` — stores actual cutpoint
+  count per column for lossless ordinal pack/unpack roundtrips
+- Optional `data` parameter in `pack_state()` for category value validation
+  (raises `ValueError` if values >= `max_categories`)
+- Runtime warning via `jax.debug.callback` when Gibbs column transitions
+  cause a view to exceed `max_cols_per_view`
+- Cyclic-only benchmark section in `benchmarks/jit_benchmark.py`
+- 8 new tests: ordinal suffstat roundtrip, NaN-does-not-bias-ordinal,
+  Von Mises dispatch parity, expanded diagnostics coverage
+  (`random_holdout_mask`, `mean_test_log_likelihood`, `evaluate_imputation`)
+
+### Changed
+- Ordinal cutpoint sampling bounds widened from [-10, +10] to [-100, +100]
+  to support data with larger ordinal ranges
+- `unpack_state()` now uses `hyper_n_cutpoints` instead of `jnp.isfinite()`
+  to determine actual cutpoint count (backward-compatible via schema migration)
+- Serialization schema bumped to v3 (auto-migrates from v2 by inferring
+  cutpoint counts from `jnp.isfinite`)
+- `enable_xla_cache()` wrapped in try-except to prevent import failure
+- `OrderedLogistic` refactored: extracted `_mu_grid_and_weights()` and
+  `_averaged_probs()` helpers, eliminating ~24 lines of duplication
+
+### Removed
+- Dead code: `_compute_suffstats_for_column()` and `_component_log_marginal()`
+  from `gibbs.py` (defined but never called)
+- Dead code: `_shape_signature()` from `packed/aot_cache.py`
+- Unused `view_counts` property from `CrossCatState`
+
+### Fixed
+- Stale grid size comment `(25,)` → `(64,)` for binary hyper grid in
+  `packed/kernels.py`
+
 ## [0.10.0] - 2026-03-26 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.9.0...v0.10.0)
 
 ### Added

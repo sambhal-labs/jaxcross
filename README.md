@@ -14,7 +14,7 @@
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
   <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
-  <img src="https://img.shields.io/badge/version-0.10.0-orange.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.10.1-orange.svg" alt="Version">
 </p>
 
 <p align="center">
