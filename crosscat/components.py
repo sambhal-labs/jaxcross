@@ -411,13 +411,8 @@ class OrderedLogistic:
         return jnp.maximum(probs, 1e-30)
 
     @staticmethod
-    def log_marginal_likelihood(suffstats: SufficientStats, hypers: ColumnHypers) -> Array:
-        """Log marginal likelihood via grid integration over μ.
-
-        Non-conjugate: integrates p(counts | μ, cutpoints) · p(μ) over μ.
-        """
-        counts = suffstats.category_counts.astype(jnp.float32)
-        n = suffstats.count.astype(jnp.float32)
+    def _mu_grid_and_weights(counts, hypers):
+        """Compute μ grid and posterior weights (shared by all OL methods)."""
         cutpoints = hypers.cutpoints
         mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
         s0 = float(hypers.s) if hypers.s is not None else 4.0
@@ -425,6 +420,33 @@ class OrderedLogistic:
 
         half_range = 4.0 * jnp.sqrt(s0)
         mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
+
+        def log_post(mu):
+            probs = OrderedLogistic._level_probs(mu, cutpoints)
+            return jnp.sum(counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
+
+        log_w = jax.vmap(log_post)(mu_grid)
+        return mu_grid, log_w, mu0, s0, cutpoints
+
+    @staticmethod
+    def _averaged_probs(counts, hypers):
+        """Compute posterior-weighted average level probabilities."""
+        mu_grid, log_w, _, _, cutpoints = OrderedLogistic._mu_grid_and_weights(counts, hypers)
+        log_w = log_w - jax.nn.logsumexp(log_w)
+        weights = jnp.exp(log_w)
+        all_probs = jax.vmap(lambda mu: OrderedLogistic._level_probs(mu, cutpoints))(mu_grid)
+        return jnp.sum(weights[:, None] * all_probs, axis=0)
+
+    @staticmethod
+    def log_marginal_likelihood(suffstats: SufficientStats, hypers: ColumnHypers) -> Array:
+        """Log marginal likelihood via grid integration over μ.
+
+        Non-conjugate: integrates p(counts | μ, cutpoints) · p(μ) over μ.
+        """
+        counts = suffstats.category_counts.astype(jnp.float32)
+        n = suffstats.count.astype(jnp.float32)
+        mu_grid, _, mu0, s0, cutpoints = OrderedLogistic._mu_grid_and_weights(counts, hypers)
+        half_range = 4.0 * jnp.sqrt(s0)
         delta_mu = 2.0 * half_range / (OrderedLogistic._N_GRID - 1)
 
         def log_score(mu):
@@ -442,24 +464,7 @@ class OrderedLogistic:
     ) -> Array:
         """Posterior predictive log p(x=k | data, cutpoints)."""
         counts = suffstats.category_counts.astype(jnp.float32)
-        cutpoints = hypers.cutpoints
-        mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
-        s0 = float(hypers.s) if hypers.s is not None else 4.0
-        s0 = max(s0, 1e-30)
-
-        half_range = 4.0 * jnp.sqrt(s0)
-        mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
-
-        def log_post(mu):
-            probs = OrderedLogistic._level_probs(mu, cutpoints)
-            return jnp.sum(counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
-
-        log_w = jax.vmap(log_post)(mu_grid)
-        log_w = log_w - jax.nn.logsumexp(log_w)
-        weights = jnp.exp(log_w)
-
-        all_probs = jax.vmap(lambda mu: OrderedLogistic._level_probs(mu, cutpoints))(mu_grid)
-        avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+        avg_probs = OrderedLogistic._averaged_probs(counts, hypers)
         return jnp.log(jnp.maximum(avg_probs[x.astype(jnp.int32)], 1e-30))
 
     @staticmethod
@@ -468,24 +473,7 @@ class OrderedLogistic:
     ) -> Array:
         """Draw samples from posterior predictive over ordinal levels."""
         counts = suffstats.category_counts.astype(jnp.float32)
-        cutpoints = hypers.cutpoints
-        mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
-        s0 = float(hypers.s) if hypers.s is not None else 4.0
-        s0 = max(s0, 1e-30)
-
-        half_range = 4.0 * jnp.sqrt(s0)
-        mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
-
-        def log_post(mu):
-            probs = OrderedLogistic._level_probs(mu, cutpoints)
-            return jnp.sum(counts * jnp.log(probs)) - 0.5 * (mu - mu0) ** 2 / s0
-
-        log_w = jax.vmap(log_post)(mu_grid)
-        log_w = log_w - jax.nn.logsumexp(log_w)
-        weights = jnp.exp(log_w)
-
-        all_probs = jax.vmap(lambda mu: OrderedLogistic._level_probs(mu, cutpoints))(mu_grid)
-        avg_probs = jnp.sum(weights[:, None] * all_probs, axis=0)
+        avg_probs = OrderedLogistic._averaged_probs(counts, hypers)
         return jax.random.categorical(rng_key, jnp.log(jnp.maximum(avg_probs, 1e-30)), shape=(n,))
 
 
