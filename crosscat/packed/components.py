@@ -601,6 +601,26 @@ def batch_ng_posterior_predictive_logp(
     )
 
 
+def batch_vm_posterior_predictive_logp(
+    xs: Array,
+    counts: Array,
+    sum_sins: Array,
+    sum_coss: Array,
+    kappas: Array,
+    vm_as: Array,
+    vm_mus: Array,
+) -> Array:
+    """Vectorized Von Mises posterior predictive for a batch of columns.
+
+    All inputs are (n_cols,) arrays. Returns (n_cols,) logps.
+    Skips all type dispatch — caller must ensure all columns are cyclic.
+    """
+    total_sin = sum_sins + vm_as * jnp.sin(vm_mus)
+    total_cos = sum_coss + vm_as * jnp.cos(vm_mus)
+    mu_post = jnp.arctan2(total_sin, total_cos)
+    return kappas * jnp.cos(xs - mu_post) - jnp.log(2.0 * jnp.pi) - log_bessel_i0(kappas)
+
+
 def batch_dc_posterior_predictive_logp(
     xs: Array, counts: Array, cat_counts_batch: Array, dir_alphas: Array
 ) -> Array:

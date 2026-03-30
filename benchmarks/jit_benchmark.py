@@ -190,6 +190,23 @@ def main():
         f"packed: {t_packed_sweep:.4f}s  speedup: {speedup:.1f}x"
     )
 
+    # Cyclic-only sweep benchmark (tests Von Mises fast path)
+    print()
+    print("Cyclic-only sweep benchmark (10 cyclic columns, 3 sweeps):")
+    print("-" * 70)
+    cyclic_types = [ColumnType.CYCLIC] * 10
+    cyclic_result = generate_crosscat_data(
+        jax.random.key(789), 200, cyclic_types, n_views=2, n_clusters=3
+    )
+    cyclic_data = cyclic_result["data"]
+    k_cyc = jax.random.key(790)
+    cyclic_state = initialize(k_cyc, cyclic_data, cyclic_types)
+    cyclic_packed = pack_state(cyclic_state)
+    t_cyc, _ = time_fn(
+        packed_gibbs_sweep, jax.random.key(791), cyclic_packed, cyclic_data, n_sweeps=3
+    )
+    print(f"  {'cyclic-only packed (3 iters)':30s}  {t_cyc:.4f}s")
+
     print()
     print("=" * 70)
     print("Benchmark complete.")
