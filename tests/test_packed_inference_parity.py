@@ -17,15 +17,18 @@ import pytest
 from crosscat.inference import (
     column_typicality,
     credible_interval,
+    impute_and_confidence,
     joint_predictive_probability,
     row_typicality,
 )
 from crosscat.model import initialize
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 from crosscat.packed_inference import (
+    multi_chain_impute_and_confidence,
     packed_column_typicality,
     packed_conditional_entropy,
     packed_credible_interval,
+    packed_impute_and_confidence,
     packed_joint_predictive_probability,
     packed_row_typicality,
 )
@@ -231,3 +234,50 @@ def test_packed_joint_predictive_matches_original(inference_setup):
     assert abs(float(log_p_packed) - float(log_p_orig)) < 1.0, (
         f"packed={log_p_packed}, orig={log_p_orig}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Impute and confidence with row_id
+# ---------------------------------------------------------------------------
+
+
+def test_packed_impute_row_id_returns_valid(inference_setup):
+    """Packed impute with row_id returns finite estimate and valid confidence."""
+    _, packed_states, data, _ = inference_setup
+    key = jax.random.key(99)
+
+    point_est, confidence = packed_impute_and_confidence(
+        key, packed_states[0], data, 0, row_id=0, n_samples=200
+    )
+    assert jnp.isfinite(point_est), f"point_est not finite: {point_est}"
+    assert 0.0 <= float(confidence) <= 1.0, f"confidence out of range: {confidence}"
+
+
+def test_packed_impute_row_id_matches_unpacked(inference_setup):
+    """Packed impute with row_id roughly matches unpacked version."""
+    states, packed_states, data, _ = inference_setup
+    key = jax.random.key(101)
+
+    # Use same key for both — sampling-based so allow tolerance
+    point_packed, conf_packed = packed_impute_and_confidence(
+        key, packed_states[0], data, 0, row_id=0, n_samples=500
+    )
+    point_orig, conf_orig = impute_and_confidence(key, states[0], data, 0, row_id=0, n_samples=500)
+
+    assert abs(float(point_packed) - float(point_orig)) < 2.0, (
+        f"packed={point_packed}, orig={point_orig}"
+    )
+    assert 0.0 <= float(conf_packed) <= 1.0
+    assert 0.0 <= float(conf_orig) <= 1.0
+
+
+def test_multi_chain_impute_row_id_returns_valid(inference_setup):
+    """Multi-chain impute with row_id returns finite estimate and valid confidence."""
+    _, packed_states, data, _ = inference_setup
+    key = jax.random.key(102)
+
+    point_est, confidence = multi_chain_impute_and_confidence(
+        key, packed_states, data, 0, row_id=0, n_samples=200
+    )
+    assert jnp.isfinite(point_est), f"point_est not finite: {point_est}"
+    assert 0.0 <= float(confidence) <= 1.0, f"confidence out of range: {confidence}"
