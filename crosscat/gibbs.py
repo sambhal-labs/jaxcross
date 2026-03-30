@@ -83,41 +83,6 @@ def _empty_suffstats(col_type: ColumnType, data: Array, col_idx: int) -> Suffici
         raise ValueError(f"Unknown column type: {col_type}")
 
 
-def _component_log_marginal(
-    suffstats: SufficientStats, hypers: ColumnHypers, col_type: ColumnType
-) -> Array:
-    """Dispatch log marginal likelihood to the correct component model."""
-    from crosscat.model import _get_component_class
-
-    return _get_component_class(col_type).log_marginal_likelihood(suffstats, hypers)
-
-
-def _compute_suffstats_for_column(
-    data: Array, col_idx: int, col_type: ColumnType, row_assignments: Array, n_clusters: int
-) -> list[SufficientStats]:
-    """Compute sufficient statistics for one column across all clusters in a view."""
-    stats = []
-    for c in range(n_clusters):
-        mask = row_assignments == c
-        col_data = data[mask, col_idx]
-        if col_type == ColumnType.CONTINUOUS:
-            ss = NormalGamma.sufficient_statistics(col_data)
-        elif col_type == ColumnType.CATEGORICAL:
-            n_cats = _safe_n_categories(data[:, col_idx])
-            ss = DirichletCategorical.sufficient_statistics(col_data, n_cats)
-        elif col_type == ColumnType.BINARY:
-            ss = BetaBernoulli.sufficient_statistics(col_data)
-        elif col_type == ColumnType.ORDINAL:
-            n_levels = _safe_n_categories(data[:, col_idx])
-            ss = OrderedLogistic.sufficient_statistics(col_data, n_levels)
-        elif col_type == ColumnType.CYCLIC:
-            ss = VonMises.sufficient_statistics(col_data)
-        else:
-            raise ValueError(f"Unknown column type: {col_type}")
-        stats.append(ss)
-    return stats
-
-
 def _log_marginal_for_column_in_view(
     data: Array,
     col_idx: int,
