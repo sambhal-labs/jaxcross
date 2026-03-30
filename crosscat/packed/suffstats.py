@@ -188,6 +188,8 @@ def _remove_row_from_suffstats(
     types = col_type_ids[safe_col_indices]
     is_valid = (~jnp.isnan(xs)) & (col_indices >= 0)
     is_valid_f = is_valid.astype(jnp.float32)
+    # NaN → 0.0 is safe: cat_idxs scatter adds is_valid_f * value, which is
+    # 0.0 for NaN entries (is_valid_f=0), so the dummy index 0 is a no-op.
     clean_xs = jnp.where(jnp.isnan(xs), 0.0, xs)
 
     # Counts (all types)
@@ -239,6 +241,8 @@ def _add_row_to_suffstats(
     types = col_type_ids[safe_col_indices]
     is_valid = (~jnp.isnan(xs)) & (col_indices >= 0)
     is_valid_f = is_valid.astype(jnp.float32)
+    # NaN → 0.0 is safe: cat_idxs scatter adds is_valid_f * value, which is
+    # 0.0 for NaN entries (is_valid_f=0), so the dummy index 0 is a no-op.
     clean_xs = jnp.where(jnp.isnan(xs), 0.0, xs)
 
     ss_counts = ss_counts.at[cluster_id, li_range].add(is_valid.astype(jnp.int32))
