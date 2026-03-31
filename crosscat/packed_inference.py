@@ -217,6 +217,78 @@ def batch_classify_column(
     return jax.vmap(_classify_one_row)(row_ids)
 
 
+def batch_score_columns_binary(
+    packed: PackedCrossCatState,
+    data: Array,
+    col_indices: Array,
+    row_id: int,
+) -> Array:
+    """Compute P(col=1 | row) for multiple binary columns in one JIT call.
+
+    Vectorized over columns via vmap. For each column, computes the
+    posterior predictive probability of value 1 vs 0 and returns P(1).
+
+    Designed for inpainting: score all missing pixels at once.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        col_indices: 1D integer array of column indices to score.
+        row_id: Row index (uses observed row's cluster assignment).
+
+    Returns:
+        Array of shape (len(col_indices),) with P(col=1 | row) in [0, 1].
+    """
+    max_k = packed.max_clusters
+
+    def _prob1_for_col(col_idx):
+        view_idx = packed.column_assignments[col_idx]
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        local_idx = _find_local_col_index(packed, view_idx, col_idx)
+
+        type_id = packed.col_type_ids[col_idx]
+
+        def _score_cluster_at_val(c_idx, x):
+            return unified_posterior_predictive_logp(
+                x,
+                type_id,
+                packed.ss_counts[view_idx, c_idx, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, c_idx, local_idx],
+                packed.ss_sum_x_sq[view_idx, c_idx, local_idx],
+                packed.ss_cat_counts[view_idx, c_idx, local_idx],
+                packed.ss_sum_sin[view_idx, c_idx, local_idx],
+                packed.ss_sum_cos[view_idx, c_idx, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        cluster_indices = jnp.arange(max_k)
+        val_1 = jnp.float32(1.0)
+        val_0 = jnp.float32(0.0)
+        log_liks_1 = jax.vmap(lambda c: _score_cluster_at_val(c, val_1))(cluster_indices)
+        log_liks_0 = jax.vmap(lambda c: _score_cluster_at_val(c, val_0))(cluster_indices)
+
+        log_weights = jnp.log(jnp.maximum(weights, LOG_EPS))
+        log_weights = jnp.where(weights > 0, log_weights, -jnp.inf)
+
+        logp1 = jax.scipy.special.logsumexp(log_weights + log_liks_1)
+        logp0 = jax.scipy.special.logsumexp(log_weights + log_liks_0)
+
+        return jnp.exp(logp1 - jnp.logaddexp(logp0, logp1))
+
+    return jax.vmap(_prob1_for_col)(col_indices)
+
+
 def packed_predictive_probability(
     packed: PackedCrossCatState,
     data: Array,
