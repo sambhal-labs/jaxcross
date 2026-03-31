@@ -70,6 +70,7 @@ from crosscat.packed_inference import (
     multi_chain_predictive_probability,
     multi_chain_predictive_sample,
     packed_anomaly_score,
+    packed_classify_column,
     packed_column_typicality,
     packed_conditional_entropy,
     packed_credible_interval,
@@ -193,6 +194,7 @@ __all__ = [
     "multi_chain_predictive_probability",
     "multi_chain_predictive_sample",
     # Packed inference
+    "packed_classify_column",
     "packed_anomaly_score",
     "packed_column_typicality",
     "packed_conditional_entropy",
