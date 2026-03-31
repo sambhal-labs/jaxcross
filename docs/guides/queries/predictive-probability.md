@@ -60,6 +60,35 @@ log_p = joint_predictive_probability(
 )
 ```
 
+## Batch CDF & Credible Intervals
+
+Vectorized over rows for production use:
+
+```python
+from crosscat import batch_predictive_cdf, batch_credible_interval
+import jax.numpy as jnp
+
+packed = pack_state(best)
+row_ids = jnp.arange(data.shape[0])
+
+# CDF for all rows at a threshold
+key, subkey = jax.random.split(key)
+cdfs = batch_predictive_cdf(
+    subkey, packed, data,
+    query_col=0,
+    query_val=jnp.array(100000.0),
+    row_ids=row_ids,
+)
+# Shape: (n_rows,) — P(salary <= 100k | row) for each row
+
+# Credible intervals for all rows
+key, subkey = jax.random.split(key)
+medians, lowers, uppers = batch_credible_interval(
+    subkey, packed, data, query_col=0, row_ids=row_ids
+)
+# Each shape: (n_rows,)
+```
+
 ## Packed Versions
 
 ```python
@@ -78,3 +107,5 @@ cdf = packed_predictive_cdf(key, packed, data, query_col=0, query_val=jnp.array(
 - [`predictive_probability`](../../api/inference.md#predictive_probability)
 - [`predictive_cdf`](../../api/inference.md#predictive_cdf)
 - [`joint_predictive_probability`](../../api/inference.md#joint_predictive_probability)
+- [`batch_predictive_cdf`](../../api/packed-inference.md#batch_predictive_cdf)
+- [`batch_credible_interval`](../../api/packed-inference.md#batch_credible_interval)

@@ -73,6 +73,29 @@ score = packed_anomaly_score(key, packed, data, query_row=42)
 z = packed_dependence_matrix([packed])
 ```
 
+## Batch Queries for Production
+
+For querying many rows at once, use the `batch_*` functions instead of Python loops. These are `vmap`-vectorized and run in a single JIT call:
+
+| Task | Loop (slow) | Batch (fast) |
+|------|-------------|--------------|
+| Anomaly scan | `for row: packed_anomaly_score(...)` | `batch_anomaly_score(packed, data, row_ids)` |
+| Impute column | `for row: packed_impute_and_confidence(...)` | `batch_impute_column(key, packed, data, col, row_ids)` |
+| Row typicality | `for row: packed_row_typicality(...)` | `batch_row_typicality(packed_states, row_ids)` |
+| Similarity matrix | `for i,j: packed_row_similarity(...)` | `batch_row_similarity(packed_states, row_ids)` |
+| Credible intervals | `for row: packed_credible_interval(...)` | `batch_credible_interval(key, packed, data, col, row_ids)` |
+
+```python
+from crosscat import batch_anomaly_score, batch_row_typicality
+import jax.numpy as jnp
+
+# Score all rows at once
+scores = batch_anomaly_score(packed, data, jnp.arange(data.shape[0]))
+typicality = batch_row_typicality([packed], jnp.arange(data.shape[0]))
+```
+
+See [Packed Inference API](../api/packed-inference.md#batch-queries-vectorized-over-rows) for the full list.
+
 ## JIT Compilation Timing
 
 The first call triggers JAX compilation:

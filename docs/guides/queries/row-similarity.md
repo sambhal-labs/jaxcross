@@ -42,6 +42,25 @@ for i in range(n):
         sim_matrix[j, i] = s
 ```
 
+## Batch Similarity Matrix (Vectorized)
+
+Compute the full pairwise similarity matrix in one call — replaces the O(n²) Python loop:
+
+```python
+from crosscat import batch_row_similarity
+import jax.numpy as jnp
+
+packed_states = [pack_state(s) for s in final_states]
+
+# Full similarity matrix for all rows
+sim_matrix = batch_row_similarity(packed_states, jnp.arange(data.shape[0]))
+# Shape: (n_rows, n_rows), values in [0, 1]
+
+# Or for a subset of rows
+subset = jnp.array([0, 5, 10, 20, 50])
+sim_sub = batch_row_similarity(packed_states, subset)
+```
+
 ## Packed Version
 
 ```python
@@ -53,3 +72,4 @@ sim = packed_row_similarity([packed], col_types, row_a=10, row_b=20)
 ## API Reference
 
 - [`row_similarity`](../../api/inference.md#row_similarity)
+- [`batch_row_similarity`](../../api/packed-inference.md#batch_row_similarity)
