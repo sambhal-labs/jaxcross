@@ -55,8 +55,9 @@ The package is `crosscat/` with these core modules:
   - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths. Sub-kernels have `@jax.jit` for independent compilation.
   - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `compile_kernels()`, `clear_cache()`)
 
-- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus multi-chain support:
-  - **Single-state:** `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
+- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus multi-chain and batch support:
+  - **Single-state:** `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`, `packed_classify_column`
+  - **Batch (vectorized over rows via vmap — production-recommended):** `batch_anomaly_score`, `batch_row_typicality`, `batch_impute_column`, `batch_classify_column`, `batch_score_columns_binary`, `batch_row_similarity`, `batch_predictive_cdf`, `batch_credible_interval`
   - **Multi-state (already accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
   - **Multi-chain wrappers:** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`
 
@@ -84,6 +85,15 @@ For streaming/online inference:
 ```python
 packed, data = packed_insert_rows(key, packed, data, new_rows)
 ```
+
+**Batch queries (production-recommended for multi-row operations):**
+```python
+from crosscat import batch_anomaly_score, batch_row_typicality, batch_impute_column
+scores = batch_anomaly_score(packed, data, jnp.arange(n_rows))       # all rows, one JIT call
+typicality = batch_row_typicality([packed], jnp.arange(n_rows))      # structural typicality
+values, confs = batch_impute_column(key, packed, data, col, row_ids) # impute column for rows
+```
+Always prefer `batch_*` functions over Python loops with single-row packed functions — they use `jax.vmap` for 10-100x speedup.
 
 **Two sweep modes:**
 - `packed_gibbs_sweep` — uses `lax.scan` for maximum throughput in production (multi-sweep, multi-chain). First compile is cached by XLA persistent cache (auto-enabled on import).
@@ -113,6 +123,7 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 ## Benchmarks
 
+- **WDI macroeconomic benchmark** (`benchmarks/wdi_macroeconomic_benchmark.ipynb`): Real-world World Bank data (~200 countries × 30+ continuous indicators). Multi-chain inference with checkpointing, dependence discovery, country anomaly detection (`batch_row_typicality`), similarity clustering (`batch_row_similarity`), holdout imputation (`batch_impute_column`), mutual information. **This is the reference notebook for production API patterns.**
 - **MNIST paper benchmark** (`benchmarks/mnist_paper_colab.ipynb`): Reproduces Section 3.2 of Mansinghka et al. (2016). 16×16 binary MNIST (257 cols), 10 chains × 100 sweeps on P100. Validates Z-matrix, pixel dependence map, inpainting (93% accuracy), and classification (79% accuracy).
 - **Synthetic benchmark** (`benchmarks/paper_synthetic_benchmark.py`): Figure 7 recovery with known ground truth.
 - **JIT benchmark** (`benchmarks/jit_benchmark.py`): Per-sweep timing comparison.
@@ -133,15 +144,67 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 ## Docs Index
 
-IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before making changes to related code.
+IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before making changes to related code. Each doc is annotated with what it covers so you can find the right one quickly.
 
-|root: ./docs
-|getting-started:{installation.md,quickstart.md,concepts.md}
-|architecture:{overview.md,model.md,gibbs-kernels.md,packed-state.md,jax-patterns.md,performance.md}
-|guides:{data-loading.md,initialization.md,inference.md,gpu-packed.md,multi-chain.md,constraints.md,serialization.md,xla-cache.md,missing-data.md,online-learning.md,diagnostics.md,dashboard.md}
-|guides/queries:{predictive-probability.md,sampling.md,anomaly-detection.md,dependence.md,imputation.md,mutual-information.md,row-similarity.md}
-|api:{types.md,components.md,model.md,gibbs.md,inference.md,packed-state.md,packed-components.md,packed-kernels.md,packed-inference.md,packed-suffstats.md,aot-cache.md,serialization.md,synthetic.md,constraints.md,diagnostics.md,data-utils.md,validation.md}
-|examples:{csv-workflow.md,mnist.md}
+### Getting Started — `docs/getting-started/`
+- `installation.md` — pip/uv install, CPU/CUDA/ROCm/Kaggle/Colab setup
+- `quickstart.md` — 5-minute end-to-end example (load → initialize → pack → sweep → query)
+- `concepts.md` — CrossCat model explanation (two-level DP, CRP, views, clusters, column types)
+
+### Architecture — `docs/architecture/`
+- `overview.md` — Module map, data flow, package structure
+- `model.md` — The CrossCat generative model, component models math, collapsed inference
+- `gibbs-kernels.md` — Row/column assignment transitions, hyper transitions, CRP alpha sampling
+- `packed-state.md` — PackedCrossCatState design, padding strategy, pack/unpack roundtrip
+- `jax-patterns.md` — JAX idioms used (vmap, lax.scan, jit, immutable state, RNG threading)
+- `performance.md` — Optimization history, type-specialized fast paths, batched suffstats, numerical stability
+
+### Feature Guides — `docs/guides/`
+- `data-loading.md` — CSV I/O, column type auto-detection, ORDINAL/CYCLIC manual override, NaN handling
+- `initialization.md` — Single/multi-chain init, initialization modes, CRP alpha, hyperparameter defaults
+- `inference.md` — Packed vs unpacked paths, kernel selection, sweep configuration, convergence
+- `gpu-packed.md` — Pack/unpack workflow, padding dimensions, batch queries for production, JIT timing
+- `multi-chain.md` — Parallel chains, multi_chain_* wrappers, best chain selection
+- `constraints.md` — Column/row dependency constraints, rejection sampling, diagnostics
+- `serialization.md` — save_state/load_state, save_packed_state/load_packed_state, checkpointing
+- `xla-cache.md` — XLA persistent compilation cache, enable_xla_cache(), compile_kernels()
+- `missing-data.md` — NaN transparency, missing data patterns, imputation strategies
+- `online-learning.md` — Row insertion (packed_insert_rows), streaming workflows
+- `diagnostics.md` — ARI, log-joint tracking, holdout evaluation, convergence monitoring
+- `dashboard.md` — Streamlit interactive dashboard
+
+### Query Guides — `docs/guides/queries/`
+- `predictive-probability.md` — Predictive probability, CDF, joint probability, batch_predictive_cdf, batch_credible_interval
+- `sampling.md` — Conditional sampling, credible intervals, predictive_sample
+- `anomaly-detection.md` — Anomaly scores, row/column typicality, batch_anomaly_score, batch_row_typicality
+- `dependence.md` — Z-matrix (dependence_matrix), pairwise dependence probability
+- `imputation.md` — Missing value imputation, confidence scores, batch_impute_column, holdout evaluation
+- `mutual-information.md` — MI estimation, Linfoot correlation, conditional entropy
+- `row-similarity.md` — Co-clustering probability, batch_row_similarity, similarity matrix
+
+### API Reference — `docs/api/`
+- `types.md` — ColumnType, CrossCatState, ViewState, PackedCrossCatState, ColumnHypers, SufficientStats
+- `components.md` — NormalGamma, DirichletCategorical, BetaBernoulli, OrderedLogistic, VonMises
+- `model.md` — initialize(), log_joint(), insert_rows()
+- `gibbs.md` — gibbs_sweep() (unpacked path)
+- `inference.md` — All unpacked inference functions (15 functions)
+- `packed-state.md` — pack_state(), unpack_state(), batch_packed_states(), select_best_chain()
+- `packed-components.md` — Unified scoring functions, type dispatch, batch type-specialized scoring
+- `packed-kernels.md` — packed_gibbs_sweep/step, all packed transition kernels, packed_insert_rows
+- `packed-inference.md` — All packed/batch/multi-chain inference functions (28+ functions including batch_*)
+- `packed-suffstats.md` — Vectorized sufficient statistics, scatter add/remove
+- `aot-cache.md` — enable_xla_cache(), compile_kernels(), clear_cache()
+- `serialization.md` — save/load state, packed state, checkpoints
+- `synthetic.md` — generate_crosscat_data(), add_missing_data()
+- `constraints.md` — ensure_col_dep_constraints(), check_* functions
+- `diagnostics.md` — ARI, collect_diagnostics(), evaluate_imputation(), packed_evaluate_imputation()
+- `data-utils.md` — read_csv(), guess_column_types(), discretize_column()
+- `validation.md` — validate_state(), assert_valid_state()
+
+### Examples — `docs/examples/`
+- `wdi-macroeconomics.md` — Real-world WDI benchmark: multi-chain with checkpointing, batch queries, dependence/anomaly/similarity/imputation analysis on ~200 countries × 30+ indicators
+- `mnist.md` — MNIST paper reproduction: binary pixel data, inpainting, classification
+- `csv-workflow.md` — 10-step CSV end-to-end: load → init → pack → sweep → query → save (uses batch functions)
 
 ## Common Workflows
 
@@ -158,11 +221,14 @@ Read: docs/architecture/model.md, docs/api/components.md
 9. `crosscat/serialization.py` — bump `_SCHEMA_VERSION`, add migration in `load_packed_state`
 
 ### Adding a new inference query
-Read: docs/guides/inference.md, docs/api/inference.md
+Read: docs/guides/inference.md, docs/api/inference.md, docs/api/packed-inference.md
 1. `crosscat/inference.py` — add unpacked implementation
-2. `crosscat/packed_inference.py` — add packed implementation
-3. `crosscat/__init__.py` — export both
-4. `tests/` — add unit test + parity test (see `test_packed_inference_parity.py`)
+2. `crosscat/packed_inference.py` — add packed single-row implementation (`packed_*`)
+3. `crosscat/packed_inference.py` — add batch implementation (`batch_*`) using `jax.vmap` over rows
+4. `crosscat/__init__.py` — export all three (unpacked, packed, batch)
+5. `tests/` — add unit test + parity test (see `test_packed_inference_parity.py`)
+6. `docs/api/packed-inference.md` — document packed + batch functions
+7. `docs/guides/queries/` — add or update the relevant query guide with batch examples
 
 ### Debugging numerical issues
 Read: docs/architecture/performance.md
