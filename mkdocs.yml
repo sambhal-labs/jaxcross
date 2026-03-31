@@ -137,6 +137,7 @@ nav:
     - JAX Design Patterns: architecture/jax-patterns.md
   - Examples:
     - MNIST Benchmark: examples/mnist.md
+    - WDI Macroeconomics: examples/wdi-macroeconomics.md
     - CSV End-to-End Workflow: examples/csv-workflow.md
   - Changelog: changelog.md
   - Contributing: contributing.md

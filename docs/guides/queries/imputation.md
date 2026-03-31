@@ -82,6 +82,31 @@ value, conf = packed_impute_and_confidence(key, packed, data, query_col=0)
 packed_new, data_new, row = packed_sample_and_insert(key, packed, data, partial_row)
 ```
 
+## Batch Imputation (Vectorized)
+
+Impute a column for many rows in a single JIT call — much faster than looping:
+
+```python
+from crosscat import batch_impute_column
+import jax.numpy as jnp
+
+packed = pack_state(best)
+
+# Find rows with missing values in column 0
+nan_rows = jnp.where(jnp.isnan(data[:, 0]))[0]
+
+key, subkey = jax.random.split(key)
+values, confidences = batch_impute_column(
+    subkey, packed, data, query_col=0, row_ids=nan_rows
+)
+
+for i, row in enumerate(nan_rows):
+    print(f"  Row {int(row)}: {float(values[i]):.2f} (conf={float(confidences[i]):.2f})")
+```
+
+!!! tip
+    Group imputation calls by column for best performance — each column shares the same view and cluster structure, so the JIT-compiled kernel is reused.
+
 ## Packed Imputation Evaluation
 
 Use `packed_evaluate_imputation` for significantly faster held-out evaluation on packed state:
@@ -97,5 +122,6 @@ metrics = packed_evaluate_imputation(packed, data, mask, col_types, rng_key=key)
 
 - [`impute_and_confidence`](../../api/inference.md#impute_and_confidence)
 - [`sample_and_insert`](../../api/inference.md#sample_and_insert)
+- [`batch_impute_column`](../../api/packed-inference.md#batch_impute_column)
 - [`evaluate_imputation`](../../api/diagnostics.md#evaluate_imputation)
 - [`packed_evaluate_imputation`](../../api/diagnostics.md#packed_evaluate_imputation)
