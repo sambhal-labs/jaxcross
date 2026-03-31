@@ -151,6 +151,496 @@ def _sample_one_column(
 # ---------------------------------------------------------------------------
 
 
+def packed_classify_column(
+    packed: PackedCrossCatState,
+    data: Array,
+    target_col: int,
+    candidate_vals: Array,
+    row_id: int,
+) -> Array:
+    """Compute log P(target_col=v | row) for each candidate value v.
+
+    Vectorized over candidate values via vmap. Useful for classification
+    where target_col is categorical and candidate_vals are the possible classes.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        target_col: Column index to classify.
+        candidate_vals: 1D array of candidate values to score.
+        row_id: Row index (uses observed row's cluster assignment).
+
+    Returns:
+        Array of shape (len(candidate_vals),) with log probabilities.
+    """
+    view_idx = int(packed.column_assignments[target_col])
+    weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+    def _score_val(v):
+        return _logp_one_column_mixture(packed, view_idx, target_col, v, weights)
+
+    return jax.vmap(_score_val)(candidate_vals)
+
+
+def batch_classify_column(
+    packed: PackedCrossCatState,
+    data: Array,
+    target_col: int,
+    candidate_vals: Array,
+    row_ids: Array,
+) -> Array:
+    """Batch classification: log P(target_col=v | row) for all rows and values.
+
+    Double-vmapped: over rows (cluster weights vary) and over candidate values.
+    After one-time JIT compilation, classifies all rows in a single GPU call.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        target_col: Column index to classify.
+        candidate_vals: 1D array of candidate values, shape (n_candidates,).
+        row_ids: 1D array of row indices, shape (n_rows,).
+
+    Returns:
+        Array of shape (n_rows, n_candidates) with log probabilities.
+    """
+    view_idx = int(packed.column_assignments[target_col])
+
+    def _classify_one_row(row_id):
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _score_val(v):
+            return _logp_one_column_mixture(packed, view_idx, target_col, v, weights)
+
+        return jax.vmap(_score_val)(candidate_vals)
+
+    return jax.vmap(_classify_one_row)(row_ids)
+
+
+def batch_score_columns_binary(
+    packed: PackedCrossCatState,
+    data: Array,
+    col_indices: Array,
+    row_id: int,
+) -> Array:
+    """Compute P(col=1 | row) for multiple binary columns in one JIT call.
+
+    Vectorized over columns via vmap. For each column, computes the
+    posterior predictive probability of value 1 vs 0 and returns P(1).
+
+    Designed for inpainting: score all missing pixels at once.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        col_indices: 1D integer array of column indices to score.
+        row_id: Row index (uses observed row's cluster assignment).
+
+    Returns:
+        Array of shape (len(col_indices),) with P(col=1 | row) in [0, 1].
+    """
+    max_k = packed.max_clusters
+
+    def _prob1_for_col(col_idx):
+        view_idx = packed.column_assignments[col_idx]
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        local_idx = _find_local_col_index(packed, view_idx, col_idx)
+
+        type_id = packed.col_type_ids[col_idx]
+
+        def _score_cluster_at_val(c_idx, x):
+            return unified_posterior_predictive_logp(
+                x,
+                type_id,
+                packed.ss_counts[view_idx, c_idx, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, c_idx, local_idx],
+                packed.ss_sum_x_sq[view_idx, c_idx, local_idx],
+                packed.ss_cat_counts[view_idx, c_idx, local_idx],
+                packed.ss_sum_sin[view_idx, c_idx, local_idx],
+                packed.ss_sum_cos[view_idx, c_idx, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        cluster_indices = jnp.arange(max_k)
+        val_1 = jnp.float32(1.0)
+        val_0 = jnp.float32(0.0)
+        log_liks_1 = jax.vmap(lambda c: _score_cluster_at_val(c, val_1))(cluster_indices)
+        log_liks_0 = jax.vmap(lambda c: _score_cluster_at_val(c, val_0))(cluster_indices)
+
+        log_weights = jnp.log(jnp.maximum(weights, LOG_EPS))
+        log_weights = jnp.where(weights > 0, log_weights, -jnp.inf)
+
+        logp1 = jax.scipy.special.logsumexp(log_weights + log_liks_1)
+        logp0 = jax.scipy.special.logsumexp(log_weights + log_liks_0)
+
+        return jnp.exp(logp1 - jnp.logaddexp(logp0, logp1))
+
+    return jax.vmap(_prob1_for_col)(col_indices)
+
+
+def batch_anomaly_score(
+    packed: PackedCrossCatState,
+    data: Array,
+    row_ids: Array,
+) -> Array:
+    """Compute anomaly scores for multiple rows in one JIT call.
+
+    For each row, evaluates the average log predictive probability across
+    all observed (non-NaN) columns, then applies a sigmoid transform.
+    Fully vectorized via vmap — no Python loops.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        row_ids: 1D integer array of row indices to score.
+
+    Returns:
+        Array of shape (len(row_ids),) with anomaly scores in [0, 1].
+        Higher = more anomalous.
+    """
+    n_cols = packed.n_cols
+    max_k = packed.max_clusters
+    all_col_indices = jnp.arange(n_cols)
+
+    def _logp_one_col_for_row(col_idx, row_id, x):
+        """Log predictive probability of value x at col_idx for row_id."""
+        view_idx = packed.column_assignments[col_idx]
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+        local_idx = _find_local_col_index(packed, view_idx, col_idx)
+        type_id = packed.col_type_ids[col_idx]
+
+        def _score_cluster(c_idx):
+            return unified_posterior_predictive_logp(
+                x,
+                type_id,
+                packed.ss_counts[view_idx, c_idx, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, c_idx, local_idx],
+                packed.ss_sum_x_sq[view_idx, c_idx, local_idx],
+                packed.ss_cat_counts[view_idx, c_idx, local_idx],
+                packed.ss_sum_sin[view_idx, c_idx, local_idx],
+                packed.ss_sum_cos[view_idx, c_idx, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        log_liks = jax.vmap(_score_cluster)(jnp.arange(max_k))
+        log_weights = jnp.log(jnp.maximum(weights, LOG_EPS))
+        log_weights = jnp.where(weights > 0, log_weights, -jnp.inf)
+        return jax.scipy.special.logsumexp(log_weights + log_liks)
+
+    def _score_one_row(row_id):
+        row_data = data[row_id]
+        valid_mask = ~jnp.isnan(row_data[:n_cols])
+
+        # Score all columns (vmap), mask invalid ones
+        log_ps = jax.vmap(lambda c: _logp_one_col_for_row(c, row_id, row_data[c]))(all_col_indices)
+
+        # Average over valid (non-NaN) columns only
+        n_valid = jnp.maximum(valid_mask.sum(), 1.0)
+        avg_log_p = jnp.where(valid_mask, log_ps, 0.0).sum() / n_valid
+
+        # Sigmoid: more negative → more anomalous
+        anomaly = 1.0 / (1.0 + jnp.exp(avg_log_p + 2.0))
+        return jnp.clip(anomaly, 0.0, 1.0)
+
+    return jax.vmap(_score_one_row)(row_ids)
+
+
+def batch_impute_column(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    row_ids: Array,
+    *,
+    n_samples: int = 100,
+) -> tuple[Array, Array]:
+    """Impute a column for multiple rows in one JIT call.
+
+    For each row, draws samples from the posterior predictive for query_col
+    using the row's cluster assignment, then computes point estimate and
+    confidence. Fully vectorized via vmap.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        query_col: Column to impute.
+        row_ids: 1D integer array of row indices to impute.
+        n_samples: Number of posterior predictive samples per row.
+
+    Returns:
+        Tuple of (point_estimates, confidences), each shape (len(row_ids),).
+    """
+    from crosscat.packed import CONTINUOUS_ID
+
+    view_idx = int(packed.column_assignments[query_col])
+    local_idx = _find_local_col_index(packed, view_idx, query_col)
+    col_idx = query_col
+    type_id = packed.col_type_ids[col_idx]
+
+    def _impute_one_row(row_key_and_id):
+        key, row_id = row_key_and_id
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _draw_one_sample(sample_key):
+            k1, k2 = jax.random.split(sample_key)
+            log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
+            cluster = jax.random.categorical(k1, log_w)
+            return unified_sample_posterior_predictive(
+                k2,
+                type_id,
+                packed.ss_counts[view_idx, cluster, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, cluster, local_idx],
+                packed.ss_sum_x_sq[view_idx, cluster, local_idx],
+                packed.ss_cat_counts[view_idx, cluster, local_idx],
+                packed.ss_sum_sin[view_idx, cluster, local_idx],
+                packed.ss_sum_cos[view_idx, cluster, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        sample_keys = jax.random.split(key, n_samples)
+        samples = jax.vmap(_draw_one_sample)(sample_keys)
+
+        # Point estimate and confidence
+        is_continuous = type_id == CONTINUOUS_ID
+        point_est = jnp.where(is_continuous, jnp.median(samples), 0.0)
+        confidence = jnp.where(is_continuous, 1.0 / (1.0 + jnp.std(samples)), 0.0)
+
+        # Categorical path: mode and mode frequency
+        s_int = samples.astype(jnp.int32)
+        max_cat = packed.max_categories
+        counts = jnp.zeros(max_cat, dtype=jnp.int32)
+        counts = counts.at[jnp.clip(s_int, 0, max_cat - 1)].add(1)
+        cat_mode = jnp.argmax(counts).astype(jnp.float32)
+        cat_conf = counts[jnp.argmax(counts)] / jnp.float32(n_samples)
+
+        point_est = jnp.where(is_continuous, point_est, cat_mode)
+        confidence = jnp.where(is_continuous, confidence, cat_conf)
+
+        return point_est, confidence
+
+    keys = jax.random.split(rng_key, len(row_ids))
+    point_ests, confidences = jax.vmap(_impute_one_row)((keys, row_ids))
+    return point_ests, confidences
+
+
+def batch_row_similarity(
+    packed_states: list[PackedCrossCatState],
+    row_ids: Array,
+) -> Array:
+    """Compute pairwise similarity matrix for multiple rows.
+
+    Similarity is the probability that two rows share the same cluster,
+    averaged over views and posterior states. Fully vectorized — no Python
+    loops over row pairs.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        row_ids: 1D integer array of row indices, shape (N,).
+
+    Returns:
+        Symmetric array of shape (N, N) with similarity scores in [0, 1].
+        Diagonal is always 1.0.
+    """
+    n = len(row_ids)
+    sim_matrix = jnp.zeros((n, n))
+
+    for packed in packed_states:
+        n_views = int(packed.n_views)
+        max_views = packed.max_views
+        view_mask = jnp.arange(max_views) < n_views
+
+        # (max_views, N) — cluster assignment per view per selected row
+        assigns = packed.view_row_assignments[:, row_ids]  # (max_views, N)
+
+        # (max_views, N, N) — same cluster indicator for all pairs
+        same = (assigns[:, :, None] == assigns[:, None, :]).astype(jnp.float32)
+
+        # Mask inactive views, average over active views
+        same_masked = jnp.where(view_mask[:, None, None], same, 0.0)
+        per_state = same_masked.sum(axis=0) / jnp.maximum(n_views, 1.0)
+
+        sim_matrix = sim_matrix + per_state
+
+    return sim_matrix / jnp.maximum(len(packed_states), 1.0)
+
+
+def batch_predictive_cdf(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    query_val: Array,
+    row_ids: Array,
+    *,
+    n_samples: int = 1000,
+) -> Array:
+    """Compute posterior predictive CDF for multiple rows in one JIT call.
+
+    P(X <= query_val | row) for each row, using the row's cluster assignment.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_col: Column index.
+        query_val: Value at which to evaluate CDF.
+        row_ids: 1D integer array of row indices.
+        n_samples: Number of MC samples per row.
+
+    Returns:
+        Array of shape (len(row_ids),) with CDF values in [0, 1].
+    """
+    view_idx = int(packed.column_assignments[query_col])
+    local_idx = _find_local_col_index(packed, view_idx, query_col)
+    col_idx = query_col
+    type_id = packed.col_type_ids[col_idx]
+
+    def _cdf_one_row(key_and_id):
+        key, row_id = key_and_id
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _draw(sample_key):
+            k1, k2 = jax.random.split(sample_key)
+            log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
+            cluster = jax.random.categorical(k1, log_w)
+            return unified_sample_posterior_predictive(
+                k2,
+                type_id,
+                packed.ss_counts[view_idx, cluster, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, cluster, local_idx],
+                packed.ss_sum_x_sq[view_idx, cluster, local_idx],
+                packed.ss_cat_counts[view_idx, cluster, local_idx],
+                packed.ss_sum_sin[view_idx, cluster, local_idx],
+                packed.ss_sum_cos[view_idx, cluster, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        sample_keys = jax.random.split(key, n_samples)
+        samples = jax.vmap(_draw)(sample_keys)
+        return jnp.mean(samples <= query_val)
+
+    keys = jax.random.split(rng_key, len(row_ids))
+    return jax.vmap(_cdf_one_row)((keys, row_ids))
+
+
+def batch_credible_interval(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    row_ids: Array,
+    *,
+    n_samples: int = 1000,
+    ci_level: float = 0.90,
+) -> tuple[Array, Array, Array]:
+    """Compute credible intervals for multiple rows in one JIT call.
+
+    For each row, draws posterior predictive samples conditioned on the
+    row's cluster assignment and computes percentile-based CI.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_col: Column to compute CI for.
+        row_ids: 1D integer array of row indices.
+        n_samples: Number of samples per row.
+        ci_level: Credible interval level (0.90 = 90% CI).
+
+    Returns:
+        Tuple of (medians, lower_bounds, upper_bounds), each shape (len(row_ids),).
+    """
+    view_idx = int(packed.column_assignments[query_col])
+    local_idx = _find_local_col_index(packed, view_idx, query_col)
+    col_idx = query_col
+    type_id = packed.col_type_ids[col_idx]
+    tail = (1.0 - ci_level) / 2.0
+
+    def _ci_one_row(key_and_id):
+        key, row_id = key_and_id
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _draw(sample_key):
+            k1, k2 = jax.random.split(sample_key)
+            log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
+            cluster = jax.random.categorical(k1, log_w)
+            return unified_sample_posterior_predictive(
+                k2,
+                type_id,
+                packed.ss_counts[view_idx, cluster, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, cluster, local_idx],
+                packed.ss_sum_x_sq[view_idx, cluster, local_idx],
+                packed.ss_cat_counts[view_idx, cluster, local_idx],
+                packed.ss_sum_sin[view_idx, cluster, local_idx],
+                packed.ss_sum_cos[view_idx, cluster, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        sample_keys = jax.random.split(key, n_samples)
+        samples = jax.vmap(_draw)(sample_keys)
+        return (
+            jnp.median(samples),
+            jnp.percentile(samples, 100.0 * tail),
+            jnp.percentile(samples, 100.0 * (1.0 - tail)),
+        )
+
+    keys = jax.random.split(rng_key, len(row_ids))
+    medians, lowers, uppers = jax.vmap(_ci_one_row)((keys, row_ids))
+    return medians, lowers, uppers
+
+
 def packed_predictive_probability(
     packed: PackedCrossCatState,
     data: Array,
@@ -352,9 +842,8 @@ def _packed_estimate_mi_sample(
 
     Maps to original inference_utils.estimate_MI_sample().
 
-    Precomputes all cluster suffstats once and vectorizes the per-cluster
-    scoring via vmap, reducing complexity from O(n_samples * n_clusters)
-    likelihood evaluations to O(n_clusters) precompute + O(n_samples) vmap calls.
+    Fully vectorized via vmap: samples all (x, y) pairs in parallel and
+    scores them across all clusters simultaneously. No Python sample loop.
     """
     cluster_weights = _cluster_weights_packed(packed, view_idx)
     log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, LOG_EPS))
@@ -385,8 +874,7 @@ def _packed_estimate_mi_sample(
     hypers_i = _get_hypers(col_i)
     hypers_j = _get_hypers(col_j)
 
-    # Precompute all cluster suffstats as (max_clusters,) arrays — avoids
-    # repeated per-cluster indexing inside the sample loop.
+    # Precompute all cluster suffstats as (max_clusters,) arrays
     ss_counts_i = packed.ss_counts[view_idx, :, local_i].astype(jnp.float32)
     ss_sum_x_i = packed.ss_sum_x[view_idx, :, local_i]
     ss_sum_x_sq_i = packed.ss_sum_x_sq[view_idx, :, local_i]
@@ -400,6 +888,8 @@ def _packed_estimate_mi_sample(
     ss_cat_counts_j = packed.ss_cat_counts[view_idx, :, local_j]
     ss_sum_sin_j = packed.ss_sum_sin[view_idx, :, local_j]
     ss_sum_cos_j = packed.ss_sum_cos[view_idx, :, local_j]
+
+    cluster_mask = jnp.arange(max_k) < n_clusters
 
     # Vectorized logp across all clusters for a given value
     def _logp_all_clusters_i(x):
@@ -417,7 +907,7 @@ def _packed_estimate_mi_sample(
             )
 
         logps = jax.vmap(_one)(jnp.arange(max_k))
-        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
+        return jnp.where(cluster_mask, logps, -jnp.inf)
 
     def _logp_all_clusters_j(y):
         def _one(c):
@@ -434,54 +924,57 @@ def _packed_estimate_mi_sample(
             )
 
         logps = jax.vmap(_one)(jnp.arange(max_k))
-        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
+        return jnp.where(cluster_mask, logps, -jnp.inf)
 
-    mi_samples = []
-    keys = jax.random.split(rng_key, n_samples)
+    def _one_sample(key):
+        """Draw one (x, y) sample and compute MI contribution."""
+        k1, k2, k3 = jax.random.split(key, 3)
 
-    for s in range(n_samples):
-        k1, k2, k3 = jax.random.split(keys[s], 3)
+        # Draw cluster from CRP weights
+        cluster = jax.random.categorical(k1, log_cluster_weights)
 
-        # Draw cluster
-        cluster = int(jax.random.categorical(k1, log_cluster_weights))
-
-        # Sample x from col_i, y from col_j in this cluster
-        ss_i = (
+        # Sample x from col_i in this cluster (index into precomputed arrays)
+        x = unified_sample_posterior_predictive(
+            k2,
+            type_id_i,
             ss_counts_i[cluster],
             ss_sum_x_i[cluster],
             ss_sum_x_sq_i[cluster],
             ss_cat_counts_i[cluster],
             ss_sum_sin_i[cluster],
             ss_sum_cos_i[cluster],
+            *hypers_i,
         )
-        x = unified_sample_posterior_predictive(k2, type_id_i, *ss_i, *hypers_i)
 
-        ss_j = (
+        # Sample y from col_j in this cluster
+        y = unified_sample_posterior_predictive(
+            k3,
+            type_id_j,
             ss_counts_j[cluster],
             ss_sum_x_j[cluster],
             ss_sum_x_sq_j[cluster],
             ss_cat_counts_j[cluster],
             ss_sum_sin_j[cluster],
             ss_sum_cos_j[cluster],
+            *hypers_j,
         )
-        y = unified_sample_posterior_predictive(k3, type_id_j, *ss_j, *hypers_j)
 
-        # Vectorized log p(x), log p(y) across all clusters
+        # Score across all clusters
         lp_x_all = _logp_all_clusters_i(x)
         lp_y_all = _logp_all_clusters_j(y)
 
-        log_px = jnp.logsumexp(log_cluster_weights + lp_x_all)
-        log_py = jnp.logsumexp(log_cluster_weights + lp_y_all)
-        log_pxy = jnp.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
+        log_px = jax.scipy.special.logsumexp(log_cluster_weights + lp_x_all)
+        log_py = jax.scipy.special.logsumexp(log_cluster_weights + lp_y_all)
+        log_pxy = jax.scipy.special.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
 
-        mi_samples.append(float(log_pxy - log_px - log_py))
+        return log_pxy - log_px - log_py
 
-    # Unweighted average: samples are already drawn from p(x,y) via CRP cluster
-    # sampling, so no importance weighting is needed.
-    mi_arr = jnp.array(mi_samples)
-    mi_est = float(jnp.mean(mi_arr))
+    # Vectorize over all samples at once — no Python loop
+    keys = jax.random.split(rng_key, n_samples)
+    mi_samples = jax.vmap(_one_sample)(keys)
 
-    return max(mi_est, 0.0)
+    mi_est = jnp.mean(mi_samples)
+    return jnp.maximum(mi_est, 0.0)
 
 
 def packed_dependence_probability(
@@ -694,6 +1187,7 @@ def packed_predictive_cdf(
     query_val: Array,
     *,
     n_samples: int = 10000,
+    row_id: int | None = None,
 ) -> Array:
     """Compute posterior predictive CDF: P(X <= query_val) via MC sampling.
 
@@ -704,11 +1198,14 @@ def packed_predictive_cdf(
         query_col: Column index.
         query_val: Value at which to evaluate CDF.
         n_samples: Number of MC samples.
+        row_id: If provided, use observed row's cluster assignment.
 
     Returns:
         CDF value P(X <= query_val) in [0, 1].
     """
-    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    samples = packed_predictive_sample(
+        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
     return jnp.mean(samples[:, 0] <= query_val)
 
 
@@ -955,6 +1452,7 @@ def packed_credible_interval(
     *,
     n_samples: int = 1000,
     ci_level: float = 0.90,
+    row_id: int | None = None,
 ) -> tuple[Array, Array, Array]:
     """Compute credible interval for a query column (packed version).
 
@@ -967,11 +1465,14 @@ def packed_credible_interval(
         query_col: Column to compute CI for.
         n_samples: Number of samples for CI estimation.
         ci_level: Credible interval level (0.90 = 90% CI).
+        row_id: If provided, use observed row's cluster assignment.
 
     Returns:
         Tuple of (median, lower_bound, upper_bound).
     """
-    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    samples = packed_predictive_sample(
+        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
     s = samples[:, 0]
 
     tail = (1.0 - ci_level) / 2.0
@@ -1069,6 +1570,71 @@ def packed_row_typicality(
     if not typicality_scores:
         return jnp.array(0.5)
     return jnp.array(sum(typicality_scores) / len(typicality_scores))
+
+
+def batch_row_typicality(
+    packed_states: list[PackedCrossCatState],
+    row_ids: Array,
+) -> Array:
+    """Compute structural typicality scores for multiple rows.
+
+    Vectorized over rows and views using JAX array ops. No Python loops
+    over rows — only a small loop over the list of posterior states.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        row_ids: 1D integer array of row indices.
+
+    Returns:
+        Array of shape (len(row_ids),) with typicality scores in [0, 1].
+    """
+    n = len(row_ids)
+    accum = jnp.zeros(n)
+
+    for packed in packed_states:
+        n_views = int(packed.n_views)
+        n_rows = int(packed.n_rows)
+        max_k = packed.max_clusters
+        max_views = packed.max_views
+        view_mask = jnp.arange(max_views) < n_views
+
+        # (max_views, n_rows) assignments
+        assigns = packed.view_row_assignments
+
+        # Per-view cluster counts: (max_views, max_k)
+        one_hot = jax.nn.one_hot(assigns[:, :n_rows], max_k)  # (max_views, n_rows, max_k)
+        counts = one_hot.sum(axis=1).astype(jnp.float32)  # (max_views, max_k)
+        totals = counts.sum(axis=1, keepdims=True)  # (max_views, 1)
+
+        # Cluster assignment for selected rows: (max_views, len(row_ids))
+        selected_assigns = assigns[:, row_ids]
+
+        # Probability of each selected row's cluster: (max_views, len(row_ids))
+        # Gather counts for selected clusters
+        view_indices = jnp.arange(max_views)[:, None]  # (max_views, 1)
+        p_cluster = counts[view_indices, selected_assigns] / jnp.maximum(totals, 1.0)
+
+        # For each row, what fraction of all rows have equal or lower cluster probability?
+        # All row probs: (max_views, n_rows)
+        all_row_probs = counts[jnp.arange(max_views)[:, None], assigns[:, :n_rows]] / jnp.maximum(
+            totals, 1.0
+        )
+
+        # Compare: (max_views, len(row_ids)) — count rows with prob <= this row's prob
+        # p_cluster: (max_views, len(row_ids)), all_row_probs: (max_views, n_rows)
+        # Broadcast: (max_views, len(row_ids), 1) vs (max_views, 1, n_rows)
+        n_less = (
+            (all_row_probs[:, None, :] <= p_cluster[:, :, None]).sum(axis=2).astype(jnp.float32)
+        )
+        view_scores = n_less / jnp.maximum(totals, 1.0)  # (max_views, len(row_ids))
+
+        # Average over active views
+        view_scores_masked = jnp.where(view_mask[:, None], view_scores, 0.0)
+        per_state = view_scores_masked.sum(axis=0) / jnp.maximum(n_views, 1.0)
+
+        accum = accum + per_state
+
+    return accum / jnp.maximum(len(packed_states), 1.0)
 
 
 def packed_conditional_entropy(
