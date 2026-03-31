@@ -1572,6 +1572,71 @@ def packed_row_typicality(
     return jnp.array(sum(typicality_scores) / len(typicality_scores))
 
 
+def batch_row_typicality(
+    packed_states: list[PackedCrossCatState],
+    row_ids: Array,
+) -> Array:
+    """Compute structural typicality scores for multiple rows.
+
+    Vectorized over rows and views using JAX array ops. No Python loops
+    over rows — only a small loop over the list of posterior states.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        row_ids: 1D integer array of row indices.
+
+    Returns:
+        Array of shape (len(row_ids),) with typicality scores in [0, 1].
+    """
+    n = len(row_ids)
+    accum = jnp.zeros(n)
+
+    for packed in packed_states:
+        n_views = int(packed.n_views)
+        n_rows = int(packed.n_rows)
+        max_k = packed.max_clusters
+        max_views = packed.max_views
+        view_mask = jnp.arange(max_views) < n_views
+
+        # (max_views, n_rows) assignments
+        assigns = packed.view_row_assignments
+
+        # Per-view cluster counts: (max_views, max_k)
+        one_hot = jax.nn.one_hot(assigns[:, :n_rows], max_k)  # (max_views, n_rows, max_k)
+        counts = one_hot.sum(axis=1).astype(jnp.float32)  # (max_views, max_k)
+        totals = counts.sum(axis=1, keepdims=True)  # (max_views, 1)
+
+        # Cluster assignment for selected rows: (max_views, len(row_ids))
+        selected_assigns = assigns[:, row_ids]
+
+        # Probability of each selected row's cluster: (max_views, len(row_ids))
+        # Gather counts for selected clusters
+        view_indices = jnp.arange(max_views)[:, None]  # (max_views, 1)
+        p_cluster = counts[view_indices, selected_assigns] / jnp.maximum(totals, 1.0)
+
+        # For each row, what fraction of all rows have equal or lower cluster probability?
+        # All row probs: (max_views, n_rows)
+        all_row_probs = counts[jnp.arange(max_views)[:, None], assigns[:, :n_rows]] / jnp.maximum(
+            totals, 1.0
+        )
+
+        # Compare: (max_views, len(row_ids)) — count rows with prob <= this row's prob
+        # p_cluster: (max_views, len(row_ids)), all_row_probs: (max_views, n_rows)
+        # Broadcast: (max_views, len(row_ids), 1) vs (max_views, 1, n_rows)
+        n_less = (
+            (all_row_probs[:, None, :] <= p_cluster[:, :, None]).sum(axis=2).astype(jnp.float32)
+        )
+        view_scores = n_less / jnp.maximum(totals, 1.0)  # (max_views, len(row_ids))
+
+        # Average over active views
+        view_scores_masked = jnp.where(view_mask[:, None], view_scores, 0.0)
+        per_state = view_scores_masked.sum(axis=0) / jnp.maximum(n_views, 1.0)
+
+        accum = accum + per_state
+
+    return accum / jnp.maximum(len(packed_states), 1.0)
+
+
 def packed_conditional_entropy(
     rng_key: Array,
     packed_states: list[PackedCrossCatState],
