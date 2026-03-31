@@ -352,9 +352,8 @@ def _packed_estimate_mi_sample(
 
     Maps to original inference_utils.estimate_MI_sample().
 
-    Precomputes all cluster suffstats once and vectorizes the per-cluster
-    scoring via vmap, reducing complexity from O(n_samples * n_clusters)
-    likelihood evaluations to O(n_clusters) precompute + O(n_samples) vmap calls.
+    Fully vectorized via vmap: samples all (x, y) pairs in parallel and
+    scores them across all clusters simultaneously. No Python sample loop.
     """
     cluster_weights = _cluster_weights_packed(packed, view_idx)
     log_cluster_weights = jnp.log(jnp.maximum(cluster_weights, LOG_EPS))
@@ -385,8 +384,7 @@ def _packed_estimate_mi_sample(
     hypers_i = _get_hypers(col_i)
     hypers_j = _get_hypers(col_j)
 
-    # Precompute all cluster suffstats as (max_clusters,) arrays — avoids
-    # repeated per-cluster indexing inside the sample loop.
+    # Precompute all cluster suffstats as (max_clusters,) arrays
     ss_counts_i = packed.ss_counts[view_idx, :, local_i].astype(jnp.float32)
     ss_sum_x_i = packed.ss_sum_x[view_idx, :, local_i]
     ss_sum_x_sq_i = packed.ss_sum_x_sq[view_idx, :, local_i]
@@ -400,6 +398,8 @@ def _packed_estimate_mi_sample(
     ss_cat_counts_j = packed.ss_cat_counts[view_idx, :, local_j]
     ss_sum_sin_j = packed.ss_sum_sin[view_idx, :, local_j]
     ss_sum_cos_j = packed.ss_sum_cos[view_idx, :, local_j]
+
+    cluster_mask = jnp.arange(max_k) < n_clusters
 
     # Vectorized logp across all clusters for a given value
     def _logp_all_clusters_i(x):
@@ -417,7 +417,7 @@ def _packed_estimate_mi_sample(
             )
 
         logps = jax.vmap(_one)(jnp.arange(max_k))
-        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
+        return jnp.where(cluster_mask, logps, -jnp.inf)
 
     def _logp_all_clusters_j(y):
         def _one(c):
@@ -434,39 +434,42 @@ def _packed_estimate_mi_sample(
             )
 
         logps = jax.vmap(_one)(jnp.arange(max_k))
-        return jnp.where(jnp.arange(max_k) < n_clusters, logps, -jnp.inf)
+        return jnp.where(cluster_mask, logps, -jnp.inf)
 
-    mi_samples = []
-    keys = jax.random.split(rng_key, n_samples)
+    def _one_sample(key):
+        """Draw one (x, y) sample and compute MI contribution."""
+        k1, k2, k3 = jax.random.split(key, 3)
 
-    for s in range(n_samples):
-        k1, k2, k3 = jax.random.split(keys[s], 3)
+        # Draw cluster from CRP weights
+        cluster = jax.random.categorical(k1, log_cluster_weights)
 
-        # Draw cluster
-        cluster = int(jax.random.categorical(k1, log_cluster_weights))
-
-        # Sample x from col_i, y from col_j in this cluster
-        ss_i = (
+        # Sample x from col_i in this cluster (index into precomputed arrays)
+        x = unified_sample_posterior_predictive(
+            k2,
+            type_id_i,
             ss_counts_i[cluster],
             ss_sum_x_i[cluster],
             ss_sum_x_sq_i[cluster],
             ss_cat_counts_i[cluster],
             ss_sum_sin_i[cluster],
             ss_sum_cos_i[cluster],
+            *hypers_i,
         )
-        x = unified_sample_posterior_predictive(k2, type_id_i, *ss_i, *hypers_i)
 
-        ss_j = (
+        # Sample y from col_j in this cluster
+        y = unified_sample_posterior_predictive(
+            k3,
+            type_id_j,
             ss_counts_j[cluster],
             ss_sum_x_j[cluster],
             ss_sum_x_sq_j[cluster],
             ss_cat_counts_j[cluster],
             ss_sum_sin_j[cluster],
             ss_sum_cos_j[cluster],
+            *hypers_j,
         )
-        y = unified_sample_posterior_predictive(k3, type_id_j, *ss_j, *hypers_j)
 
-        # Vectorized log p(x), log p(y) across all clusters
+        # Score across all clusters
         lp_x_all = _logp_all_clusters_i(x)
         lp_y_all = _logp_all_clusters_j(y)
 
@@ -474,14 +477,14 @@ def _packed_estimate_mi_sample(
         log_py = jax.scipy.special.logsumexp(log_cluster_weights + lp_y_all)
         log_pxy = jax.scipy.special.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
 
-        mi_samples.append(float(log_pxy - log_px - log_py))
+        return log_pxy - log_px - log_py
 
-    # Unweighted average: samples are already drawn from p(x,y) via CRP cluster
-    # sampling, so no importance weighting is needed.
-    mi_arr = jnp.array(mi_samples)
-    mi_est = float(jnp.mean(mi_arr))
+    # Vectorize over all samples at once — no Python loop
+    keys = jax.random.split(rng_key, n_samples)
+    mi_samples = jax.vmap(_one_sample)(keys)
 
-    return max(mi_est, 0.0)
+    mi_est = jnp.mean(mi_samples)
+    return jnp.maximum(mi_est, 0.0)
 
 
 def packed_dependence_probability(
