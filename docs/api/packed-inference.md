@@ -88,6 +88,16 @@ Sample missing values and insert completed row into packed state.
 
 **Returns**: `(updated_packed, updated_data, completed_row)`.
 
+### `packed_classify_column`
+
+```python
+packed_classify_column(packed, data, target_col, candidate_vals, row_id) -> Array
+```
+
+Compute log P(target_col=v | row) for each candidate value v. Useful for classification where `target_col` is categorical and `candidate_vals` are the possible classes.
+
+**Returns**: `Array (len(candidate_vals),)` with log probabilities.
+
 ---
 
 ## Structure Queries (Accept Lists of States)
@@ -197,3 +207,94 @@ multi_chain_predictive_cdf(rng_key, packed_states, data, query_col, query_val, *
 ```
 
 Predictive CDF averaged across chains.
+
+---
+
+## Batch Queries (Vectorized over Rows)
+
+!!! tip "Production path"
+    Batch functions are the recommended way to run queries at scale. They use `jax.vmap` to vectorize over rows in a single JIT call — 10-100x faster than Python loops over single-row functions.
+
+### `batch_anomaly_score`
+
+```python
+batch_anomaly_score(packed, data, row_ids) -> Array
+```
+
+Anomaly scores for multiple rows in one JIT call. Evaluates average log predictive probability across all observed columns per row, then applies a sigmoid transform.
+
+**Returns**: `Array (len(row_ids),)` with anomaly scores in [0, 1]. Higher = more anomalous.
+
+### `batch_row_typicality`
+
+```python
+batch_row_typicality(packed_states, row_ids) -> Array
+```
+
+Structural typicality scores for multiple rows. Measures how well each row fits its assigned cluster(s), averaged over views and posterior states.
+
+**Args**: `packed_states` is a list of `PackedCrossCatState` (MCMC samples).
+
+**Returns**: `Array (len(row_ids),)` with typicality in [0, 1]. Lower = more atypical.
+
+### `batch_impute_column`
+
+```python
+batch_impute_column(rng_key, packed, data, query_col, row_ids, *, n_samples=100) -> tuple[Array, Array]
+```
+
+Impute a column for multiple rows in one JIT call. Draws posterior predictive samples per row using that row's cluster assignment.
+
+**Returns**: `(point_estimates, confidences)`, each shape `(len(row_ids),)`.
+
+### `batch_classify_column`
+
+```python
+batch_classify_column(packed, data, target_col, candidate_vals, row_ids) -> Array
+```
+
+Batch classification: log P(target_col=v | row) for all rows and candidate values. Double-vmapped over rows and values.
+
+**Returns**: `Array (len(row_ids), len(candidate_vals))` with log probabilities.
+
+### `batch_score_columns_binary`
+
+```python
+batch_score_columns_binary(packed, data, col_indices, row_id) -> Array
+```
+
+Compute P(col=1 | row) for multiple binary columns in one JIT call. Designed for inpainting: score all missing pixels at once.
+
+**Returns**: `Array (len(col_indices),)` with P(col=1 | row) in [0, 1].
+
+### `batch_row_similarity`
+
+```python
+batch_row_similarity(packed_states, row_ids) -> Array
+```
+
+Pairwise similarity matrix for multiple rows. Similarity is the probability that two rows share the same cluster, averaged over views and posterior states.
+
+**Args**: `packed_states` is a list of `PackedCrossCatState`.
+
+**Returns**: Symmetric `Array (N, N)` with similarity in [0, 1]. Diagonal is 1.0.
+
+### `batch_predictive_cdf`
+
+```python
+batch_predictive_cdf(rng_key, packed, data, query_col, query_val, row_ids, *, n_samples=1000) -> Array
+```
+
+Posterior predictive CDF P(X <= query_val | row) for multiple rows in one JIT call.
+
+**Returns**: `Array (len(row_ids),)` with CDF values in [0, 1].
+
+### `batch_credible_interval`
+
+```python
+batch_credible_interval(rng_key, packed, data, query_col, row_ids, *, n_samples=1000, ci_level=0.90) -> tuple[Array, Array, Array]
+```
+
+Credible intervals for multiple rows in one JIT call. Draws posterior predictive samples per row and computes percentile-based CI.
+
+**Returns**: `(medians, lower_bounds, upper_bounds)`, each shape `(len(row_ids),)`.

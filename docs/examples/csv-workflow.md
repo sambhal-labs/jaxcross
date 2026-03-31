@@ -107,33 +107,36 @@ print(f"Std: {jnp.std(samples[:, 0]):.0f}")
 ## 7. Anomaly Detection
 
 ```python
-from crosscat import predictive_anomalousness
+from crosscat import batch_anomaly_score
+import numpy as np
+
+packed = pack_state(best)
+
+# Score all rows in one vectorized call (no Python loop)
+key, subkey = jax.random.split(key)
+scores = batch_anomaly_score(packed, data, jnp.arange(data.shape[0]))
 
 print("\nTop anomalous rows:")
-scores = []
-for row_id in range(data.shape[0]):
-    key, subkey = jax.random.split(key)
-    s = predictive_anomalousness(subkey, best, data, query_row=row_id)
-    scores.append(float(s))
-
-import numpy as np
-top5 = np.argsort(scores)[-5:][::-1]
+top5 = np.argsort(np.array(scores))[-5:][::-1]
 for idx in top5:
-    print(f"  Row {idx}: score={scores[idx]:.3f}")
+    print(f"  Row {idx}: score={float(scores[idx]):.3f}")
 ```
 
 ## 8. Imputation
 
 ```python
-from crosscat import impute_and_confidence
+from crosscat import batch_impute_column
 
-# Find missing values and impute them
+# Impute missing values column-by-column (vectorized over rows)
 for col in range(data.shape[1]):
     nan_rows = jnp.where(jnp.isnan(data[:, col]))[0]
-    for row in nan_rows[:3]:  # first 3 missing per column
+    if len(nan_rows) > 0:
         key, subkey = jax.random.split(key)
-        value, conf = impute_and_confidence(subkey, best, data, query_col=col)
-        print(f"  {col_names[col]}[row={int(row)}]: {value:.2f} (conf={conf:.2f})")
+        values, confs = batch_impute_column(
+            subkey, packed, data, query_col=col, row_ids=nan_rows[:3]
+        )
+        for i, row in enumerate(nan_rows[:3]):
+            print(f"  {col_names[col]}[row={int(row)}]: {float(values[i]):.2f} (conf={float(confs[i]):.2f})")
 ```
 
 ## 9. Save the Model
