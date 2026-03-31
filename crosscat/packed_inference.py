@@ -470,9 +470,9 @@ def _packed_estimate_mi_sample(
         lp_x_all = _logp_all_clusters_i(x)
         lp_y_all = _logp_all_clusters_j(y)
 
-        log_px = jnp.logsumexp(log_cluster_weights + lp_x_all)
-        log_py = jnp.logsumexp(log_cluster_weights + lp_y_all)
-        log_pxy = jnp.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
+        log_px = jax.scipy.special.logsumexp(log_cluster_weights + lp_x_all)
+        log_py = jax.scipy.special.logsumexp(log_cluster_weights + lp_y_all)
+        log_pxy = jax.scipy.special.logsumexp(log_cluster_weights + lp_x_all + lp_y_all)
 
         mi_samples.append(float(log_pxy - log_px - log_py))
 
