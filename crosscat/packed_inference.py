@@ -182,6 +182,41 @@ def packed_classify_column(
     return jax.vmap(_score_val)(candidate_vals)
 
 
+def batch_classify_column(
+    packed: PackedCrossCatState,
+    data: Array,
+    target_col: int,
+    candidate_vals: Array,
+    row_ids: Array,
+) -> Array:
+    """Batch classification: log P(target_col=v | row) for all rows and values.
+
+    Double-vmapped: over rows (cluster weights vary) and over candidate values.
+    After one-time JIT compilation, classifies all rows in a single GPU call.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        target_col: Column index to classify.
+        candidate_vals: 1D array of candidate values, shape (n_candidates,).
+        row_ids: 1D array of row indices, shape (n_rows,).
+
+    Returns:
+        Array of shape (n_rows, n_candidates) with log probabilities.
+    """
+    view_idx = int(packed.column_assignments[target_col])
+
+    def _classify_one_row(row_id):
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _score_val(v):
+            return _logp_one_column_mixture(packed, view_idx, target_col, v, weights)
+
+        return jax.vmap(_score_val)(candidate_vals)
+
+    return jax.vmap(_classify_one_row)(row_ids)
+
+
 def packed_predictive_probability(
     packed: PackedCrossCatState,
     data: Array,
