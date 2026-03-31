@@ -64,6 +64,7 @@ from crosscat.packed import (
     unpack_state,
 )
 from crosscat.packed_inference import (
+    batch_classify_column,
     multi_chain_anomaly_score,
     multi_chain_impute_and_confidence,
     multi_chain_predictive_cdf,
@@ -194,6 +195,7 @@ __all__ = [
     "multi_chain_predictive_probability",
     "multi_chain_predictive_sample",
     # Packed inference
+    "batch_classify_column",
     "packed_classify_column",
     "packed_anomaly_score",
     "packed_column_typicality",
