@@ -455,6 +455,192 @@ def batch_impute_column(
     return point_ests, confidences
 
 
+def batch_row_similarity(
+    packed_states: list[PackedCrossCatState],
+    row_ids: Array,
+) -> Array:
+    """Compute pairwise similarity matrix for multiple rows.
+
+    Similarity is the probability that two rows share the same cluster,
+    averaged over views and posterior states. Fully vectorized — no Python
+    loops over row pairs.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        row_ids: 1D integer array of row indices, shape (N,).
+
+    Returns:
+        Symmetric array of shape (N, N) with similarity scores in [0, 1].
+        Diagonal is always 1.0.
+    """
+    n = len(row_ids)
+    sim_matrix = jnp.zeros((n, n))
+
+    for packed in packed_states:
+        n_views = int(packed.n_views)
+        max_views = packed.max_views
+        view_mask = jnp.arange(max_views) < n_views
+
+        # (max_views, N) — cluster assignment per view per selected row
+        assigns = packed.view_row_assignments[:, row_ids]  # (max_views, N)
+
+        # (max_views, N, N) — same cluster indicator for all pairs
+        same = (assigns[:, :, None] == assigns[:, None, :]).astype(jnp.float32)
+
+        # Mask inactive views, average over active views
+        same_masked = jnp.where(view_mask[:, None, None], same, 0.0)
+        per_state = same_masked.sum(axis=0) / jnp.maximum(n_views, 1.0)
+
+        sim_matrix = sim_matrix + per_state
+
+    return sim_matrix / jnp.maximum(len(packed_states), 1.0)
+
+
+def batch_predictive_cdf(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    query_val: Array,
+    row_ids: Array,
+    *,
+    n_samples: int = 1000,
+) -> Array:
+    """Compute posterior predictive CDF for multiple rows in one JIT call.
+
+    P(X <= query_val | row) for each row, using the row's cluster assignment.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_col: Column index.
+        query_val: Value at which to evaluate CDF.
+        row_ids: 1D integer array of row indices.
+        n_samples: Number of MC samples per row.
+
+    Returns:
+        Array of shape (len(row_ids),) with CDF values in [0, 1].
+    """
+    view_idx = int(packed.column_assignments[query_col])
+    local_idx = _find_local_col_index(packed, view_idx, query_col)
+    col_idx = query_col
+    type_id = packed.col_type_ids[col_idx]
+
+    def _cdf_one_row(key_and_id):
+        key, row_id = key_and_id
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _draw(sample_key):
+            k1, k2 = jax.random.split(sample_key)
+            log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
+            cluster = jax.random.categorical(k1, log_w)
+            return unified_sample_posterior_predictive(
+                k2,
+                type_id,
+                packed.ss_counts[view_idx, cluster, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, cluster, local_idx],
+                packed.ss_sum_x_sq[view_idx, cluster, local_idx],
+                packed.ss_cat_counts[view_idx, cluster, local_idx],
+                packed.ss_sum_sin[view_idx, cluster, local_idx],
+                packed.ss_sum_cos[view_idx, cluster, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        sample_keys = jax.random.split(key, n_samples)
+        samples = jax.vmap(_draw)(sample_keys)
+        return jnp.mean(samples <= query_val)
+
+    keys = jax.random.split(rng_key, len(row_ids))
+    return jax.vmap(_cdf_one_row)((keys, row_ids))
+
+
+def batch_credible_interval(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    row_ids: Array,
+    *,
+    n_samples: int = 1000,
+    ci_level: float = 0.90,
+) -> tuple[Array, Array, Array]:
+    """Compute credible intervals for multiple rows in one JIT call.
+
+    For each row, draws posterior predictive samples conditioned on the
+    row's cluster assignment and computes percentile-based CI.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix.
+        query_col: Column to compute CI for.
+        row_ids: 1D integer array of row indices.
+        n_samples: Number of samples per row.
+        ci_level: Credible interval level (0.90 = 90% CI).
+
+    Returns:
+        Tuple of (medians, lower_bounds, upper_bounds), each shape (len(row_ids),).
+    """
+    view_idx = int(packed.column_assignments[query_col])
+    local_idx = _find_local_col_index(packed, view_idx, query_col)
+    col_idx = query_col
+    type_id = packed.col_type_ids[col_idx]
+    tail = (1.0 - ci_level) / 2.0
+
+    def _ci_one_row(key_and_id):
+        key, row_id = key_and_id
+        weights = _cluster_weights_for_row(packed, view_idx, row_id)
+
+        def _draw(sample_key):
+            k1, k2 = jax.random.split(sample_key)
+            log_w = jnp.log(jnp.maximum(weights, LOG_EPS))
+            cluster = jax.random.categorical(k1, log_w)
+            return unified_sample_posterior_predictive(
+                k2,
+                type_id,
+                packed.ss_counts[view_idx, cluster, local_idx].astype(jnp.float32),
+                packed.ss_sum_x[view_idx, cluster, local_idx],
+                packed.ss_sum_x_sq[view_idx, cluster, local_idx],
+                packed.ss_cat_counts[view_idx, cluster, local_idx],
+                packed.ss_sum_sin[view_idx, cluster, local_idx],
+                packed.ss_sum_cos[view_idx, cluster, local_idx],
+                packed.hyper_mu[col_idx],
+                packed.hyper_r[col_idx],
+                packed.hyper_s[col_idx],
+                packed.hyper_nu[col_idx],
+                packed.hyper_dirichlet_alpha[col_idx],
+                packed.hyper_alpha[col_idx],
+                packed.hyper_beta[col_idx],
+                packed.hyper_kappa[col_idx],
+                packed.hyper_vm_a[col_idx],
+                packed.hyper_vm_mu[col_idx],
+                packed.hyper_cutpoints[col_idx],
+            )
+
+        sample_keys = jax.random.split(key, n_samples)
+        samples = jax.vmap(_draw)(sample_keys)
+        return (
+            jnp.median(samples),
+            jnp.percentile(samples, 100.0 * tail),
+            jnp.percentile(samples, 100.0 * (1.0 - tail)),
+        )
+
+    keys = jax.random.split(rng_key, len(row_ids))
+    medians, lowers, uppers = jax.vmap(_ci_one_row)((keys, row_ids))
+    return medians, lowers, uppers
+
+
 def packed_predictive_probability(
     packed: PackedCrossCatState,
     data: Array,
@@ -1001,6 +1187,7 @@ def packed_predictive_cdf(
     query_val: Array,
     *,
     n_samples: int = 10000,
+    row_id: int | None = None,
 ) -> Array:
     """Compute posterior predictive CDF: P(X <= query_val) via MC sampling.
 
@@ -1011,11 +1198,14 @@ def packed_predictive_cdf(
         query_col: Column index.
         query_val: Value at which to evaluate CDF.
         n_samples: Number of MC samples.
+        row_id: If provided, use observed row's cluster assignment.
 
     Returns:
         CDF value P(X <= query_val) in [0, 1].
     """
-    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    samples = packed_predictive_sample(
+        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
     return jnp.mean(samples[:, 0] <= query_val)
 
 
@@ -1262,6 +1452,7 @@ def packed_credible_interval(
     *,
     n_samples: int = 1000,
     ci_level: float = 0.90,
+    row_id: int | None = None,
 ) -> tuple[Array, Array, Array]:
     """Compute credible interval for a query column (packed version).
 
@@ -1274,11 +1465,14 @@ def packed_credible_interval(
         query_col: Column to compute CI for.
         n_samples: Number of samples for CI estimation.
         ci_level: Credible interval level (0.90 = 90% CI).
+        row_id: If provided, use observed row's cluster assignment.
 
     Returns:
         Tuple of (median, lower_bound, upper_bound).
     """
-    samples = packed_predictive_sample(rng_key, packed, data, [query_col], n_samples=n_samples)
+    samples = packed_predictive_sample(
+        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
     s = samples[:, 0]
 
     tail = (1.0 - ci_level) / 2.0
