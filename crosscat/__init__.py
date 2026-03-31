@@ -66,7 +66,10 @@ from crosscat.packed import (
 from crosscat.packed_inference import (
     batch_anomaly_score,
     batch_classify_column,
+    batch_credible_interval,
     batch_impute_column,
+    batch_predictive_cdf,
+    batch_row_similarity,
     batch_score_columns_binary,
     multi_chain_anomaly_score,
     multi_chain_impute_and_confidence,
@@ -200,7 +203,10 @@ __all__ = [
     # Packed inference
     "batch_anomaly_score",
     "batch_classify_column",
+    "batch_credible_interval",
     "batch_impute_column",
+    "batch_predictive_cdf",
+    "batch_row_similarity",
     "batch_score_columns_binary",
     "packed_classify_column",
     "packed_anomaly_score",
