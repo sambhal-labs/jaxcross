@@ -15,7 +15,7 @@
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
   <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
-  <a href="https://img.shields.io/badge/Maintained%3F-yes-green.svg"><img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" alt="Maintained"></a>
+  <img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" alt="Maintained">
   <a href="https://github.com/sambhal-labs/jaxcross/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/stargazers"><img src="https://img.shields.io/github/stars/sambhal-labs/jaxcross?style=social" alt="Stars"></a>
 </p>

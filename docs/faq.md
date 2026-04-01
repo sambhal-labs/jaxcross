@@ -19,7 +19,7 @@ If it shows only CPU:
 
 1. Check CUDA is installed: `nvidia-smi` should show your GPU
 2. Reinstall JAX with CUDA support: `pip install "jax[cuda13]"`
-3. Verify CUDA version compatibility — JAX 0.4+ requires CUDA 12.x or 13.x
+3. Verify CUDA version compatibility — check the [JAX installation docs](https://jax.readthedocs.io/en/latest/installation.html) for supported CUDA versions
 
 ### `ptxas` version mismatch on Kaggle / Colab
 
@@ -161,9 +161,9 @@ Yes! Use `predictive_probability` or `predictive_sample` with the target column 
 
 ```python
 # Predict column 0 given columns 1-10
-prob = predictive_probability(state, data, query_col=0, query_val=target_class,
-                              context_cols=[1,2,3,4,5,6,7,8,9,10],
-                              context_vals=new_row[1:11])
+prob = predictive_probability(state, data, query_cols=[0], query_vals=jnp.array([target_class]),
+                              condition_cols=[1,2,3,4,5,6,7,8,9,10],
+                              condition_vals=new_row[1:11])
 ```
 
 CrossCat won't match a dedicated classifier on accuracy, but it provides uncertainty estimates and works with mixed column types natively. The [MNIST benchmark](examples/mnist.md) demonstrates 79% classification accuracy on handwritten digits.

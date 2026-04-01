@@ -29,11 +29,11 @@ packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)
 
 # Impute missing values for a specific row and column
-row_idx = 5   # Row with missing data
-col_idx = 2   # Column to impute
+row_id = 5    # Row with missing data
+query_col = 2 # Column to impute
 
 value, confidence = impute_and_confidence(
-    jax.random.key(2), state, data, row_idx=row_idx, col_idx=col_idx
+    jax.random.key(2), state, data, query_col=query_col, row_id=row_id
 )
 print(f"Imputed value: {value:.2f}, Confidence: {confidence:.3f}")
 ```
@@ -44,15 +44,13 @@ print(f"Imputed value: {value:.2f}, Confidence: {confidence:.3f}")
 from crosscat import packed_impute_and_confidence
 
 value, confidence = packed_impute_and_confidence(
-    jax.random.key(2), packed, col_types, data,
-    row_idx=row_idx, col_idx=col_idx
+    jax.random.key(2), packed, data, query_col=query_col, row_id=row_id
 )
 
 # Multi-chain for more robust imputation
 from crosscat import multi_chain_impute_and_confidence
 value, confidence = multi_chain_impute_and_confidence(
-    jax.random.key(2), packed_states, col_types, data,
-    row_idx=row_idx, col_idx=col_idx
+    jax.random.key(2), packed_states, data, query_col=query_col, row_id=row_id
 )
 ```
 
@@ -63,12 +61,12 @@ For continuous columns, get a Bayesian credible interval instead of a point esti
 ```python
 from crosscat import credible_interval
 
-lower, upper = credible_interval(
+lower, median, upper = credible_interval(
     jax.random.key(3), state, data,
-    row_idx=row_idx, col_idx=col_idx,
-    alpha=0.05  # 95% credible interval
+    query_col=query_col,
+    ci_level=0.95  # 95% credible interval
 )
-print(f"95% CI: [{lower:.2f}, {upper:.2f}]")
+print(f"95% CI: [{lower:.2f}, {upper:.2f}], Median: {median:.2f}")
 ```
 
 ## Batch Imputation
@@ -86,7 +84,7 @@ for i in range(data.shape[0]):
         if np.isnan(data[i, j]):
             val, conf = impute_and_confidence(
                 jax.random.key(i * data.shape[1] + j),
-                state, data, row_idx=i, col_idx=j
+                state, data, query_col=j, row_id=i
             )
             imputed_data[i, j] = val
             confidences[i, j] = conf
