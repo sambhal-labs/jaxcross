@@ -219,23 +219,34 @@ See [Architecture Docs](https://sambhal-labs.github.io/jaxcross/architecture/ove
 ## Project Structure
 
 ```
-crosscat/
-├── types.py              # Core dataclasses: CrossCatState, ViewState, ColumnType
-├── components.py         # 5 Bayesian component models
-├── model.py              # Initialization, scoring, row insertion
-├── gibbs.py              # Collapsed Gibbs MCMC kernels
-├── inference.py          # 15 posterior predictive queries
-├── packed/               # JIT-compiled packed state path
-│   ├── state.py          #   Pack/unpack, batching, multi-chain
-│   ├── components.py     #   Unified type-dispatched scoring
-│   ├── kernels.py        #   Vectorized Gibbs kernels
-│   └── suffstats.py      #   Batched sufficient statistics
-├── packed_inference.py   # 15 packed queries + 5 multi-chain wrappers
-├── constraints.py        # Column/row dependency enforcement
-├── diagnostics.py        # ARI, log-joint, held-out likelihood
-├── serialization.py      # Save/load in .jxc format
-├── synthetic.py          # Synthetic data generation
-└── data_utils.py         # CSV I/O, type detection
+crosscat/                            # Core library
+├── types.py                         #   Dataclasses: CrossCatState, ViewState, ColumnType
+├── components.py                    #   5 Bayesian component models (conjugate + grid)
+├── model.py                         #   Initialization, scoring, row insertion
+├── gibbs.py                         #   Collapsed Gibbs MCMC kernels (unpacked)
+├── inference.py                     #   15 posterior predictive queries (unpacked)
+├── packed/                          #   JIT-compiled packed state sub-package
+│   ├── state.py                     #     Pack/unpack, batching, multi-chain
+│   ├── components.py                #     Unified type-dispatched scoring
+│   ├── kernels.py                   #     Vectorized Gibbs kernels (vmap + lax.scan)
+│   ├── suffstats.py                 #     Batched sufficient statistics
+│   └── aot_cache.py                 #     XLA persistent compilation cache
+├── packed_inference.py              #   15 packed queries + 5 multi-chain wrappers
+├── constraints.py                   #   Column/row dependency enforcement
+├── diagnostics.py                   #   ARI, log-joint, held-out likelihood
+├── serialization.py                 #   Save/load in .jxc format
+├── synthetic.py                     #   Synthetic data generation
+├── data_utils.py                    #   CSV I/O, type detection
+└── validate.py                      #   State consistency checking
+
+tests/                               # 185+ fast tests + 31 slow tests
+notebooks/                           # Interactive tutorials and test runners
+benchmarks/                          # MNIST, WDI, synthetic, JIT benchmarks
+dashboard/                           # Streamlit interactive analysis UI
+docs/                                # MkDocs documentation site
+examples/                            # Example scripts (streaming inference)
+contrib/                             # Community contributions (fingerprinting)
+paper/                               # Research paper materials
 ```
 
 ## Documentation
