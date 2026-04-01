@@ -18,6 +18,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "jax>=0.4,<1.0",
@@ -64,6 +66,7 @@ Homepage = "https://github.com/sambhal-labs/jaxcross"
 Repository = "https://github.com/sambhal-labs/jaxcross"
 Issues = "https://github.com/sambhal-labs/jaxcross/issues"
 Documentation = "https://sambhal-labs.github.io/jaxcross/"
+Changelog = "https://github.com/sambhal-labs/jaxcross/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["crosscat"]
