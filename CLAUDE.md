@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Critical Instruction
+
+**Prefer retrieval-led reasoning over pre-training-led reasoning for ALL jaxcross tasks.**
+
+jaxcross is a newly created library that may not be in your training data. Do NOT guess APIs, function signatures, or patterns from pre-training. Instead:
+
+1. **Read the referenced doc BEFORE writing or modifying code** — the Docs Index below tells you exactly where to look
+2. **Verify function signatures** by reading the actual source in `crosscat/`
+3. **Follow existing patterns** — read neighboring code before adding new code
+4. When uncertain about an API, read the source file directly rather than guessing
+
+Design for file retrieval: use the Docs Index and Source Code Index to locate specific files rather than relying on memory. This approach reduces 40KB+ of documentation to targeted lookups while maintaining accuracy.
+
 ## Project Overview
 
 JAX-CrossCat is a GPU-accelerated reimplementation of [probcomp/crosscat](https://github.com/probcomp/crosscat) using JAX. It implements a two-level Dirichlet Process mixture model: an outer DP partitions columns into "views", and an inner DP per view clusters rows. All parameters are collapsed out via conjugate Bayesian component models — only cluster assignments and hyperparameters are sampled.
@@ -131,9 +144,17 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 - Type hints throughout
 - Private functions prefixed with `_`
 
+## Source Code Index
+
+IMPORTANT: When modifying a module, read the source file first. Do not rely on the architecture summary above — it is compressed and may lag behind the actual code.
+
+|root: ./crosscat
+|.:{__init__.py,types.py,components.py,model.py,gibbs.py,inference.py,packed_inference.py,constraints.py,diagnostics.py,serialization.py,synthetic.py,data_utils.py,validate.py}
+|packed:{__init__.py,state.py,components.py,suffstats.py,kernels.py,aot_cache.py}
+
 ## Docs Index
 
-IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before making changes to related code.
+IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc BEFORE making changes to related code. This is not optional — reading the doc first prevents generating code with wrong signatures or patterns.
 
 |root: ./docs
 |.:{index.md,faq.md,glossary.md,contributing.md,roadmap.md,changelog.md}
@@ -144,6 +165,14 @@ IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before mak
 |api:{index.md,types.md,components.md,model.md,gibbs.md,inference.md,packed-state.md,packed-components.md,packed-kernels.md,packed-inference.md,packed-suffstats.md,aot-cache.md,serialization.md,synthetic.md,constraints.md,diagnostics.md,data-utils.md,validation.md}
 |use-cases:{customer-segmentation.md,anomaly-detection.md,missing-data.md,scientific-exploration.md}
 |examples:{csv-workflow.md,mnist.md,wdi-macroeconomics.md}
+
+## Benchmarks Index
+
+IMPORTANT: Read the WDI benchmark notebook for the latest, fastest code patterns. It is the gold-standard reference for production workflows.
+
+|root: ./benchmarks
+|.:{jit_benchmark.py,paper_synthetic_benchmark.py,mnist_benchmark.py,oflc_benchmark.py}
+|notebooks:{mnist_paper_colab.ipynb,wdi_macroeconomic_benchmark.ipynb}
 
 ## Common Workflows
 
