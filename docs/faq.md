@@ -62,12 +62,14 @@ pip install -e .
 
 The first call to `packed_gibbs_sweep` triggers JAX's JIT (just-in-time) compilation. This is a one-time cost:
 
-| Phase | Time | Happens |
-|-------|------|---------|
-| JIT compilation | 20–60s | First sweep only |
+| Phase | Typical Time | Happens |
+|-------|-------------|---------|
+| JIT compilation | 20–60s (varies by dataset shape) | First sweep only |
 | XLA cache write | ~5s | First run only |
 | Subsequent sweeps | 4–12s each | Every sweep |
 | Cached restart | ~2s | When XLA cache exists |
+
+Times vary by dataset shape and hardware. See [benchmarks/](https://github.com/sambhal-labs/jaxcross/tree/main/benchmarks) for current numbers.
 
 The **XLA persistent cache** is auto-enabled when you import `crosscat.packed`. On subsequent runs, JIT compilation is skipped entirely.
 
@@ -177,9 +179,8 @@ Use column constraints when you have domain knowledge:
 
 ```python
 from crosscat import ensure_col_dep_constraints
-state = ensure_col_dep_constraints(key, state, data, col_types,
-    dep_constraints=[(0, 1)],    # Columns 0,1 must be together
-    indep_constraints=[(2, 3)])  # Columns 2,3 must be apart
+state = ensure_col_dep_constraints(key, state, data,
+    constraints=[(0, 1, True), (2, 3, False)])  # True=must-link, False=cannot-link
 ```
 
 ---
