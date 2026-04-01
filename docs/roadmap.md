@@ -55,6 +55,3 @@ These are areas of active interest. Priority depends on community feedback — [
 - Scalability benchmarks on public datasets
 - Tutorial notebooks for specific domains (healthcare, finance, NLP features)
 
----
-
-*Last updated: April 2026*

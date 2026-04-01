@@ -8,7 +8,7 @@ Key terms used throughout the jax-crosscat documentation.
 :   A distribution over partitions used as a prior for cluster assignments. New items join existing clusters proportionally to their size, or start a new cluster with probability proportional to the concentration parameter `alpha`. CrossCat uses CRP at two levels: one for partitioning columns into views, another (per view) for clustering rows.
 
 **Collapsed Inference**
-:   A technique where component model parameters (means, variances, etc.) are analytically integrated out, leaving only discrete cluster assignments to be sampled. This reduces the dimensionality of the sampling problem and typically improves mixing. All five component models in jax-crosscat use collapsed inference via conjugate priors.
+:   A technique where component model parameters (means, variances, etc.) are analytically integrated out, leaving only discrete cluster assignments to be sampled. This reduces the dimensionality of the sampling problem and typically improves mixing. Four of the five component models in jax-crosscat use collapsed inference via conjugate priors. The ordered logistic model uses grid integration over a latent location parameter because it lacks a conjugate prior.
 
 **Conjugate Prior**
 :   A prior distribution that, when combined with a particular likelihood, yields a posterior in the same family. For example, a Normal-Gamma prior is conjugate to a Normal likelihood. Conjugacy enables closed-form computation of marginal likelihoods and posterior predictives — the foundation of collapsed inference in CrossCat.
