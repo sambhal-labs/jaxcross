@@ -146,7 +146,7 @@ from crosscat import packed_mutual_information
 
 mi_val, linfoot = packed_mutual_information(
     packed_states, column_types,
-    col_a, col_b,
+    col_i, col_j,
     rng_key=mi_key,
     n_samples=500,
 )
