@@ -1,0 +1,31 @@
+/* Social proof / metrics bar */
+p:has(strong) + hr {
+  margin-top: 0.5em;
+}
+
+/* Feature grid cards — tighter spacing */
+.md-typeset .grid.cards > ul > li {
+  border-left: 3px solid var(--md-primary-fg-color);
+}
+
+/* Examples table — align Colab badges */
+.md-typeset table img[alt="Open In Colab"] {
+  vertical-align: middle;
+}
+
+/* CTA buttons — more prominent spacing */
+.md-typeset .md-button {
+  margin-right: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Performance table — zebra striping */
+.md-typeset table:not([class]) tbody tr:nth-child(even) {
+  background-color: var(--md-default-bg-color--lighter, rgba(0, 0, 0, 0.02));
+}
+
+/* Colab badge alignment in tables */
+.md-typeset td a > img {
+  display: inline-block;
+  vertical-align: middle;
+}
