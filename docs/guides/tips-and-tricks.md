@@ -19,7 +19,7 @@ There's no universal answer, but these guidelines work well:
 
 ```python
 from crosscat import collect_diagnostics
-diagnostics = collect_diagnostics(states)
+diagnostics = collect_diagnostics(state, data)
 # Plot diagnostics['log_joint'] over sweeps
 ```
 
@@ -39,8 +39,13 @@ for i, state in enumerate(states):
     packed_states.append(packed)
 
 # Select the best chain by log-joint
-from crosscat.packed import select_best_chain
-best = select_best_chain(packed_states, data)
+from crosscat.packed import batch_packed_states, select_best_chain
+from crosscat.packed.kernels import packed_log_joint
+import jax.numpy as jnp
+
+batched = batch_packed_states(packed_states)
+scores = jnp.array([packed_log_joint(p, data) for p in packed_states])
+best = select_best_chain(batched, scores)
 ```
 
 **When single-chain is fine**: Quick exploration, small datasets (<50 rows), or when you just need a rough answer.

@@ -31,13 +31,13 @@ state = unpack_state(packed, col_types, data=data)
 # Score all rows
 anomaly_scores = []
 for i in range(data.shape[0]):
-    score = predictive_anomalousness(state, data, row_idx=i)
+    score = predictive_anomalousness(jax.random.key(i), state, data, query_row=i)
     anomaly_scores.append(float(score))
 
 # Or use row typicality (lower = more atypical)
 typicality = []
 for i in range(data.shape[0]):
-    t = row_typicality(state, data, row_idx=i)
+    t = row_typicality([state], row_id=i)
     typicality.append(float(t))
 
 # Flag top anomalies
@@ -52,12 +52,12 @@ top_anomalies = np.argsort(scores)[-10:]  # Top 10 most anomalous
 from crosscat import packed_anomaly_score, packed_row_typicality
 
 # Score individual rows on packed state
-score = packed_anomaly_score(packed, col_types, data, row_idx=5)
-typicality = packed_row_typicality(packed, col_types, data, row_idx=5)
+score = packed_anomaly_score(jax.random.key(3), packed, data, query_row=5)
+typicality = packed_row_typicality([packed], row_id=5)
 
 # Multi-chain scoring for robust estimates
 from crosscat import multi_chain_anomaly_score
-score = multi_chain_anomaly_score(packed_states, col_types, data, row_idx=5)
+score = multi_chain_anomaly_score(jax.random.key(4), packed_states, data, query_row=5)
 ```
 
 ## Interpreting Scores

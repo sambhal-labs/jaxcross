@@ -49,9 +49,9 @@ z_matrix = dependence_matrix([state])
 # Predict churn for a new customer
 from crosscat import predictive_probability
 churn_prob = predictive_probability(
-    state, data, query_col=4, query_val=1.0,  # P(churned=1)
-    context_cols=[0, 2, 5],                     # given revenue, plan, satisfaction
-    context_vals=jnp.array([500.0, 0.0, 2.0])  # low revenue, free tier, low satisfaction
+    state, data, query_cols=[4], query_vals=jnp.array([1.0]),  # P(churned=1)
+    condition_cols=[0, 2, 5],                       # given revenue, plan, satisfaction
+    condition_vals=jnp.array([500.0, 0.0, 2.0])    # low revenue, free tier, low satisfaction
 )
 ```
 
