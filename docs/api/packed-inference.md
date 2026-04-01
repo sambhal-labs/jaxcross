@@ -33,7 +33,7 @@ Posterior predictive samples on packed state.
 ### `packed_predictive_cdf`
 
 ```python
-packed_predictive_cdf(rng_key, packed, data, query_col, query_val, *, n_samples=10000) -> Array
+packed_predictive_cdf(rng_key, packed, data, query_col, query_val, *, n_samples=10000, row_id=None) -> Array
 ```
 
 Posterior predictive CDF on packed state.
@@ -43,7 +43,7 @@ Posterior predictive CDF on packed state.
 ### `packed_credible_interval`
 
 ```python
-packed_credible_interval(rng_key, packed, data, query_col, *, n_samples=1000, ci_level=0.90) -> tuple[Array, Array, Array]
+packed_credible_interval(rng_key, packed, data, query_col, *, n_samples=1000, ci_level=0.90, row_id=None) -> tuple[Array, Array, Array]
 ```
 
 Credible interval on packed state.
@@ -53,7 +53,7 @@ Credible interval on packed state.
 ### `packed_impute_and_confidence`
 
 ```python
-packed_impute_and_confidence(rng_key, packed, data, query_col, *, n_samples=1000) -> tuple[Array, Array]
+packed_impute_and_confidence(rng_key, packed, data, query_col, *, n_samples=1000, row_id=None) -> tuple[Array, Array]
 ```
 
 Imputation with confidence on packed state.
@@ -105,7 +105,7 @@ Compute log P(target_col=v | row) for each candidate value v. Useful for classif
 ### `packed_dependence_probability`
 
 ```python
-packed_dependence_probability(packed_states, col_a, col_b) -> Array
+packed_dependence_probability(packed_states, col_i, col_j) -> Array
 ```
 
 Posterior probability that two columns are dependent.
@@ -195,7 +195,7 @@ Average anomaly score across chains.
 ### `multi_chain_impute_and_confidence`
 
 ```python
-multi_chain_impute_and_confidence(rng_key, packed_states, data, query_col, *, n_samples=1000) -> tuple[Array, Array]
+multi_chain_impute_and_confidence(rng_key, packed_states, data, query_col, *, n_samples=1000, row_id=None) -> tuple[Array, Array]
 ```
 
 Imputation with confidence averaged across chains.
