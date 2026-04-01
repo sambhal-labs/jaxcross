@@ -9,12 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/sambhal-labs/jaxcross/releases"><img src="https://img.shields.io/github/v/release/sambhal-labs/jaxcross?color=orange" alt="Release"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
   <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
-  <img src="https://img.shields.io/badge/version-0.10.1-orange.svg" alt="Version">
+  <a href="https://github.com/sambhal-labs/jaxcross/stargazers"><img src="https://img.shields.io/github/stars/sambhal-labs/jaxcross?style=social" alt="Stars"></a>
 </p>
 
 <p align="center">
