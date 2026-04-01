@@ -1,0 +1,5427 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GPU-accelerated Bayesian cross-categorization in JAX">
+      
+      
+      
+        <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/api/components/">
+      
+      
+        <link rel="prev" href="../model/">
+      
+      
+        <link rel="next" href="../gibbs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Component Models - JAX-CrossCat</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#component-models" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="JAX-CrossCat" class="md-header__button md-logo" aria-label="JAX-CrossCat" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            JAX-CrossCat
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Component Models
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sambhal-labs/jaxcross" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sambhal-labs/jaxcross
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guides/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Feature Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../use-cases/customer-segmentation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Use Cases
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/mnist/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ & Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../glossary/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="JAX-CrossCat" class="md-nav__button md-logo" aria-label="JAX-CrossCat" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    JAX-CrossCat
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sambhal-labs/jaxcross" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sambhal-labs/jaxcross
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Guides
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Feature Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/data-loading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loading & Column Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/initialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Initialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/gpu-packed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU Acceleration (Packed Path)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Querying the Posterior
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Querying the Posterior
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditional Sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/anomaly-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anomaly Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/imputation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/mutual-information/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutual Information
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/row-similarity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Row Similarity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/queries/predictive-probability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Predictive CDF & Probability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constraint Enforcement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/missing-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Missing Data Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/serialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization & Checkpointing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/multi-chain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Chain Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convergence Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/online-learning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Learning (Row Insertion)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/xla-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XLA Compilation Caching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamlit Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tips-and-tricks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tips & Tricks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Use Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/customer-segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customer Segmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/anomaly-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anomaly Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/scientific-exploration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scientific Exploration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/missing-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Missing Data Imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component Models
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Component Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#crosscat.components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NormalGamma
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NormalGamma">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirichletCategorical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DirichletCategorical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderedLogistic
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OrderedLogistic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BetaBernoulli
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BetaBernoulli">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VonMises
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VonMises">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.get_component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_component
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalgamma-continuous" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NormalGamma (Continuous)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dirichletcategorical-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirichletCategorical (Categorical)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#betabernoulli-binary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BetaBernoulli (Binary)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#orderedlogistic-ordinal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderedLogistic (Ordinal)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vonmises-cyclic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VonMises (Cyclic)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_component
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gibbs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gibbs Sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Queries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constraints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../serialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../synthetic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Synthetic Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packed-state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packed-kernels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed Kernels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packed-components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packed-inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packed-suffstats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed Suffstats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aot-cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The CrossCat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/gibbs-kernels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gibbs Kernels in Detail
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/packed-state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packed State Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Optimizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/jax-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JAX Design Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/mnist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MNIST Benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/wdi-macroeconomics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WDI Macroeconomics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/csv-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CSV End-to-End Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#crosscat.components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NormalGamma
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NormalGamma">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.NormalGamma.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirichletCategorical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DirichletCategorical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.DirichletCategorical.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderedLogistic
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OrderedLogistic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.OrderedLogistic.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BetaBernoulli
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BetaBernoulli">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.BetaBernoulli.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VonMises
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VonMises">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.sufficient_statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sufficient_statistics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.log_marginal_likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_marginal_likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.posterior_predictive_logp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        posterior_predictive_logp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.VonMises.sample_posterior_predictive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sample_posterior_predictive
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.components.get_component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_component
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalgamma-continuous" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NormalGamma (Continuous)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dirichletcategorical-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DirichletCategorical (Categorical)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#betabernoulli-binary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BetaBernoulli (Binary)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#orderedlogistic-ordinal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderedLogistic (Ordinal)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vonmises-cyclic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VonMises (Cyclic)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Helper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_component
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="component-models">Component Models<a class="headerlink" href="#component-models" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="crosscat.components" class="doc doc-heading">
+            <code>crosscat.components</code>
+
+
+<a href="#crosscat.components" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Conjugate component models for CrossCat.</p>
+<p>Each component model provides:
+- Sufficient statistic computation from data (NaN-aware)
+- Log marginal likelihood (collapsed — no per-observation parameters)
+- Posterior predictive density and sampling</p>
+<p>Original CrossCat (probcomp/crosscat) component models:
+- ContinuousComponentModel (Normal-Inverse-Gamma)  -&gt; NormalGamma
+- MultinomialComponentModel (Dirichlet-Categorical) -&gt; DirichletCategorical
+- CyclicComponentModel (Von Mises)                  -&gt; VonMises</p>
+<p>New component models for LaborLens use cases:
+- OrderedLogistic — ordinal data (wage levels I-IV)
+- BetaBernoulli — binary flags (h1b_dependent, willful_violator)</p>
+<p>All sufficient_statistics methods filter NaN values, matching the original
+CrossCat behavior where missing data is transparently skipped.</p>
+<p>NOTE: All component models use collapsed (conjugate) inference — cluster
+parameters are integrated out analytically, and only assignments and
+hyperparameters are sampled. Uncollapsed inference (Neal Algorithm 8 with
+explicit per-cluster parameters) is not implemented. This is sufficient for
+all current conjugate models.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.components.NormalGamma" class="doc doc-heading">
+            <code>NormalGamma</code>
+
+
+<a href="#crosscat.components.NormalGamma" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Normal-Gamma conjugate model for continuous data.</p>
+<p>Sufficient statistics: count, sum_x, sum_x_sq
+Hyperparameters: mu (prior mean), r (prior precision scale),
+                 s (prior variance scale), nu (prior df)</p>
+<p>Maps to original ContinuousComponentModel in cpp_code/src/.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.NormalGamma.sufficient_statistics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SufficientStats</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.NormalGamma.sufficient_statistics" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute sufficient statistics from data vector.</p>
+<p>Maps to original ContinuousComponentModel::insert_element() accumulation.
+NaN values are filtered before accumulation.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1D array of continuous observations (may contain NaN).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>SufficientStats with count, sum_x, sum_x_sq.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.NormalGamma.log_marginal_likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.NormalGamma.log_marginal_likelihood" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log marginal likelihood p(data | hypers) with parameters integrated out.</p>
+<p>Uses the Normal-Inverse-Gamma conjugate integral. The result is:
+log p(x_1..x_n | mu0, r, s, nu) =
+    -n/2 log(2pi) + 1/2 log(r/r_n)
+    + nu/2 log(nu<em>s/2) - nu_n/2 log(nu_n</em>s_n/2)
+    + gammaln(nu_n/2) - gammaln(nu/2)</p>
+
+
+<details class="where-the-posterior-parameters-are" open>
+  <summary>where the posterior parameters are</summary>
+  <p>r_n = r + n
+mu_n = (r<em>mu0 + sum_x) / r_n
+nu_n = nu + n
+nu_n</em>s_n = nu<em>s + sum_x_sq - sum_x^2/n - r_n</em>(mu_n - mu0)^2 + ...</p>
+</details>        <p>Maps to original numerics.cpp::calc_continuous_logp().</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters (mu, r, s, nu).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scalar log marginal likelihood.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.NormalGamma.posterior_predictive_logp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.NormalGamma.posterior_predictive_logp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log posterior predictive density p(x_new | data, hypers).</p>
+
+
+<details class="the-posterior-predictive-is-a-student-t-distribution" open>
+  <summary>The posterior predictive is a Student-t distribution</summary>
+  <p>x_new | data ~ t_{nu_n}(mu_n, s_n * (1 + 1/r_n))</p>
+</details>
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>New observation(s) to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Log predictive density at x.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.NormalGamma.sample_posterior_predictive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.NormalGamma.sample_posterior_predictive" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Draw samples from posterior predictive distribution.</p>
+<p>Samples from Student-t by: z ~ t_df, then x = loc + scale * z.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Array of shape (n,) with samples.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.components.DirichletCategorical" class="doc doc-heading">
+            <code>DirichletCategorical</code>
+
+
+<a href="#crosscat.components.DirichletCategorical" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Dirichlet-Categorical conjugate model for categorical data.</p>
+<p>Sufficient statistics: count, category_counts (histogram)
+Hyperparameters: dirichlet_alpha (symmetric concentration)</p>
+<p>Maps to original MultinomialComponentModel in cpp_code/src/.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.DirichletCategorical.sufficient_statistics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">n_categories</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SufficientStats</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.DirichletCategorical.sufficient_statistics" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute sufficient statistics from categorical data.</p>
+<p>NaN values are filtered before accumulation.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1D array of integer category indices (may contain NaN).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_categories</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of possible categories.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>SufficientStats with count and category_counts.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.DirichletCategorical.log_marginal_likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.DirichletCategorical.log_marginal_likelihood" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log marginal likelihood using Dirichlet-Multinomial conjugacy.</p>
+<p>log p(data | alpha) = log [B(counts + alpha) / B(alpha)]
+    = sum_k gammaln(count_k + alpha) - gammaln(N + K<em>alpha)
+      - K</em>gammaln(alpha) + gammaln(K*alpha)</p>
+<p>Maps to original numerics.cpp::calc_multinomial_logp().</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters (dirichlet_alpha).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scalar log marginal likelihood.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.DirichletCategorical.posterior_predictive_logp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.DirichletCategorical.posterior_predictive_logp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log posterior predictive probability for a category.</p>
+<p>p(x_new = k | data, alpha) = (count_k + alpha) / (N + K * alpha)</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Category index/indices to evaluate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Log predictive probability.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.DirichletCategorical.sample_posterior_predictive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.DirichletCategorical.sample_posterior_predictive" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Draw samples from posterior predictive (categorical distribution).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>suffstats</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SufficientStats
+
+
+  
+      dataclass
+   (crosscat.types.SufficientStats)" href="../types/#crosscat.types.SufficientStats">SufficientStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cluster sufficient statistics.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hypers</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ColumnHypers
+
+
+  
+      dataclass
+   (crosscat.types.ColumnHypers)" href="../types/#crosscat.types.ColumnHypers">ColumnHypers</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column hyperparameters.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Array of shape (n,) with category indices.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.components.OrderedLogistic" class="doc doc-heading">
+            <code>OrderedLogistic</code>
+
+
+<a href="#crosscat.components.OrderedLogistic" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Ordered logistic model for ordinal data.</p>
+<p>Uses a cumulative logistic link function with cutpoints:
+P(Y = k | μ, cutpoints) = σ(c_k - μ) - σ(c_{k-1} - μ)</p>
+<p>Each cluster has a location parameter μ (integrated out via grid).
+Cutpoints c₁ &lt; c₂ &lt; ... &lt; c_{K-1} are per-column hyperparameters.
+Scale σ = 1 (fixed).</p>
+<p>Prior: μ ~ N(hypers.mu, hypers.s)</p>
+<p>Sufficient statistics: count, level_counts (histogram over ordered levels)
+Hyperparameters: cutpoints, mu (prior mean), s (prior variance)</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.OrderedLogistic.sufficient_statistics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">n_levels</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SufficientStats</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.OrderedLogistic.sufficient_statistics" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute sufficient statistics from ordinal data. NaN-aware.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.OrderedLogistic.log_marginal_likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.OrderedLogistic.log_marginal_likelihood" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log marginal likelihood via grid integration over μ.</p>
+<p>Non-conjugate: integrates p(counts | μ, cutpoints) · p(μ) over μ.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.OrderedLogistic.posterior_predictive_logp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.OrderedLogistic.posterior_predictive_logp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Posterior predictive log p(x=k | data, cutpoints).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.OrderedLogistic.sample_posterior_predictive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.OrderedLogistic.sample_posterior_predictive" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Draw samples from posterior predictive over ordinal levels.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.components.BetaBernoulli" class="doc doc-heading">
+            <code>BetaBernoulli</code>
+
+
+<a href="#crosscat.components.BetaBernoulli" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Beta-Bernoulli conjugate model for binary data.</p>
+<p>Not present in original CrossCat. Added for LaborLens binary flag analysis.</p>
+<p>Sufficient statistics: count, sum_x (number of 1s)
+Hyperparameters: alpha, beta (Beta prior parameters)</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.BetaBernoulli.sufficient_statistics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SufficientStats</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.BetaBernoulli.sufficient_statistics" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute sufficient statistics from binary data. NaN-aware.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.BetaBernoulli.log_marginal_likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.BetaBernoulli.log_marginal_likelihood" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log marginal likelihood using Beta-Binomial conjugacy.</p>
+<p>log p(data | alpha, beta) = gammaln(alpha + beta) - gammaln(n + alpha + beta)
+    + gammaln(k + alpha) - gammaln(alpha)
+    + gammaln(n - k + beta) - gammaln(beta)</p>
+<p>where k = sum_x (number of 1s), n = count.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.BetaBernoulli.posterior_predictive_logp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.BetaBernoulli.posterior_predictive_logp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log posterior predictive probability for a binary outcome.</p>
+<p>p(x=1 | data) = (k + alpha) / (n + alpha + beta)</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.BetaBernoulli.sample_posterior_predictive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.BetaBernoulli.sample_posterior_predictive" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Draw samples from posterior predictive (Bernoulli).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.components.VonMises" class="doc doc-heading">
+            <code>VonMises</code>
+
+
+<a href="#crosscat.components.VonMises" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Von Mises conjugate model for circular/directional data.</p>
+<p>Maps to original CyclicComponentModel in cpp_code/src/.</p>
+<p>Data is on [0, 2*pi). The model uses a von Mises likelihood with
+conjugate prior on the mean direction.</p>
+<p>Sufficient statistics: count, sum_sin, sum_cos
+Hyperparameters:
+    kappa — likelihood concentration
+    vm_a  — prior concentration on mean direction (a in original)
+    vm_mu — prior mean direction (b in original)</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.VonMises.sufficient_statistics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SufficientStats</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.VonMises.sufficient_statistics" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute sufficient statistics from circular data. NaN-aware.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.VonMises.log_marginal_likelihood" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.VonMises.log_marginal_likelihood" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log marginal likelihood for circular data.</p>
+<p>Exact conjugate marginal obtained by integrating out the mean direction
+mu from the von Mises likelihood × von Mises prior:</p>
+<div class="language-text highlight"><pre><span></span><code>p(data | kappa, a, b) = [1/(2*pi)]^n * I_0(R) / [I_0(kappa)^n * I_0(a)]
+</code></pre></div>
+<p>where R = ||(sum_sin + a<em>sin(b), sum_cos + a</em>cos(b))|| is the posterior
+resultant length combining data with the prior contribution.</p>
+
+
+<details class="hyperparameters" open>
+  <summary>Hyperparameters</summary>
+  <p>kappa — likelihood concentration
+vm_a  — prior concentration on mean direction
+vm_mu — prior mean direction (b)</p>
+</details>        <p>See Mardia &amp; Jupp (2000), Section 5.3.
+Maps to original calc_marginal_logp in CyclicComponentModel.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.VonMises.posterior_predictive_logp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.VonMises.posterior_predictive_logp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log posterior predictive density for a circular observation.</p>
+<p>Approximation: posterior von Mises with concentration = kappa and
+mean direction from the posterior resultant vector.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.components.VonMises.sample_posterior_predictive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">suffstats</span><span class="p">:</span> <span class="n">SufficientStats</span><span class="p">,</span> <span class="n">hypers</span><span class="p">:</span> <span class="n">ColumnHypers</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#crosscat.components.VonMises.sample_posterior_predictive" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Draw samples from posterior predictive von Mises.</p>
+<p>Uses the Best-Fisher algorithm (Best &amp; Fisher, 1979) which has
+acceptance rate &gt; 50% for all kappa, replacing the previous uniform
+rejection sampler that degraded badly for small kappa and silently
+fell back to 0.0 after 1000 iterations.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.components.get_component" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_component</span><span class="p">(</span><span class="n">column_type</span><span class="p">:</span> <span class="n">ColumnType</span><span class="p">)</span></code>
+
+<a href="#crosscat.components.get_component" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the component model class for a given column type.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>Bayesian conjugate component models. Each column type uses a specific model where parameters are analytically integrated out — only sufficient statistics are stored.</p>
+<h2 id="common-interface">Common Interface<a class="headerlink" href="#common-interface" title="Permanent link">&para;</a></h2>
+<p>All component models provide four methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sufficient_statistics(data, ...)</code></td>
+<td>Compute sufficient statistics from data</td>
+</tr>
+<tr>
+<td><code>log_marginal_likelihood(suffstats, hypers)</code></td>
+<td>Log p(data | hypers) with parameters marginalized</td>
+</tr>
+<tr>
+<td><code>posterior_predictive_logp(x, suffstats, hypers)</code></td>
+<td>Log p(x_new | data, hypers)</td>
+</tr>
+<tr>
+<td><code>sample_posterior_predictive(rng_key, suffstats, hypers, n=1)</code></td>
+<td>Draw from predictive distribution</td>
+</tr>
+</tbody>
+</table>
+<h2 id="normalgamma-continuous"><code>NormalGamma</code> (Continuous)<a class="headerlink" href="#normalgamma-continuous" title="Permanent link">&para;</a></h2>
+<p>For real-valued data. Uses a Normal-Inverse-Gamma conjugate prior.</p>
+<p><strong>Hyperparameters:</strong> <code>mu</code> (prior mean), <code>r</code> (prior count), <code>s</code> (prior sum-of-squares), <code>nu</code> (prior degrees of freedom)</p>
+<p><strong>Sufficient statistics:</strong> <code>count</code>, <code>sum_x</code>, <code>sum_x_sq</code></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">NormalGamma</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">ss</span> <span class="o">=</span> <span class="n">NormalGamma</span><span class="o">.</span><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data_column</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">logp</span> <span class="o">=</span> <span class="n">NormalGamma</span><span class="o">.</span><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">pred</span> <span class="o">=</span> <span class="n">NormalGamma</span><span class="o">.</span><span class="n">posterior_predictive_logp</span><span class="p">(</span><span class="n">x_new</span><span class="p">,</span> <span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">samples</span> <span class="o">=</span> <span class="n">NormalGamma</span><span class="o">.</span><span class="n">sample_posterior_predictive</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="dirichletcategorical-categorical"><code>DirichletCategorical</code> (Categorical)<a class="headerlink" href="#dirichletcategorical-categorical" title="Permanent link">&para;</a></h2>
+<p>For unordered discrete labels (0, 1, 2, ...). Uses a Dirichlet-Categorical conjugate prior.</p>
+<p><strong>Hyperparameters:</strong> <code>dirichlet_alpha</code> (concentration per category)</p>
+<p><strong>Sufficient statistics:</strong> <code>count</code>, <code>category_counts</code></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">DirichletCategorical</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">ss</span> <span class="o">=</span> <span class="n">DirichletCategorical</span><span class="o">.</span><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data_column</span><span class="p">,</span> <span class="n">n_categories</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">logp</span> <span class="o">=</span> <span class="n">DirichletCategorical</span><span class="o">.</span><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="betabernoulli-binary"><code>BetaBernoulli</code> (Binary)<a class="headerlink" href="#betabernoulli-binary" title="Permanent link">&para;</a></h2>
+<p>For 0/1 data. Uses a Beta-Bernoulli conjugate prior.</p>
+<p><strong>Hyperparameters:</strong> <code>alpha</code> (prior successes), <code>beta</code> (prior failures)</p>
+<p><strong>Sufficient statistics:</strong> <code>count</code>, <code>category_counts</code> (counts of 0s and 1s)</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">BetaBernoulli</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">ss</span> <span class="o">=</span> <span class="n">BetaBernoulli</span><span class="o">.</span><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data_column</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">logp</span> <span class="o">=</span> <span class="n">BetaBernoulli</span><span class="o">.</span><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="orderedlogistic-ordinal"><code>OrderedLogistic</code> (Ordinal)<a class="headerlink" href="#orderedlogistic-ordinal" title="Permanent link">&para;</a></h2>
+<p>For ordered categorical data (1, 2, 3, ...). Uses a cumulative link function with grid integration over a latent location parameter. <strong>Non-conjugate</strong> — uses grid integration (default 31 points, configurable via <code>crosscat.types.ORDINAL_N_GRID</code>).</p>
+<p><strong>Hyperparameters:</strong> <code>cutpoints</code> (ordered thresholds), <code>mu</code> (latent location), <code>s</code> (prior variance)</p>
+<p><strong>Sufficient statistics:</strong> <code>count</code>, <code>category_counts</code></p>
+<p>The cumulative link function is: P(Y=k | mu, cutpoints) = sigma(c_k - mu) - sigma(c_{k-1} - mu)</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedLogistic</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">ss</span> <span class="o">=</span> <span class="n">OrderedLogistic</span><span class="o">.</span><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data_column</span><span class="p">,</span> <span class="n">n_levels</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">logp</span> <span class="o">=</span> <span class="n">OrderedLogistic</span><span class="o">.</span><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="vonmises-cyclic"><code>VonMises</code> (Cyclic)<a class="headerlink" href="#vonmises-cyclic" title="Permanent link">&para;</a></h2>
+<p>For angular/circular data in [0, 2*pi). Uses a Von Mises likelihood with conjugate prior. Sampling uses the Best-Fisher algorithm (acceptance rate &gt; 50% for all kappa).</p>
+<p><strong>Hyperparameters:</strong> <code>kappa</code> (likelihood concentration), <code>vm_a</code> (prior concentration), <code>vm_mu</code> (prior mean direction)</p>
+<p><strong>Sufficient statistics:</strong> <code>count</code>, <code>sum_sin</code>, <code>sum_cos</code></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">VonMises</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">ss</span> <span class="o">=</span> <span class="n">VonMises</span><span class="o">.</span><span class="n">sufficient_statistics</span><span class="p">(</span><span class="n">data_column</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">logp</span> <span class="o">=</span> <span class="n">VonMises</span><span class="o">.</span><span class="n">log_marginal_likelihood</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">hypers</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="helper">Helper<a class="headerlink" href="#helper" title="Permanent link">&para;</a></h2>
+<h3 id="get_component"><code>get_component</code><a class="headerlink" href="#get_component" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">get_component</span><span class="p">(</span><span class="n">column_type</span><span class="p">:</span> <span class="n">ColumnType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span>
+</span></code></pre></div>
+<p>Return the component model class for a given column type.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.components</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_component</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ColumnType</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">model_class</span> <span class="o">=</span> <span class="n">get_component</span><span class="p">(</span><span class="n">ColumnType</span><span class="o">.</span><span class="n">CONTINUOUS</span><span class="p">)</span>  <span class="c1"># returns NormalGamma</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/sambhal-labs/jaxcross" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "content.code.copy", "content.code.annotate", "content.tabs.link", "search.suggest", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
