@@ -111,11 +111,12 @@ data = initial_data
 # 2. Process incoming rows
 for i, new_batch in enumerate(data_stream):
     key = jax.random.key(i + 100)
-    packed, data = packed_insert_rows(key, packed, data, new_batch)
+    k1, k2 = jax.random.split(key)
+    packed, data = packed_insert_rows(k1, packed, data, new_batch)
 
     # Optionally refine every N batches
     if (i + 1) % 10 == 0:
-        packed = packed_gibbs_sweep(key, packed, data, n_sweeps=10)
+        packed = packed_gibbs_sweep(k2, packed, data, n_sweeps=10)
 ```
 
 ## Tips

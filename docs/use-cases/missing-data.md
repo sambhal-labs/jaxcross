@@ -98,7 +98,7 @@ Use the built-in holdout evaluation to assess imputation accuracy:
 from crosscat import random_holdout_mask, evaluate_imputation
 
 # Create a random holdout mask (10% of observed values)
-mask = random_holdout_mask(jax.random.key(99), data, holdout_frac=0.1)
+mask = random_holdout_mask(jax.random.key(99), data.shape[0], data.shape[1], holdout_fraction=0.1)
 
 # Evaluate imputation quality
 metrics = evaluate_imputation(state, data, mask, col_types)
