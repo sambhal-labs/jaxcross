@@ -8,13 +8,13 @@ version = "0.10.1"
 description = "GPU-accelerated nonparametric cross-categorization in JAX"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+license = "BUSL-1.1"
 authors = [{ name = "jax-crosscat contributors" }]
 keywords = ["bayesian", "crosscat", "dirichlet-process", "jax", "gpu", "gibbs-sampling"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",

@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/sambhal-labs/jaxcross/releases"><img src="https://img.shields.io/github/v/release/sambhal-labs/jaxcross?color=orange" alt="Release"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
+  <a href="https://mariadb.com/bsl11/"><img src="https://img.shields.io/badge/License-BSL_1.1-orange.svg" alt="License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
@@ -309,4 +309,4 @@ If you use jax-crosscat in your research, please cite the original CrossCat pape
 
 ## License
 
-[Apache 2.0](LICENSE) — free for commercial and academic use.
+[Business Source License 1.1](LICENSE) — free for non-production use (research, education, evaluation, benchmarking). Production use requires a [commercial license](mailto:contact@sambhal-labs.com). Converts to Apache 2.0 on 2030-04-01.

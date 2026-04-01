@@ -12,7 +12,7 @@ No feature engineering. No model selection. Just jaxcross.
 
 <p align="center">
   <a href="https://github.com/sambhal-labs/jaxcross/releases"><img src="https://img.shields.io/github/v/release/sambhal-labs/jaxcross?color=orange" alt="Release"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
+  <a href="https://mariadb.com/bsl11/"><img src="https://img.shields.io/badge/License-BSL_1.1-orange.svg" alt="License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
