@@ -31,7 +31,7 @@ from crosscat.packed.aot_cache import enable_xla_cache
 enable_xla_cache(cache_dir="/tmp/my_xla_cache")
 ```
 
-Default location: `~/.cache/jax/`
+Default location: `~/.cache/jaxcross/aot/`
 
 ## Pre-Compile Kernels
 
