@@ -27,6 +27,15 @@
             "command": "echo $CLAUDE_FILE_PATHS | grep -qE '(inference|packed_inference)\\.py$' && ! echo $CLAUDE_FILE_PATHS | grep -q '__init__.py' && echo 'WARN: If adding new public functions to inference modules, remember to export them in __init__.py' || true"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+commit' && git branch --show-current | grep -qE '^main$' && echo 'BLOCK: Never commit directly to main. Create a feature branch first.' && exit 1 || exit 0"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -63,6 +72,15 @@
           {
             "type": "command",
             "command": "echo $CLAUDE_FILE_PATHS | grep -q 'tests/test_' && git diff $CLAUDE_FILE_PATHS 2>/dev/null | grep -q '+.*gibbs_sweep\\|+.*n_sweeps' && ! git diff $CLAUDE_FILE_PATHS 2>/dev/null | grep -q '+.*pytest.mark.slow' && echo 'WARN: New test uses Gibbs sweeps — consider adding @pytest.mark.slow' || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo $CLAUDE_FILE_PATHS | grep -q 'packed/' && git diff $CLAUDE_FILE_PATHS 2>/dev/null | grep -qE '\\+.*PackedCrossCatState\\(' && echo 'WARN: Modifying PackedCrossCatState constructor — verify ALL construction sites in kernels.py and packed_insert_rows are updated' || true"
           }
         ]
       }
