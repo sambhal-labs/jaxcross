@@ -136,12 +136,14 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc before making changes to related code.
 
 |root: ./docs
+|.:{index.md,faq.md,glossary.md,contributing.md,roadmap.md,changelog.md}
 |getting-started:{installation.md,quickstart.md,concepts.md}
 |architecture:{overview.md,model.md,gibbs-kernels.md,packed-state.md,jax-patterns.md,performance.md}
-|guides:{data-loading.md,initialization.md,inference.md,gpu-packed.md,multi-chain.md,constraints.md,serialization.md,xla-cache.md,missing-data.md,online-learning.md,diagnostics.md,dashboard.md}
+|guides:{index.md,data-loading.md,initialization.md,inference.md,gpu-packed.md,multi-chain.md,constraints.md,serialization.md,xla-cache.md,missing-data.md,online-learning.md,diagnostics.md,dashboard.md,tips-and-tricks.md}
 |guides/queries:{predictive-probability.md,sampling.md,anomaly-detection.md,dependence.md,imputation.md,mutual-information.md,row-similarity.md}
-|api:{types.md,components.md,model.md,gibbs.md,inference.md,packed-state.md,packed-components.md,packed-kernels.md,packed-inference.md,packed-suffstats.md,aot-cache.md,serialization.md,synthetic.md,constraints.md,diagnostics.md,data-utils.md,validation.md}
-|examples:{csv-workflow.md,mnist.md}
+|api:{index.md,types.md,components.md,model.md,gibbs.md,inference.md,packed-state.md,packed-components.md,packed-kernels.md,packed-inference.md,packed-suffstats.md,aot-cache.md,serialization.md,synthetic.md,constraints.md,diagnostics.md,data-utils.md,validation.md}
+|use-cases:{customer-segmentation.md,anomaly-detection.md,missing-data.md,scientific-exploration.md}
+|examples:{csv-workflow.md,mnist.md,wdi-macroeconomics.md}
 
 ## Common Workflows
 
