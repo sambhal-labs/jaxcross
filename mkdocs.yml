@@ -77,6 +77,9 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/sambhal-labs/jaxcross
 
+extra_css:
+  - stylesheets/extra.css
+
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
@@ -109,6 +112,12 @@ nav:
     - Online Learning (Row Insertion): guides/online-learning.md
     - XLA Compilation Caching: guides/xla-cache.md
     - Streamlit Dashboard: guides/dashboard.md
+    - Tips & Tricks: guides/tips-and-tricks.md
+  - Use Cases:
+    - Customer Segmentation: use-cases/customer-segmentation.md
+    - Anomaly Detection: use-cases/anomaly-detection.md
+    - Scientific Exploration: use-cases/scientific-exploration.md
+    - Missing Data Imputation: use-cases/missing-data.md
   - API Reference:
     - api/index.md
     - Types & State: api/types.md
@@ -139,5 +148,8 @@ nav:
     - MNIST Benchmark: examples/mnist.md
     - WDI Macroeconomics: examples/wdi-macroeconomics.md
     - CSV End-to-End Workflow: examples/csv-workflow.md
+  - FAQ & Troubleshooting: faq.md
+  - Glossary: glossary.md
+  - Roadmap: roadmap.md
   - Changelog: changelog.md
   - Contributing: contributing.md

@@ -1,5 +1,7 @@
 # MNIST Paper Benchmark
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/mnist_paper_colab.ipynb)
+
 Reproduction of the MNIST experiments from [Mansinghka et al. (2016)](https://jmlr.org/papers/v17/11-392.html), Section 3.2.
 
 ## Setup

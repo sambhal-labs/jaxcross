@@ -5,7 +5,7 @@
 <h1 align="center">jax-crosscat</h1>
 
 <p align="center">
-  <strong>GPU-accelerated Bayesian structure discovery for tabular data</strong>
+  <em>Discover hidden structure in tabular data — automatically.<br/>No feature engineering. No model selection. Just jaxcross.</em>
 </p>
 
 <p align="center">
@@ -15,14 +15,30 @@
   <a href="https://github.com/sambhal-labs/jaxcross/actions"><img src="https://github.com/sambhal-labs/jaxcross/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://sambhal-labs.github.io/jaxcross/"><img src="https://img.shields.io/badge/docs-mkdocs-blue.svg" alt="Docs"></a>
   <img src="https://img.shields.io/badge/JAX-0.4+-green.svg" alt="JAX">
+  <a href="https://img.shields.io/badge/Maintained%3F-yes-green.svg"><img src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" alt="Maintained"></a>
+  <a href="https://github.com/sambhal-labs/jaxcross/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
   <a href="https://github.com/sambhal-labs/jaxcross/stargazers"><img src="https://img.shields.io/github/stars/sambhal-labs/jaxcross?style=social" alt="Stars"></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> &middot;
-  <a href="notebooks/intro_tutorial.ipynb">Interactive Tutorial</a> &middot;
   <a href="https://sambhal-labs.github.io/jaxcross/">Documentation</a> &middot;
-  <a href="benchmarks/">Benchmarks</a>
+  <a href="#use-cases">Use Cases</a> &middot;
+  <a href="benchmarks/">Benchmarks</a> &middot;
+  <a href="https://github.com/sambhal-labs/jaxcross/discussions">Community</a>
+</p>
+
+<p align="center">
+  <a href="https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
+</p>
+
+---
+
+<p align="center">
+  <strong>12x faster</strong> than sequential inference &nbsp;&middot;&nbsp;
+  <strong>5 native</strong> column types &nbsp;&middot;&nbsp;
+  <strong>93% accuracy</strong> on MNIST inpainting &nbsp;&middot;&nbsp;
+  <strong>Fully Bayesian</strong> — zero hyperparameter tuning
 </p>
 
 ---
@@ -36,6 +52,14 @@ Built on [JAX](https://github.com/jax-ml/jax) for hardware-accelerated inference
 Most clustering methods force a single partition over all columns. Real data doesn't work that way.
 
 An employee dataset might cluster by `(salary, experience)` into seniority tiers, but independently by `(commute_distance, zip_code)` into geographic regions — with no alignment between the two. CrossCat discovers these **multiple overlapping structures** automatically.
+
+## Use Cases
+
+- **Customer Segmentation** — Discover natural segments in mixed-type customer data (demographics, behavior, spend) without choosing k or encoding categories
+- **Anomaly & Fraud Detection** — Score how unusual each row is relative to the learned structure; flag outliers across heterogeneous record types
+- **Missing Data Imputation** — Fill in missing values with Bayesian confidence scores; no separate imputation pipeline needed
+- **Scientific Data Exploration** — Uncover which variables are related in genomics, economics, or sensor data without assuming a model
+- **Feature Relationship Discovery** — Build a dependence matrix showing which features carry information about each other, informing ML pipelines
 
 ## Key Capabilities
 
@@ -111,7 +135,9 @@ z_matrix = dependence_matrix([state])  # which columns are related?
 samples = predictive_sample(jax.random.key(2), state, data, query_cols=[0])
 ```
 
-> **Want the full walkthrough?** Open the **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** — covers synthetic data, inference, and 7 query types end-to-end.
+> **Want the full walkthrough?** Open the **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** in Colab — covers synthetic data, inference, and 7 query types end-to-end.
+>
+> [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb)
 
 ## Column Types
 
@@ -143,7 +169,7 @@ from crosscat import (
 )
 ```
 
-All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](docs/guides/queries/) for detailed examples.
+All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
 
 ## Performance
 
@@ -154,6 +180,20 @@ All queries are fully Bayesian — they integrate over cluster assignment uncert
 | MNIST 16x16 | 1,000 x 257 | 12s | 20 min |
 
 Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction scripts including the [MNIST paper benchmark](benchmarks/mnist_paper_colab.ipynb).
+
+## Features
+
+| Category | Details |
+|----------|---------|
+| **Column Types** | Continuous (Normal-Gamma), Categorical (Dirichlet-Categorical), Binary (Beta-Bernoulli), Ordinal (Ordered Logistic), Cyclic (Von Mises) |
+| **Inference** | Collapsed Gibbs sampling, multi-chain with best-chain selection, constraint enforcement, convergence diagnostics |
+| **GPU Acceleration** | JIT-compiled packed state, vectorized kernels via `vmap`/`lax.scan`, XLA persistent compilation cache, 12x speedup |
+| **Query API** | Predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy |
+| **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
+| **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
+| **Data Handling** | Transparent NaN (missing data), CSV I/O with auto type detection, no preprocessing needed for mixed types |
+| **Production** | Serialization (`.jxc` format), checkpointing, state validation, deterministic RNG for reproducibility |
+| **Constraints** | Column dependency enforcement (must-link / cannot-link), row clustering constraints via rejection sampling |
 
 ## Architecture
 
@@ -174,7 +214,7 @@ CrossCatState  ──pack_state()──▸  PackedCrossCatState  ──packed_gi
   (Python)                          (JAX arrays, JIT)                                                        (query-friendly)
 ```
 
-See [docs/architecture/](docs/architecture/) for deep dives into the model, kernels, and JAX patterns.
+See [Architecture Docs](https://sambhal-labs.github.io/jaxcross/architecture/overview/) for deep dives into the model, kernels, and JAX patterns.
 
 ## Project Structure
 
@@ -196,23 +236,6 @@ crosscat/
 ├── serialization.py      # Save/load in .jxc format
 ├── synthetic.py          # Synthetic data generation
 └── data_utils.py         # CSV I/O, type detection
-
-notebooks/
-├── intro_tutorial.ipynb  # Start here — full beginner walkthrough
-└── run_tests.ipynb       # Test runner for Kaggle/Colab GPU
-
-benchmarks/
-├── mnist_paper_colab.ipynb          # MNIST paper reproduction (Section 3.2)
-├── wdi_macroeconomic_benchmark.ipynb # Real-world macroeconomic data
-├── paper_synthetic_benchmark.py     # Figure 7 synthetic recovery
-└── jit_benchmark.py                 # Per-sweep timing
-
-docs/
-├── getting-started/      # Installation, quickstart, concepts
-├── guides/               # Feature guides + 7 query-specific guides
-├── api/                  # Complete API reference (18 modules)
-├── architecture/         # Model design, kernels, JAX patterns
-└── examples/             # End-to-end workflows
 ```
 
 ## Documentation
@@ -220,13 +243,21 @@ docs/
 | Resource | Description |
 |----------|-------------|
 | **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** | Hands-on notebook: data generation, inference, 7 query types |
-| **[Getting Started](docs/getting-started/)** | Installation, quickstart, core concepts |
-| **[Feature Guides](docs/guides/)** | Deep dives into every capability |
-| **[Query Guides](docs/guides/queries/)** | Dedicated guides for each query type |
-| **[API Reference](docs/api/)** | Complete function documentation (88+ functions) |
-| **[Architecture](docs/architecture/)** | Internal design, JAX patterns, performance |
+| **[Getting Started](https://sambhal-labs.github.io/jaxcross/getting-started/installation/)** | Installation, quickstart, core concepts |
+| **[Feature Guides](https://sambhal-labs.github.io/jaxcross/guides/)** | Deep dives into every capability |
+| **[Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/)** | Dedicated guides for each query type |
+| **[API Reference](https://sambhal-labs.github.io/jaxcross/api/types/)** | Complete function documentation (88+ functions) |
+| **[Architecture](https://sambhal-labs.github.io/jaxcross/architecture/overview/)** | Internal design, JAX patterns, performance |
 | **[Benchmarks](benchmarks/)** | MNIST, synthetic recovery, JIT timing |
 | **[Full Docs Site](https://sambhal-labs.github.io/jaxcross/)** | Searchable hosted documentation |
+
+## Examples
+
+| Example | Colab | Description |
+|---------|-------|-------------|
+| **[MNIST Benchmark](benchmarks/mnist_paper_colab.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/mnist_paper_colab.ipynb) | Reproduce Section 3.2 of the JMLR paper — pixel dependence, inpainting, classification |
+| **[WDI Macroeconomics](benchmarks/wdi_macroeconomic_benchmark.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb) | Real-world GDP, trade, and population data — structure discovery in economics |
+| **[Intro Tutorial](notebooks/intro_tutorial.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb) | End-to-end walkthrough: synthetic data, inference, 7 query types |
 
 ## From Source
 
@@ -238,6 +269,14 @@ uv sync --extra dev --extra gpu        # GPU (NVIDIA CUDA)
 uv run pytest                          # Run tests
 uv run ruff check . && uv run ruff format .  # Lint & format
 ```
+
+## Community
+
+- **[GitHub Discussions](https://github.com/sambhal-labs/jaxcross/discussions)** — Questions, ideas, show & tell
+- **[Issue Tracker](https://github.com/sambhal-labs/jaxcross/issues)** — Bug reports and feature requests
+- **[Contributing Guide](docs/contributing.md)** — How to contribute
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** — Our community standards
+- **[Security Policy](SECURITY.md)** — How to report vulnerabilities
 
 ## Citation
 
@@ -257,10 +296,6 @@ If you use jax-crosscat in your research, please cite the original CrossCat pape
 }
 ```
 
-## Contributing
-
-We welcome contributions. See [docs/contributing.md](docs/contributing.md) for guidelines.
-
 ## License
 
-[Apache 2.0](LICENSE)
+[Apache 2.0](LICENSE) — free for commercial and academic use.
