@@ -1,5 +1,9 @@
 name: "CodeQL"
 
+# Requires "Code scanning" to be enabled in repository settings:
+# Settings > Code security > Code scanning > Set up > Default
+# On GitHub Free, this requires the repository to be public.
+
 on:
   push:
     branches: [main]
