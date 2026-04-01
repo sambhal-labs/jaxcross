@@ -61,7 +61,7 @@ For continuous columns, get a Bayesian credible interval instead of a point esti
 ```python
 from crosscat import credible_interval
 
-lower, median, upper = credible_interval(
+median, lower, upper = credible_interval(
     jax.random.key(3), state, data,
     query_col=query_col,
     ci_level=0.95  # 95% credible interval
