@@ -1,5 +1,7 @@
 # CSV End-to-End Workflow
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb)
+
 A complete walkthrough from raw CSV data to posterior queries, using all major features.
 
 ## 1. Load Data
