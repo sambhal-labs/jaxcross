@@ -3112,7 +3112,7 @@
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">enable_xla_cache</span><span class="p">(</span><span class="n">cache_dir</span><span class="o">=</span><span class="s2">&quot;/tmp/my_xla_cache&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Default location: <code>~/.cache/jax/</code></p>
+<p>Default location: <code>~/.cache/jaxcross/aot/</code></p>
 <h2 id="pre-compile-kernels">Pre-Compile Kernels<a class="headerlink" href="#pre-compile-kernels" title="Permanent link">&para;</a></h2>
 <p>Trigger compilation of all 4 Gibbs sub-kernels for a specific data shape before your main workload:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.packed.aot_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">compile_kernels</span>

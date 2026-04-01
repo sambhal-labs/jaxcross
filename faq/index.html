@@ -3464,14 +3464,14 @@
 <thead>
 <tr>
 <th>Phase</th>
-<th>Time</th>
+<th>Typical Time</th>
 <th>Happens</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>JIT compilation</td>
-<td>20–60s</td>
+<td>20–60s (varies by dataset shape)</td>
 <td>First sweep only</td>
 </tr>
 <tr>
@@ -3491,6 +3491,7 @@
 </tr>
 </tbody>
 </table>
+<p>Times vary by dataset shape and hardware. See <a href="https://github.com/sambhal-labs/jaxcross/tree/main/benchmarks">benchmarks/</a> for current numbers.</p>
 <p>The <strong>XLA persistent cache</strong> is auto-enabled when you import <code>crosscat.packed</code>. On subsequent runs, JIT compilation is skipped entirely.</p>
 <h3 id="how-do-i-use-the-xla-compilation-cache">How do I use the XLA compilation cache?<a class="headerlink" href="#how-do-i-use-the-xla-compilation-cache" title="Permanent link">&para;</a></h3>
 <p>It's automatic! The cache activates on <code>import crosscat.packed</code>. To pre-compile all kernels for a specific data shape:</p>
@@ -3623,9 +3624,8 @@
 <li><strong>Cannot-link</strong>: "These columns should never be in the same view" (e.g., redundant encodings)</li>
 </ul>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">ensure_col_dep_constraints</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">state</span> <span class="o">=</span> <span class="n">ensure_col_dep_constraints</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">dep_constraints</span><span class="o">=</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)],</span>    <span class="c1"># Columns 0,1 must be together</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">indep_constraints</span><span class="o">=</span><span class="p">[(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)])</span>  <span class="c1"># Columns 2,3 must be apart</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">state</span> <span class="o">=</span> <span class="n">ensure_col_dep_constraints</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">constraints</span><span class="o">=</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="kc">False</span><span class="p">)])</span>  <span class="c1"># True=must-link, False=cannot-link</span>
 </span></code></pre></div>
 <hr />
 <h2 id="common-errors">Common Errors<a class="headerlink" href="#common-errors" title="Permanent link">&para;</a></h2>
