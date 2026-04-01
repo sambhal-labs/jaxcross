@@ -1,5 +1,7 @@
 # WDI Macroeconomic Benchmark
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb)
+
 A real-world benchmark analyzing World Bank Development Indicators across ~200 countries. This notebook demonstrates the full production workflow: multi-chain inference with checkpointing, dependence discovery, country-level anomaly detection, similarity clustering, holdout imputation validation, and mutual information analysis.
 
 !!! info "Notebook"
