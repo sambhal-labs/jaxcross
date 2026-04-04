@@ -57,10 +57,11 @@ categorical, binary, ordinal, cyclic), 15+ posterior inference queries,
 multi-chain MCMC with automatic chain selection, online row insertion,
 column/row dependency constraints, and persistent XLA compilation
 caching. We reproduce the key experiments from \citet{mansinghka2016crosscat}
---- including MNIST digit classification (79\% accuracy), image
-inpainting (93\% accuracy at 30\% observation), and synthetic structure
-recovery (ARI~$\geq 0.80$) --- and present new scalability results on
-macroeconomic data (217 countries $\times$ 95 indicators). The library
+--- including MNIST digit classification (93\% accuracy), image
+inpainting (93.8\% accuracy at 30\% observation), and synthetic structure
+recovery (ARI~$= 1.0$) --- and present new results on
+macroeconomic data (217 countries $\times$ 95 indicators, imputation
+$r = 0.987$). The library
 comprises ${\sim}10{,}800$ lines of Python, is validated by 241 tests
 including 33 Hypothesis property tests, and is available under the
 Business Source License~1.1.
@@ -352,8 +353,8 @@ posterior averaging.
 \label{sec:experiments}
 
 We reproduce three key experiments from \citet{mansinghka2016crosscat}
-and present new scalability and macroeconomic results. All GPU
-experiments use an NVIDIA P100 (16~GB) on Kaggle unless otherwise noted.
+and present new scalability and macroeconomic results. GPU experiments
+use NVIDIA T4 (Colab/Kaggle) and P100 (Kaggle) GPUs.
 
 \subsection{Synthetic Structure Recovery}
 \label{sec:synthetic}
@@ -417,44 +418,54 @@ Within-view dependence prob. & $\geq 0.80$ & 1.000 & \textsc{pass} \\
 Following Section~3.2 of \citet{mansinghka2016crosscat}, we apply
 \jaxcc{} to 1{,}000 stratified MNIST images (100 per digit), downsampled
 to $16 \times 16$ binary pixels (256 columns) plus a categorical digit
-label (1 column), for a total of 257 columns. We run 4 chains of 500
-Gibbs sweeps on an NVIDIA P100.
+label (1 column), for a total of 257 columns. We run 6 chains of 800
+Gibbs sweeps on 2$\times$ T4 GPUs (3 chains per device, total inference
+time 456~seconds).
 
 \paragraph{Dependence structure.} Figure~\ref{fig:mnist_zmatrix} shows
 the inferred Z-matrix. \jaxcc{} separates foreground pixels (dependent on
 the digit label) from background border pixels (independent of digit),
-reproducing Figure~13 of \citet{mansinghka2016crosscat}.
+reproducing Figure~13 of \citet{mansinghka2016crosscat}. Of 6 chains,
+5 discovered multi-view structure (2--6 views).
 
 \paragraph{Inpainting.} Given 30\% of observed pixels, \jaxcc{} predicts
-the remaining pixels with 93\% accuracy by sampling from the posterior
-predictive distribution conditioned on the observed pixels, reproducing
-Figure~14 of \citet{mansinghka2016crosscat}.
+the remaining pixels with 93.8\% accuracy by sampling from the posterior
+predictive distribution conditioned on the observed pixels
+(Figure~\ref{fig:mnist_inpainting}), reproducing Figure~14 of
+\citet{mansinghka2016crosscat}. At 10\% observation, accuracy is already
+93.1\%.
 
 \paragraph{Classification.} Using the posterior predictive to infer the
-most probable digit label, \jaxcc{} achieves 79\% classification accuracy
-on a held-out test set, competitive with linear SVMs and consistent with
-the results reported in \citet{mansinghka2016crosscat}. ROC curves per
-digit are shown in Figure~\ref{fig:mnist_roc}.
+most probable digit label via \texttt{batch\_classify\_column}, \jaxcc{}
+achieves 93.0\% classification accuracy on a held-out test set.
+SVM baselines achieve 99.9\% (linear) and 96.9\% (RBF) on the same
+split. ROC curves per digit are shown in Figure~\ref{fig:mnist_roc}.
 
 \begin{figure}[h]
 \centering
-% \includegraphics[width=0.45\textwidth]{figures/mnist_z_matrix.png}
-% \includegraphics[width=0.45\textwidth]{figures/mnist_pixel_dependence_map.png}
+\includegraphics[width=0.45\textwidth]{figures/mnist_z_matrix.png}
+\includegraphics[width=0.45\textwidth]{figures/mnist_pixel_dependence_map.png}
 \caption{(Left) Z-matrix for 257 MNIST features. Two blocks emerge: foreground
   pixels dependent on the digit label, and background pixels independent of it.
-  (Right) Spatial visualization: blue pixels are digit-dependent (foreground),
-  magenta pixels are independent (background border).
-  \textit{[Figures to be generated from MNIST notebook output.]}}
+  (Right) Spatial visualization of pixel--label dependence probability.}
 \label{fig:mnist_zmatrix}
 \end{figure}
 
 \begin{figure}[h]
 \centering
-% \includegraphics[width=0.95\textwidth]{figures/mnist_classification_roc.png}
-\caption{Per-digit ROC curves for MNIST classification. \jaxcc{} (4 chains,
-  500 sweeps) outperforms linear SVM and is competitive with RBF-kernel SVM.
-  \textit{[Figure to be generated from MNIST notebook output.]}}
+\includegraphics[width=0.95\textwidth]{figures/mnist_classification_roc.png}
+\caption{Per-digit ROC curves for MNIST classification. \jaxcc{} (6 chains,
+  800 sweeps) compared against SVM with linear and RBF kernels.}
 \label{fig:mnist_roc}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/mnist_inpainting.png}
+\caption{Pixel inpainting at 30\% observation. For each digit: original image,
+  observed pixels (cyan = missing), posterior predictive $P(\text{pixel}=1)$,
+  and thresholded prediction. Accuracy: 93.8\%.}
+\label{fig:mnist_inpainting}
 \end{figure}
 
 \subsection{World Bank Development Indicators}
@@ -467,18 +478,34 @@ environment. The data is mixed-type (continuous and categorical), with
 16.7\% missing values. We run 4 chains of 800 Gibbs sweeps (${\sim}1.09$~s/sweep
 on P100).
 
-\paragraph{Structure discovery.} The best chain discovers 6 views with
-3--10 clusters per view. The inferred view structure groups semantically
+\paragraph{Structure discovery.} Chains discover 4--6 views with
+3--10 clusters per view. The best chain (6 views) groups semantically
 coherent indicators: View~0 contains 80 demographic/health indicators,
-while smaller views isolate economic, infrastructure, and environmental
-variables.
+while smaller views isolate inflation/water (2 indicators), migration/transport
+(4), environment/economy (7), and singleton outliers.
 
-\paragraph{Dependence matrix.} The Z-matrix reveals known macroeconomic
-relationships (e.g., GDP per capita correlates with life expectancy and
-education) as well as independencies (e.g., geographic area is
-independent of income level). These results extend the health economics
-analysis from Section~3.1 of \citet{mansinghka2016crosscat} to a
-broader, more heterogeneous dataset.
+\paragraph{Dependence matrix.} The Z-matrix (Figure~\ref{fig:wdi_zmatrix})
+reveals known macroeconomic relationships: GDP per capita shows high
+mutual information with Internet access (MI$=0.41$, Linfoot$=0.75$),
+life expectancy (MI$=0.34$), and fertility rate (MI$=0.38$). Life expectancy
+and under-5 mortality are strongly coupled (MI$=0.42$).
+
+\paragraph{Imputation.} Holdout evaluation (10\% of observed cells masked)
+yields imputation correlation $r = 0.987$ with NRMSE~$= 0.81$.
+
+\paragraph{Anomaly detection.} Venezuela (typicality~$= 0.41$) is identified
+as the most atypical country, driven by extreme GDP contraction ($-27.7\%$)
+and hyperinflation (real interest rate $-89.5\%$). Most typical: Sri Lanka
+(0.97), Greece (0.96), Latvia (0.94).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/wdi_z_matrix.png}
+\caption{Z-matrix for 95 World Development Indicators (2019). Hierarchical
+  clustering reveals blocks of demographic/health, economic, and infrastructure
+  variables with clear independence between blocks.}
+\label{fig:wdi_zmatrix}
+\end{figure}
 
 \subsection{Scalability}
 \label{sec:scalability}
