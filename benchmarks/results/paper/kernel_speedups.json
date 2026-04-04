@@ -1,0 +1,27 @@
+{
+  "row_assignments": {
+    "unpacked_s": 260.5145,
+    "packed_s": 0.2761,
+    "speedup": 943.5
+  },
+  "column_hypers": {
+    "unpacked_s": 71.4523,
+    "packed_s": 0.0044,
+    "speedup": 16301.5
+  },
+  "crp_alphas": {
+    "unpacked_s": 0.6102,
+    "packed_s": 0.0011,
+    "speedup": 571.0
+  },
+  "total": {
+    "unpacked_s": 332.5771,
+    "packed_s": 0.2816,
+    "speedup": 1181.2
+  },
+  "full_sweep_3": {
+    "unpacked_s": 1082.6577,
+    "packed_s": 25.8979,
+    "speedup": 41.8
+  }
+}
