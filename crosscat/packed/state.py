@@ -148,6 +148,24 @@ class PackedCrossCatState:
         return cls(**kwargs)
 
 
+def suggest_max_clusters(n_rows: int) -> int:
+    """Suggest a ``max_clusters`` value based on dataset size.
+
+    Uses ``min(32, max(4, int(sqrt(n_rows))))``. This keeps the O(N*K) scoring
+    cost manageable at scale while allowing enough clusters for structure
+    discovery on smaller datasets.
+
+    Args:
+        n_rows: Number of rows in the dataset.
+
+    Returns:
+        Suggested ``max_clusters`` value for ``pack_state()``.
+    """
+    import math
+
+    return min(32, max(4, int(math.sqrt(n_rows))))
+
+
 # ---------------------------------------------------------------------------
 # Pack / unpack conversion
 # ---------------------------------------------------------------------------
