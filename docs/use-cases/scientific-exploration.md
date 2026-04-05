@@ -43,8 +43,8 @@ z_matrix = dependence_matrix(states)
 #   {trade_balance, FDI, exports} — trade indicators
 
 # Quantify specific relationships
-mi = mutual_information(states, col_i=0, col_j=5, n_samples=1000)
-print(f"MI between GDP and life expectancy: {mi:.3f}")
+mi, linfoot = mutual_information(states, col_i=0, col_j=5, n_samples=1000)
+print(f"MI between GDP and life expectancy: {mi:.3f} (Linfoot: {linfoot:.3f})")
 ```
 
 ## What You Get
