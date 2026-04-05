@@ -119,7 +119,7 @@ from crosscat.packed import suggest_max_clusters
 
 # Check memory for your dataset
 mem = estimate_packed_memory(data.shape[0], data.shape[1], max_clusters=16)
-print(mem['human'])  # e.g., "~45.2 MB"
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
 
 # Data-driven max_clusters suggestion
 k = suggest_max_clusters(data.shape[0])

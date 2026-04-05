@@ -27,27 +27,24 @@ Read a CSV file into a JAX array.
 ## `read_csv_chunked`
 
 ```python
-read_csv_chunked(filepath, *, chunk_size=10_000, has_header=True, nan_values=None) -> Iterator[tuple[Array, list[str]]]
+read_csv_chunked(filepath, *, chunk_size=10_000, has_header=True, nan_values=None) -> tuple[Array, list[str]]
 ```
 
-Stream a large CSV file in chunks. Each iteration yields `(chunk_array, column_names)`. Column names are read from the header once and reused for all chunks.
+Read a large CSV file in chunks to limit peak memory. Reads `chunk_size` rows at a time into NumPy, then converts to a single JAX array at the end. This avoids holding the full Python list-of-lists in memory simultaneously with the final array.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `filepath` | `str \| Path` | Path to CSV file |
-| `chunk_size` | `int` | Rows per chunk |
+| `chunk_size` | `int` | Number of rows to read per chunk (default 10,000) |
 | `has_header` | `bool` | Whether first row is column names |
 | `nan_values` | `set[str] \| None` | Additional strings to treat as NaN |
 
-**Returns**: Iterator of `(data_chunk, column_names)`.
+**Returns**: `(data_array, column_names)` — same as `read_csv`, but with bounded peak memory.
 
 ```python
 from crosscat import read_csv_chunked
 
-chunks = []
-for chunk, col_names in read_csv_chunked("large_data.csv", chunk_size=50_000):
-    chunks.append(chunk)
-data = jnp.concatenate(chunks)
+data, col_names = read_csv_chunked("large_data.csv", chunk_size=50_000)
 ```
 
 ## `write_csv`
@@ -134,44 +131,81 @@ Write a JAX array to Parquet format. Requires `pyarrow`.
 
 ---
 
-## Arrow IPC I/O
+## Arrow IPC (Feather v2)
 
-### `read_arrow_ipc`
+Requires `pyarrow` (`pip install pyarrow`).
+
+### `save_arrow`
 
 ```python
-read_arrow_ipc(filepath) -> tuple[Array, list[str]]
+save_arrow(filepath, data, column_names=None, *, compression="lz4") -> None
 ```
 
-Read an Arrow IPC (Feather v2) file into a JAX array. Requires `pyarrow`.
+Save data array in Arrow IPC format. Faster than Parquet for read-heavy workflows.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Output path (conventionally .arrow or .feather) |
+| `data` | `Array (n_rows, n_cols)` | Data array |
+| `column_names` | `list[str] \| None` | Column names. Defaults to col_0, col_1, ... |
+| `compression` | `str` | Compression codec: `"lz4"`, `"zstd"`, or `"uncompressed"` |
+
+!!! note
+    LZ4-compressed files cannot be memory-mapped for random access. Use `compression="uncompressed"` for true memory-mapped reads via `load_arrow(memory_map=True)`.
+
+### `load_arrow`
+
+```python
+load_arrow(filepath, *, memory_map=True, columns=None) -> tuple[Array, list[str]]
+```
+
+Load data from Arrow IPC format.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Path to .arrow/.feather file |
+| `memory_map` | `bool` | If True, memory-map the file at the Arrow level |
+| `columns` | `list[str] \| None` | Optional subset of columns to load |
 
 **Returns**: `(data_array, column_names)`.
 
-### `write_arrow_ipc`
-
-```python
-write_arrow_ipc(filepath, data, column_names) -> None
-```
-
-Write a JAX array to Arrow IPC format.
-
 ---
 
-## NumPy I/O
+## NumPy Memory-Mapped I/O
 
-### `read_npy`
-
-```python
-read_npy(filepath) -> Array
-```
-
-Load a `.npy` file as a JAX array via memory mapping (`mmap_mode='r'`). Efficient for large arrays — data is loaded on demand without copying into RAM.
-
-**Returns**: JAX array.
-
-### `write_npy`
+### `save_npy`
 
 ```python
-write_npy(filepath, data) -> None
+save_npy(filepath, data, column_names=None) -> None
 ```
 
-Save a JAX array to `.npy` format.
+Save data array to uncompressed `.npy` for fast memory-mapped reloading. Column names are stored in a separate JSON sidecar file.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Output path (`.npy` suffix is used regardless of extension) |
+| `data` | `Array (n_rows, n_cols)` | Data array |
+| `column_names` | `list[str] \| None` | Optional column names (saved as JSON sidecar) |
+
+### `load_npy_mmap`
+
+```python
+load_npy_mmap(filepath, *, mmap_mode="r") -> tuple[np.ndarray, list[str] | None]
+```
+
+Load data from `.npy` file with memory-mapping for large files. Returns a **NumPy memmap**, not a JAX array. The OS pages data in on demand, so peak RAM stays low for multi-GB files.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Path to `.npy` file |
+| `mmap_mode` | `str` | NumPy mmap mode (`"r"` for read-only, `"r+"` for read-write) |
+
+**Returns**: `(numpy_memmap, column_names_or_None)`.
+
+```python
+data_np, names = load_npy_mmap("data.npy")
+batch = jnp.array(data_np[1000:2000])  # only this slice hits RAM/GPU
+```
+
+!!! warning "Deprecated aliases"
+    `save_npz` and `load_npz_mmap` are deprecated aliases that emit `DeprecationWarning`. Use `save_npy` and `load_npy_mmap` instead.

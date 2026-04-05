@@ -282,7 +282,7 @@ See the [Scaling Guide](guides/scaling.md) for full details.
 from crosscat import estimate_packed_memory
 
 mem = estimate_packed_memory(100_000, 50, max_clusters=16)
-print(mem['human'])  # e.g., "~245.3 MB"
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
 ```
 
 ### What's `InitResult` and why did `initialize()` change?
@@ -301,11 +301,13 @@ This wrapper also carries `subsample_idx` when `subsample_rows` is set.
 Use the TensorBoard logger:
 
 ```python
-from crosscat import TBLogger
+from crosscat.tb_logger import TBLogger
 
-logger = TBLogger("runs/my_experiment")
-# Pass to gibbs_sweep_early_stopping or log manually
-logger.log_scalar("log_joint", score, step=sweep)
+with TBLogger("runs/my_experiment") as tb:
+    for sweep in range(n_sweeps):
+        packed = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
+        state = unpack_state(packed, col_types, data=data)
+        tb.log_sweep(collect_diagnostics(state, data), sweep)
 ```
 
 See the [TensorBoard Guide](guides/tb-logger.md).

@@ -117,26 +117,22 @@ metadata = gen_column_metadata(data, col_types, col_names)
 
 ## Large CSV Files
 
-For CSV files too large to fit in memory at once, use chunked reading:
+For datasets that don't fit in memory as Python lists, use chunked reading. It reads `chunk_size` rows at a time into NumPy internally, then returns a single concatenated JAX array:
 
 ```python
 from crosscat import read_csv_chunked
-import jax.numpy as jnp
 
-chunks = []
-for chunk, col_names in read_csv_chunked("large_data.csv", chunk_size=50_000):
-    chunks.append(chunk)
-data = jnp.concatenate(chunks)
+data, col_names = read_csv_chunked("large_data.csv", chunk_size=50_000)
 ```
 
 ## Parquet Files
 
-Parquet is the recommended format for large datasets — columnar storage with compression:
+Parquet is the recommended format for large datasets — columnar storage with compression (requires `pip install pyarrow`):
 
 ```python
 from crosscat import read_parquet, write_parquet
 
-# Read (requires pyarrow)
+# Read
 data, col_names = read_parquet("data.parquet")
 
 # Read specific columns only
@@ -148,27 +144,29 @@ write_parquet("output.parquet", data, col_names)
 
 ## Arrow IPC Format
 
-Arrow IPC (Feather v2) provides zero-copy reads for maximum I/O speed:
+Arrow IPC (Feather v2) is faster than Parquet for read-heavy workflows (requires `pip install pyarrow`):
 
 ```python
-from crosscat import read_arrow_ipc, write_arrow_ipc
+from crosscat import save_arrow, load_arrow
 
-data, col_names = read_arrow_ipc("data.arrow")
-write_arrow_ipc("output.arrow", data, col_names)
+save_arrow("data.arrow", data, col_names, compression="lz4")
+data, col_names = load_arrow("data.arrow")
 ```
 
 ## Memory-Mapped Loading
 
-For very large numeric arrays, use NumPy memory mapping to avoid loading the full dataset into RAM:
+For multi-GB datasets, use NumPy memory-mapping to avoid loading everything into RAM. Returns a **NumPy memmap**, not a JAX array — convert slices as needed:
 
 ```python
-from crosscat import read_npy, write_npy
+from crosscat import save_npy, load_npy_mmap
+import jax.numpy as jnp
 
-# Save once
-write_npy("data.npy", data)
+# Save once (uncompressed .npy)
+save_npy("data.npy", data, col_names)
 
-# Load on demand (memory-mapped, no full copy)
-data = read_npy("data.npy")
+# Load as memory-mapped NumPy array (OS pages on demand)
+data_np, names = load_npy_mmap("data.npy")
+batch = jnp.array(data_np[0:10_000])  # only this slice hits RAM/GPU
 ```
 
 ## Format Comparison
@@ -180,13 +178,16 @@ data = read_npy("data.npy")
 | Arrow IPC | Fastest | Medium | Column-level | `pyarrow` |
 | NPY | Fast | Medium | Memory-mapped | None |
 
+!!! tip
+    For production workflows with repeated reads, save your data as `.npy` (for memory-mapping) or `.arrow` (for fast columnar access). Use Parquet for interchange with other tools.
+
 ## API Reference
 
-- [`read_csv`](../api/data-utils.md#read_csv)
+- [`read_csv`](../api/data-utils.md#read_csv) / [`write_csv`](../api/data-utils.md#write_csv)
 - [`read_csv_chunked`](../api/data-utils.md#read_csv_chunked)
-- [`read_parquet`](../api/data-utils.md#read_parquet)
-- [`read_arrow_ipc`](../api/data-utils.md#read_arrow_ipc)
-- [`read_npy`](../api/data-utils.md#read_npy)
+- [`read_parquet`](../api/data-utils.md#read_parquet) / [`write_parquet`](../api/data-utils.md#write_parquet)
+- [`save_arrow`](../api/data-utils.md#save_arrow) / [`load_arrow`](../api/data-utils.md#load_arrow)
+- [`save_npy`](../api/data-utils.md#save_npy) / [`load_npy_mmap`](../api/data-utils.md#load_npy_mmap)
 - [`guess_column_types`](../api/data-utils.md#guess_column_types)
 - [`gen_column_metadata`](../api/data-utils.md#gen_column_metadata)
 - [`discretize_column`](../api/data-utils.md#discretize_column)
