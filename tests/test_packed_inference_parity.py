@@ -55,7 +55,7 @@ def inference_setup():
     packed_states = []
     for i in range(2):
         k = jax.random.fold_in(key, i)
-        state = initialize(k, data, column_types)
+        state = initialize(k, data, column_types).state
         packed = pack_state(state)
         packed = packed_gibbs_sweep(jax.random.fold_in(key, i + 100), packed, data, n_sweeps=3)
         packed_states.append(packed)

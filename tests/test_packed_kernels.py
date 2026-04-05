@@ -42,7 +42,7 @@ def mixed_packed_state():
     ]
     result = generate_crosscat_data(key, 50, column_types, n_views=2, n_clusters=2)
     k2 = jax.random.key(43)
-    state = initialize(k2, result["data"], column_types)
+    state = initialize(k2, result["data"], column_types).state
     packed = pack_state(state, max_clusters=8, max_categories=8)
     return packed, result["data"], column_types
 
@@ -349,7 +349,7 @@ def inference_packed_state():
     ]
     result = generate_crosscat_data(key, 50, column_types, n_views=2, n_clusters=2)
     k2 = jax.random.key(701)
-    state = initialize(k2, result["data"], column_types)
+    state = initialize(k2, result["data"], column_types).state
 
     # Run a couple of Gibbs sweeps for a non-trivial clustering
     from crosscat.gibbs import gibbs_sweep
@@ -521,7 +521,7 @@ def test_cluster_budget_exhaustion():
     column_types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
     result = generate_crosscat_data(key, 20, column_types, n_views=1, n_clusters=2)
     k2 = jax.random.key(501)
-    state = initialize(k2, result["data"], column_types)
+    state = initialize(k2, result["data"], column_types).state
     packed = pack_state(state, max_clusters=3, max_categories=4)
     k3 = jax.random.key(502)
     packed_new = packed_transition_row_assignments(k3, packed, result["data"])
@@ -626,7 +626,7 @@ def test_mixed_column_types_full_sweep():
     ]
     result = generate_crosscat_data(key, 50, column_types, n_views=2, n_clusters=2)
     k2 = jax.random.key(601)
-    state = initialize(k2, result["data"], column_types)
+    state = initialize(k2, result["data"], column_types).state
     packed = pack_state(state)
     k3 = jax.random.key(602)
     packed_new = packed_gibbs_sweep(k3, packed, result["data"], n_sweeps=2)
@@ -649,7 +649,7 @@ def test_column_overflow_warning():
     column_types = [ColumnType.CONTINUOUS] * 6
     data = jax.random.normal(key, (30, 6))
     k2 = jax.random.key(701)
-    state = initialize(k2, data, column_types)
+    state = initialize(k2, data, column_types).state
 
     # Pack with max_cols_per_view=3 — should warn during column transition
     packed_small = pack_state(state, max_cols_per_view=3)

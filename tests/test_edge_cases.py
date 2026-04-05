@@ -25,7 +25,7 @@ def test_single_row_initializes():
     key = jax.random.key(1)
     data = jnp.array([[1.0, 0.0, 3.5]])
     types = [ColumnType.CONTINUOUS, ColumnType.BINARY, ColumnType.CONTINUOUS]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     assert state.n_rows == 1
     assert state.n_cols == 3
@@ -42,7 +42,7 @@ def test_single_row_packed_sweep():
     key = jax.random.key(2)
     data = jnp.array([[5.0, 1.0]])
     types = [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
     packed = pack_state(state)
 
     k1, k2 = jax.random.split(key)
@@ -74,7 +74,7 @@ def test_all_nan_column():
         ]
     )
     types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     # Should initialize without error
     assert state.n_rows == 5
@@ -97,7 +97,7 @@ def test_partial_nan_column():
         ]
     )
     types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     # Should initialize without crashing
     assert state.n_rows == 5
@@ -118,7 +118,7 @@ def test_single_column():
     key = jax.random.key(5)
     data = jnp.array([[1.0], [2.0], [3.0], [10.0], [11.0], [12.0]])
     types = [ColumnType.CONTINUOUS]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     assert state.n_cols == 1
     assert state.n_views == 1  # single column -> single view
@@ -140,7 +140,7 @@ def test_single_view_initialization():
         ]
     )
     types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
-    state = initialize(key, data, types, initialization="together")
+    state = initialize(key, data, types, initialization="together").state
 
     assert state.n_views == 1
 
@@ -165,7 +165,7 @@ def test_binary_only_dataset():
         dtype=jnp.float32,
     )
     types = [ColumnType.BINARY] * 3
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     assert jnp.isfinite(log_joint(state, data))
 
@@ -196,6 +196,6 @@ def test_cyclic_only_dataset():
         ]
     )
     types = [ColumnType.CYCLIC, ColumnType.CYCLIC]
-    state = initialize(key, data, types)
+    state = initialize(key, data, types).state
 
     assert jnp.isfinite(log_joint(state, data))

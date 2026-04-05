@@ -33,7 +33,7 @@ def simple_state(rng_key):
     col3 = jnp.where(jnp.arange(n_rows) < 50, -5.0, 5.0) + jax.random.normal(k4, (n_rows,))
     data = jnp.column_stack([col0, col1, col2, col3])
     column_types = [ColumnType.CONTINUOUS] * 4
-    state = initialize(rng_key, data, column_types)
+    state = initialize(rng_key, data, column_types).state
     return state, data, column_types
 
 
@@ -133,7 +133,7 @@ def run_multi_chain_with_diagnostics(data, column_types, *, n_chains=4, n_sweeps
         is a list of lists: all_diagnostics[chain][sweep] = diagnostics dict.
     """
     key = jax.random.key(seed)
-    init_states = initialize(key, data, column_types, n_chains=n_chains)
+    init_states = initialize(key, data, column_types, n_chains=n_chains).state
     all_diagnostics = []
     final_states = []
     diag_interval = max(1, n_sweeps // 5)

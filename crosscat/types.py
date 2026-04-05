@@ -191,3 +191,21 @@ class CrossCatState:
     def n_views(self) -> int:
         """Number of active views (column groups)."""
         return len(self.views)
+
+
+@dataclass(frozen=True)
+class InitResult:
+    """Result of ``initialize()`` — wraps state(s) with optional subsample info.
+
+    Always returned by ``initialize()``, regardless of whether subsampling
+    is used. This avoids polymorphic return types that change based on
+    runtime parameters.
+
+    Attributes:
+        state: Single CrossCatState (n_chains=1) or list of states (n_chains>1).
+        subsample_idx: Row indices used for subsampling, or None if full data
+            was used. Shape ``(subsample_rows,)`` when set.
+    """
+
+    state: CrossCatState | list[CrossCatState]
+    subsample_idx: Array | None = None

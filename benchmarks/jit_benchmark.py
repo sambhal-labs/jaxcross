@@ -109,7 +109,7 @@ def main():
     # Initialize state
     key = jax.random.key(0)
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, data, column_types)
+    state = initialize(k1, data, column_types).state
     # Warm up with a few sweeps
     state = gibbs_sweep(k2, state, data, n_sweeps=3)
     packed = pack_state(state)
@@ -200,7 +200,7 @@ def main():
     )
     cyclic_data = cyclic_result["data"]
     k_cyc = jax.random.key(790)
-    cyclic_state = initialize(k_cyc, cyclic_data, cyclic_types)
+    cyclic_state = initialize(k_cyc, cyclic_data, cyclic_types).state
     cyclic_packed = pack_state(cyclic_state)
     t_cyc, _ = time_fn(
         packed_gibbs_sweep, jax.random.key(791), cyclic_packed, cyclic_data, n_sweeps=3

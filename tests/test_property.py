@@ -295,7 +295,7 @@ def test_pack_unpack_roundtrip_continuous(seed):
     col_types = [ColumnType.CONTINUOUS] * n_cols
 
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, data, col_types)
+    state = initialize(k1, data, col_types).state
     packed = pack_state(state)
     recovered = unpack_state(packed, col_types, data=data)
 
@@ -322,7 +322,7 @@ def test_pack_unpack_preserves_hypers(seed):
     data = jax.random.normal(key, (n_rows, n_cols))
     col_types = [ColumnType.CONTINUOUS] * n_cols
 
-    state = initialize(key, data, col_types)
+    state = initialize(key, data, col_types).state
     packed = pack_state(state)
     recovered = unpack_state(packed, col_types, data=data)
 
@@ -352,7 +352,7 @@ def test_pack_unpack_mixed_types(seed):
         ColumnType.BINARY,
     ]
 
-    state = initialize(key, data, col_types)
+    state = initialize(key, data, col_types).state
     packed = pack_state(state)
     recovered = unpack_state(packed, col_types, data=data)
 
@@ -920,7 +920,7 @@ def test_serialize_deserialize_roundtrip(seed, tmp_path_factory):
     column_types = [ColumnType.CONTINUOUS, ColumnType.BINARY, ColumnType.CONTINUOUS]
     data = data.at[:, 1].set(jnp.where(data[:, 1] > 0, 1.0, 0.0))
 
-    state = initialize(key, data, column_types)
+    state = initialize(key, data, column_types).state
     packed = pack_state(state)
 
     path = tmp_path_factory.mktemp("ser") / f"test_{seed}.jxc"
@@ -954,7 +954,7 @@ def test_initialize_valid_assignments(seed):
     data = jax.random.normal(key, (20, 4))
     column_types = [ColumnType.CONTINUOUS] * 4
 
-    state = initialize(key, data, column_types)
+    state = initialize(key, data, column_types).state
 
     # Column assignments cover all views
     assert state.n_views == len(state.views)
@@ -976,7 +976,7 @@ def test_pack_unpack_preserves_assignments(seed):
     data = jax.random.normal(key, (25, 3))
     column_types = [ColumnType.CONTINUOUS] * 3
 
-    state = initialize(key, data, column_types)
+    state = initialize(key, data, column_types).state
     packed = pack_state(state)
     recovered = unpack_state(packed, column_types, data=data)
 

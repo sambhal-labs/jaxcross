@@ -51,7 +51,7 @@ class InferenceEngine:
 
         # Initialize from the prior with a fixed seed for reproducibility
         rng_key = jax.random.key(42)
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
 
         self.packed: PackedCrossCatState = pack_state(
             state,

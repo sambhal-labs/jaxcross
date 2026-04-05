@@ -42,7 +42,7 @@ class TestCRPAlphaGrid:
         from crosscat.gibbs import transition_crp_alphas
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
 
         # Run many CRP alpha transitions and collect sampled values
         alphas_col = []
@@ -84,7 +84,7 @@ class TestSingletonViewHandling:
         column_types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
 
         key = rng_key
-        state = initialize(key, data, column_types, initialization="apart")
+        state = initialize(key, data, column_types, initialization="apart").state
 
         # Both columns should be in separate views (apart initialization)
         assert len(state.views) == 2, "Expected 2 views with 'apart' initialization"
@@ -101,7 +101,7 @@ class TestSingletonViewHandling:
         from crosscat.gibbs import transition_column_assignments
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
 
         # Run many column transitions and track new view alphas
         new_view_alphas = set()
@@ -128,7 +128,7 @@ class TestNormalGammaRSampling:
         from crosscat.gibbs import transition_column_hypers
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
 
         r_values = set()
         key = rng_key
@@ -149,7 +149,7 @@ class TestNormalGammaRSampling:
         from crosscat.gibbs import gibbs_sweep
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
 
         key, subkey = jax.random.split(rng_key)
         state = gibbs_sweep(subkey, state, data, n_sweeps=10)
@@ -179,7 +179,7 @@ class TestDependenceProbability:
         states = []
         for i in range(5):
             key = jax.random.fold_in(rng_key, i)
-            s = initialize(key, data, column_types, initialization="together")
+            s = initialize(key, data, column_types, initialization="together").state
             states.append(s)
 
         dp = dependence_probability(states, 0, 1)
@@ -201,7 +201,7 @@ class TestDependenceProbability:
         states = []
         for i in range(5):
             key = jax.random.fold_in(rng_key, i)
-            s = initialize(key, data, column_types)
+            s = initialize(key, data, column_types).state
             states.append(s)
 
         z = dependence_matrix(states)
@@ -232,7 +232,7 @@ class TestDependenceProbability:
         packed_states = []
         for i in range(5):
             key = jax.random.fold_in(rng_key, i)
-            s = initialize(key, data, column_types)
+            s = initialize(key, data, column_types).state
             states.append(s)
             packed_states.append(pack_state(s))
 
@@ -254,7 +254,7 @@ class TestOptionalRecomputeSuffstats:
         from crosscat.packed import pack_state, packed_transition_row_assignments
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
         packed = pack_state(state)
 
         key, subkey = jax.random.split(rng_key)
@@ -267,7 +267,7 @@ class TestOptionalRecomputeSuffstats:
         from crosscat.packed.kernels import packed_transition_row_assignments
 
         data, column_types = simple_continuous_data
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
         packed = pack_state(state)
 
         key, subkey = jax.random.split(rng_key)

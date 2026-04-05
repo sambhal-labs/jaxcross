@@ -97,7 +97,7 @@ print("Phase 1: Initial Training")
 print("-" * 60)
 
 key, k_init, k_sweep = jax.random.split(key, 3)
-state = initialize(k_init, data, column_types)
+state = initialize(k_init, data, column_types).state
 packed = pack_state(state, max_views=8, max_clusters=16)
 
 t0 = time.time()
