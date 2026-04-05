@@ -1006,8 +1006,9 @@ def packed_transition_row_assignments_parallel(
 
         # Score each row with its own contribution removed (leave-one-out)
         def score_one_row(row_data, old_cluster):
-            # Remove this row from counts (CRP prior correction)
-            adj_counts = counts.at[old_cluster].add(-1.0)
+            # Remove this row from counts (CRP prior correction).
+            # Clamp to 0 to prevent NaN from log(-1) on inactive view padding.
+            adj_counts = jnp.maximum(counts.at[old_cluster].add(-1.0), 0.0)
 
             # Remove this row from suffstats
             ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = _remove_row_from_suffstats(
