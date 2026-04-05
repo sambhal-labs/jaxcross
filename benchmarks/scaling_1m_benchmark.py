@@ -149,7 +149,7 @@ def benchmark_minibatch_throughput(key, n_rows=1_000_000, n_cols=20, n_sweeps=5)
     # Time mini-batch sweeps
     t0 = time.perf_counter()
     full_packed = minibatch_gibbs_sweep(
-        k3, full_packed, data, batch_size=10_000, n_sweeps=n_sweeps
+        k3, full_packed, current_data, batch_size=10_000, n_sweeps=n_sweeps
     )
     full_packed.column_assignments.block_until_ready()
     total = time.perf_counter() - t0
