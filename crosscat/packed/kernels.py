@@ -950,6 +950,138 @@ def packed_transition_row_assignments_minibatch(
 
 
 # ---------------------------------------------------------------------------
+# Parallel row assignment kernel (vmap over rows)
+# ---------------------------------------------------------------------------
+
+
+@jax.jit
+def packed_transition_row_assignments_parallel(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+) -> PackedCrossCatState:
+    """Batch-parallel Gibbs sweep: scores ALL rows simultaneously via vmap.
+
+    Instead of sequential lax.scan (one row at a time with suffstat updates),
+    this kernel scores all N rows against the SAME current sufficient statistics
+    in parallel using vmap, then samples new assignments for all rows at once.
+    Suffstats are recomputed from scratch afterward.
+
+    Tradeoffs vs sequential kernel:
+    - Much faster on GPU (full parallelism, no sequential dependency)
+    - Slightly different convergence (rows don't see each other's updates
+      within a sweep — similar to "synchronous Gibbs")
+    - Best for large N where GPU parallelism dominates
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+
+    Returns:
+        Updated PackedCrossCatState with new row assignments and suffstats.
+    """
+    n_rows = packed.n_rows
+    max_c = packed.max_clusters
+    max_views = packed.max_views
+
+    view_keys = jax.random.split(rng_key, max_views)
+
+    def process_one_view(carry, v_idx):
+        ra_all, nc_all = carry
+        is_active = packed.view_mask[v_idx]
+        col_indices = packed.view_column_indices[v_idx]
+        n_columns = packed.view_n_columns[v_idx]
+        alpha = packed.view_row_crp_alpha[v_idx]
+        dom_type = _compute_dominant_type(col_indices, packed.col_type_ids, n_columns)
+
+        assigns = ra_all[v_idx]
+
+        # Current cluster counts
+        counts = jnp.bincount(assigns, length=max_c).astype(jnp.int32)
+
+        # Score ALL rows against current suffstats in parallel
+        def score_one_row(row_data):
+            return _score_row_all_clusters(
+                row_data,
+                col_indices,
+                n_columns,
+                packed.col_type_ids,
+                counts,
+                packed.ss_counts[v_idx],
+                packed.ss_sum_x[v_idx],
+                packed.ss_sum_x_sq[v_idx],
+                packed.ss_cat_counts[v_idx],
+                packed.ss_sum_sin[v_idx],
+                packed.ss_sum_cos[v_idx],
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_a,
+                packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
+                alpha,
+                max_c,
+                dominant_type=dom_type,
+            )
+
+        all_log_probs = jax.vmap(score_one_row)(data)  # (n_rows, max_c + 1)
+
+        # Block new cluster if budget exhausted
+        n_cl = nc_all[v_idx]
+        budget_exhausted = n_cl >= (max_c - 1)
+        all_log_probs = all_log_probs.at[:, max_c].set(
+            jnp.where(budget_exhausted, -jnp.inf, all_log_probs[:, max_c])
+        )
+
+        # Normalize and sample all rows in parallel
+        all_log_probs = all_log_probs - jnp.max(all_log_probs, axis=1, keepdims=True)
+        row_keys = jax.random.split(view_keys[v_idx], n_rows)
+        chosen = jax.vmap(jax.random.categorical)(row_keys, all_log_probs)  # (n_rows,)
+
+        # Handle new cluster assignments
+        is_new = chosen == max_c
+        # Find free slots via counts
+        free_slot = jnp.argmin(counts)
+        new_assigns = jnp.where(is_new, free_slot, chosen).astype(jnp.int32)
+
+        # Compact cluster IDs
+        compacted, compacted_n_cl = _compact_clusters(new_assigns, n_rows, max_c)
+
+        new_ra = jnp.where(is_active, compacted, ra_all[v_idx])
+        new_nc = jnp.where(is_active, compacted_n_cl, nc_all[v_idx])
+        ra_all = ra_all.at[v_idx].set(new_ra)
+        nc_all = nc_all.at[v_idx].set(new_nc)
+
+        return (ra_all, nc_all), None
+
+    init_carry = (jnp.array(packed.view_row_assignments), jnp.array(packed.view_n_clusters))
+    (new_row_assigns, new_n_clusters), _ = jax.lax.scan(
+        process_one_view, init_carry, jnp.arange(max_views)
+    )
+
+    updated = PackedCrossCatState(
+        **{
+            name: (
+                new_row_assigns
+                if name == "view_row_assignments"
+                else new_n_clusters
+                if name == "view_n_clusters"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+    return recompute_all_suffstats(updated, data)
+
+
+# ---------------------------------------------------------------------------
 # Column hypers kernel (JIT-compatible via vmap)
 # ---------------------------------------------------------------------------
 
