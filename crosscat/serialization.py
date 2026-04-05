@@ -9,7 +9,11 @@ No external dependencies beyond ``json`` and ``numpy`` (both already required).
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
+import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -25,7 +29,37 @@ from crosscat.packed.state import (
 )
 from crosscat.types import ColumnType, CrossCatState
 
+logger = logging.getLogger(__name__)
+
 _SCHEMA_VERSION = 3
+_MIN_READER_VERSION = 3
+
+
+@contextmanager
+def _file_lock(lock_path: Path, *, shared: bool = False):
+    """Cross-platform advisory file lock (exclusive or shared).
+
+    Uses ``fcntl.flock`` on POSIX and is a no-op on Windows (where file
+    locking semantics differ and GPU workflows are uncommon).
+    """
+    try:
+        import fcntl
+    except ImportError:
+        # Windows: no fcntl, skip locking
+        yield
+        return
+
+    flag = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+    fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT)
+    try:
+        fcntl.flock(fd, flag)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+        # Clean up lock file (best-effort, may fail if another process holds it)
+        with contextlib.suppress(OSError):
+            lock_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +72,7 @@ def save_packed_state(
     path: str | Path,
     *,
     column_types: list[ColumnType] | None = None,
+    _extra_metadata: dict | None = None,
 ) -> Path:
     """Save a PackedCrossCatState to disk.
 
@@ -45,6 +80,8 @@ def save_packed_state(
         packed: The packed state to save.
         path: Directory path (a ``.jxc`` suffix is added if missing).
         column_types: Optional column types (needed to reconstruct CrossCatState later).
+        _extra_metadata: Internal — additional metadata fields written atomically
+            under the same lock (used by save_state/save_checkpoint).
 
     Returns:
         The resolved directory path.
@@ -57,20 +94,26 @@ def save_packed_state(
     # Metadata
     metadata: dict = {
         "schema_version": _SCHEMA_VERSION,
+        "min_reader_version": _MIN_READER_VERSION,
         "state_type": "packed",
     }
     for name in _STATIC_FIELDS:
         metadata[name] = int(getattr(packed, name))
     if column_types is not None:
         metadata["column_types"] = [ct.value for ct in column_types]
+    if _extra_metadata:
+        metadata.update(_extra_metadata)
 
-    with open(path / "metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2)
+    # Write under exclusive lock to prevent concurrent corruption
+    lock_path = path / ".lock"
+    with _file_lock(lock_path):
+        with open(path / "metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
 
-    # Arrays
-    arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
-    np.savez_compressed(path / "arrays.npz", **arrays)
+        arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
+        np.savez_compressed(path / "arrays.npz", **arrays)
 
+    logger.info("Saved packed state to %s (schema v%d)", path, _SCHEMA_VERSION)
     return path
 
 
@@ -95,38 +138,48 @@ def load_packed_state(
     if not path.exists():
         raise FileNotFoundError(f"No saved state at {path}")
 
-    # Metadata
-    with open(path / "metadata.json") as f:
-        metadata = json.load(f)
+    # Read under shared lock to prevent reading during concurrent writes
+    lock_path = path / ".lock"
+    with _file_lock(lock_path, shared=True):
+        # Metadata
+        with open(path / "metadata.json") as f:
+            metadata = json.load(f)
 
-    version = metadata.get("schema_version", 0)
-    if version > _SCHEMA_VERSION:
-        raise ValueError(
-            f"Unsupported schema version {version} (expected <={_SCHEMA_VERSION}). "
-            f"This state was saved with a newer version of jax-crosscat."
-        )
+        version = metadata.get("schema_version", 0)
+        min_reader = metadata.get("min_reader_version", 0)
+        if min_reader > _SCHEMA_VERSION:
+            raise ValueError(
+                f"This state requires reader version >={min_reader} but this "
+                f"installation supports <={_SCHEMA_VERSION}. Upgrade jax-crosscat."
+            )
+        if version > _SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported schema version {version} (expected <={_SCHEMA_VERSION}). "
+                f"This state was saved with a newer version of jax-crosscat."
+            )
 
-    # Arrays
-    npz = np.load(path / "arrays.npz")
-    kwargs = {}
-    for name in _ARRAY_FIELDS:
-        if name in npz:
-            kwargs[name] = jnp.array(npz[name])
-        elif name == "hyper_cutpoints":
-            # Migration from schema v1: synthesize default cutpoints (+inf padding)
-            n_cols = int(metadata["n_cols"])
-            max_cats = int(metadata["max_categories"])
-            kwargs[name] = jnp.full((n_cols, max_cats - 1), jnp.inf)
-        elif name == "hyper_n_cutpoints":
-            # Migration from schema v2: infer cutpoint counts from isfinite
-            n_cols = int(metadata["n_cols"])
-            if "hyper_cutpoints" in kwargs:
-                cp = kwargs["hyper_cutpoints"]
-                kwargs[name] = jnp.sum(jnp.isfinite(cp), axis=1).astype(jnp.int32)
+        # Arrays
+        npz = np.load(path / "arrays.npz")
+        kwargs = {}
+        for name in _ARRAY_FIELDS:
+            if name in npz:
+                kwargs[name] = jnp.array(npz[name])
+            elif name == "hyper_cutpoints":
+                # Migration from schema v1: synthesize default cutpoints (+inf padding)
+                n_cols = int(metadata["n_cols"])
+                max_cats = int(metadata["max_categories"])
+                kwargs[name] = jnp.full((n_cols, max_cats - 1), jnp.inf)
+            elif name == "hyper_n_cutpoints":
+                # Migration from schema v2: infer cutpoint counts from isfinite
+                n_cols = int(metadata["n_cols"])
+                if "hyper_cutpoints" in kwargs:
+                    cp = kwargs["hyper_cutpoints"]
+                    kwargs[name] = jnp.sum(jnp.isfinite(cp), axis=1).astype(jnp.int32)
+                else:
+                    kwargs[name] = jnp.zeros(n_cols, dtype=jnp.int32)
             else:
-                kwargs[name] = jnp.zeros(n_cols, dtype=jnp.int32)
-        else:
-            raise ValueError(f"Missing required array field '{name}' in saved state")
+                raise ValueError(f"Missing required array field '{name}' in saved state")
+
     for name in _STATIC_FIELDS:
         kwargs[name] = int(metadata[name])
 
@@ -137,6 +190,7 @@ def load_packed_state(
     if "column_types" in metadata:
         column_types = [ColumnType(v) for v in metadata["column_types"]]
 
+    logger.info("Loaded packed state from %s (schema v%d)", path, version)
     return packed, column_types
 
 
@@ -158,17 +212,12 @@ def save_state(state: CrossCatState, path: str | Path) -> Path:
         The resolved directory path.
     """
     packed = pack_state(state)
-    result = save_packed_state(packed, path, column_types=state.column_types)
-
-    # Mark as CrossCatState origin for load_state
-    meta_path = result / "metadata.json"
-    with open(meta_path) as f:
-        metadata = json.load(f)
-    metadata["state_type"] = "crosscat"
-    with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
-
-    return result
+    return save_packed_state(
+        packed,
+        path,
+        column_types=state.column_types,
+        _extra_metadata={"state_type": "crosscat"},
+    )
 
 
 def load_state(path: str | Path, data: Array | None = None) -> CrossCatState:
@@ -237,19 +286,11 @@ def save_checkpoint(
     ckpt_name = f"checkpoint_sweep_{sweep_number:06d}"
     ckpt_path = base_path / ckpt_name
 
-    result = save_packed_state(packed, ckpt_path, column_types=column_types)
-
-    # Add checkpoint-specific metadata
-    meta_path = result / "metadata.json"
-    with open(meta_path) as f:
-        metadata = json.load(f)
-    metadata["sweep_number"] = sweep_number
+    extra: dict = {"sweep_number": sweep_number}
     if log_joint_value is not None:
-        metadata["log_joint"] = float(log_joint_value)
-    with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+        extra["log_joint"] = float(log_joint_value)
 
-    return result
+    return save_packed_state(packed, ckpt_path, column_types=column_types, _extra_metadata=extra)
 
 
 def load_latest_checkpoint(

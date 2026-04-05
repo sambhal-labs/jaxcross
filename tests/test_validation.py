@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.cpu
+
 
 class TestValidation:
     def test_valid_state(self, simple_state):
