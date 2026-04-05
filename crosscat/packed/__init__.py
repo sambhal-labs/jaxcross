@@ -39,6 +39,7 @@ from crosscat.packed.state import (
     batch_packed_states,
     pack_state,
     select_best_chain,
+    suggest_max_clusters,
     unbatch_packed_states,
     unpack_state,
 )
@@ -91,6 +92,7 @@ __all__ = [
     "packed_transition_row_assignments",
     "recompute_all_suffstats",
     "select_best_chain",
+    "suggest_max_clusters",
     "unbatch_packed_states",
     "unified_log_marginal",
     "unified_posterior_predictive_logp",
