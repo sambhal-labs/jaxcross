@@ -42,7 +42,7 @@ A dataset of employees might cluster by `(salary, experience)` into seniority ti
 CrossCat models this with a **two-level Dirichlet Process**:
 
 <p align="center">
-  <img src="diagrams/two-level-dp.svg" alt="Two-Level Dirichlet Process Mixture Model" width="800" />
+  <img src="diagrams/two-level-dp.svg" alt="Two-Level Dirichlet Process Mixture Model" width="900" />
 </p>
 
 ## Use Cases
@@ -178,7 +178,8 @@ col_types = guess_column_types(data)
 
 # 2. Initialize and run inference
 key = jax.random.key(42)
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)

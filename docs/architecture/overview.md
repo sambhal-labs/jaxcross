@@ -5,13 +5,13 @@ This section explains the internal design of jax-crosscat: how the CrossCat mode
 ## Pipeline
 
 <p align="center">
-  <img src="../diagrams/architecture-pipeline.svg" alt="JAX-CrossCat Architecture" width="800" />
+  <img src="../diagrams/architecture-pipeline.svg" alt="JAX-CrossCat Architecture" width="900" />
 </p>
 
 ## Module Map
 
 <p align="center">
-  <img src="../diagrams/module-architecture.svg" alt="Module Architecture" width="800" />
+  <img src="../diagrams/module-architecture.svg" alt="Module Architecture" width="900" />
 </p>
 
 | Module | Purpose |
@@ -31,20 +31,20 @@ This section explains the internal design of jax-crosscat: how the CrossCat mode
 | `diagnostics.py` | ARI, convergence metrics, held-out evaluation |
 | `serialization.py` | Save/load states and checkpoints (`.jxc` format) |
 | `synthetic.py` | Synthetic data generation |
-| `data_utils.py` | CSV I/O, column type detection |
+| `data_utils.py` | CSV/Parquet/Arrow/NPY I/O, column type detection |
 | `validate.py` | State consistency checking |
+| `scaling.py` | Large-dataset strategies: subsample annealing, minibatch, parallel, early stopping |
+| `tb_logger.py` | TensorBoard logging for inference monitoring |
 
 ## Data Flow
 
-1. **`initialize()`** creates a `CrossCatState` by sampling from CRP priors and computing data-driven hyperparameter defaults.
+1. **`initialize()`** creates an `InitResult` wrapping a `CrossCatState` by sampling from CRP priors and computing data-driven hyperparameter defaults.
 
 2. **`pack_state()`** converts to fixed-size padded arrays for JIT compilation.
 
-3. **`packed_gibbs_sweep()`** runs compiled Gibbs kernels (row assignments → column assignments → hyperparameters → CRP alphas).
+3. **`packed_gibbs_sweep()`** runs compiled Gibbs kernels (row assignments → column assignments → hyperparameters → CRP alphas). For large datasets, use `scaling.py` alternatives (minibatch, subsample annealing, early stopping).
 
-4. **`unpack_state()`** converts back to Python-friendly state for queries and inspection.
-
-5. **Queries** read the posterior state to answer questions via mixture-weighted posterior predictives.
+4. **Packed queries** (`packed_inference.py`) run directly on the packed state — no unpacking needed. Use `unpack_state()` only if you need the unpacked `inference.py` functions or want to inspect the state structure.
 
 ## Sections
 

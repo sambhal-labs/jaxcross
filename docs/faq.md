@@ -101,9 +101,9 @@ Tune the padding parameters in `pack_state()`:
 
 ```python
 packed = pack_state(state,
-    max_views=5,        # Default: n_cols (often too large)
-    max_clusters=20,    # Default: n_rows (often too large)
-    max_categories=10,  # Default: auto-detected
+    max_views=5,        # Default: 16
+    max_clusters=20,    # Default: 32
+    max_categories=10,  # Default: 16
 )
 ```
 
@@ -126,7 +126,8 @@ It depends on dataset size and complexity:
 **Use multi-chain inference** to assess convergence:
 
 ```python
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 # Run each chain, then compare with diagnostics
 ```
 
@@ -259,3 +260,65 @@ from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 # Unpacked (slow) — only for debugging
 from crosscat import gibbs_sweep
 ```
+
+---
+
+## Scaling & Production
+
+### How do I handle datasets with 10K+ rows?
+
+Use the `crosscat.scaling` module, which provides four strategies:
+
+1. **Subsample annealing** — start small, grow progressively (`subsample_anneal`)
+2. **Mini-batch Gibbs** — update a random subset of rows per sweep (`minibatch_gibbs_sweep`)
+3. **Parallel row scoring** — `vmap` over all rows simultaneously (`parallel_gibbs_sweep`)
+4. **Early stopping** — stop when log-joint converges (`gibbs_sweep_early_stopping`)
+
+See the [Scaling Guide](guides/scaling.md) for full details.
+
+### How do I estimate GPU memory usage before packing?
+
+```python
+from crosscat import estimate_packed_memory
+
+mem = estimate_packed_memory(100_000, 50, max_clusters=16)
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
+```
+
+### What's `InitResult` and why did `initialize()` change?
+
+`initialize()` now returns an `InitResult` instead of a bare state. Access the state via `result.state`:
+
+```python
+result = initialize(key, data, col_types)
+state = result.state  # CrossCatState (same as before)
+```
+
+This wrapper also carries `subsample_idx` when `subsample_rows` is set.
+
+### How do I monitor inference progress?
+
+Use the TensorBoard logger:
+
+```python
+from crosscat.tb_logger import TBLogger
+
+with TBLogger("runs/my_experiment") as tb:
+    for sweep in range(n_sweeps):
+        packed = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
+        state = unpack_state(packed, col_types, data=data)
+        tb.log_sweep(collect_diagnostics(state, data), sweep)
+```
+
+See the [TensorBoard Guide](guides/tb-logger.md).
+
+### Can I load Parquet files directly?
+
+Yes, if `pyarrow` is installed:
+
+```python
+from crosscat import read_parquet
+data, col_names = read_parquet("data.parquet")
+```
+
+See [Data Loading Guide](guides/data-loading.md#parquet-files) for Parquet, Arrow IPC, and NPY formats.

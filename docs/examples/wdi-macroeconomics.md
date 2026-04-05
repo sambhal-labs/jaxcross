@@ -38,7 +38,8 @@ for chain_idx in range(N_CHAINS):
     try:
         packed, _, start_sweep = load_latest_checkpoint(ckpt_dir)
     except FileNotFoundError:
-        state = initialize(init_keys[chain_idx], data_jax, column_types)
+        result = initialize(init_keys[chain_idx], data_jax, column_types)
+        state = result.state
         packed = pack_state(state)
         start_sweep = 0
 
