@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,6 +1696,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2127,6 +2191,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.packed.state.suggest_max_clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        suggest_max_clusters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.packed.state.estimate_packed_memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_packed_memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.packed.state.pack_state" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2257,6 +2343,28 @@
     <span class="md-ellipsis">
       
         select_best_chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggest_max_clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        suggest_max_clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#estimate_packed_memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_packed_memory
       
     </span>
   </a>
@@ -2410,6 +2518,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3011,6 +3175,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.packed.state.suggest_max_clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        suggest_max_clusters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.packed.state.estimate_packed_memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_packed_memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.packed.state.pack_state" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3148,6 +3334,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#suggest_max_clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        suggest_max_clusters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#estimate_packed_memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_packed_memory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#type-id-constants" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3270,6 +3478,265 @@ Invalid entries are masked via view_mask, n_views, n_clusters.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.packed.state.suggest_max_clusters" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">suggest_max_clusters</span><span class="p">(</span><span class="n">n_rows</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span></code>
+
+<a href="#crosscat.packed.state.suggest_max_clusters" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Suggest a <code>max_clusters</code> value based on dataset size.</p>
+<p>Uses <code>min(32, max(4, int(sqrt(n_rows))))</code>. This keeps the O(N*K) scoring
+cost manageable at scale while allowing enough clusters for structure
+discovery on smaller datasets.</p>
+<p>.. warning::</p>
+<div class="language-text highlight"><pre><span></span><code>The cap of 32 means datasets with more than 32 true clusters will
+lose fidelity. If you know your data has more clusters, pass a
+higher ``max_clusters`` to ``pack_state()`` directly — e.g.
+``pack_state(state, max_clusters=64)``.
+</code></pre></div>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rows</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows in the dataset (must be &gt;= 0).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Suggested <code>max_clusters</code> value for <code>pack_state()</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If n_rows is negative.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.packed.state.estimate_packed_memory" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">estimate_packed_memory</span><span class="p">(</span><span class="n">n_rows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_clusters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span> <span class="n">max_views</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span> <span class="n">max_categories</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span> <span class="n">max_cols_per_view</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span></code>
+
+<a href="#crosscat.packed.state.estimate_packed_memory" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate GPU memory usage for a packed state in bytes.</p>
+<p>Covers all <code>PackedCrossCatState</code> array fields plus the data matrix.
+This is a close estimate; actual usage may be slightly higher due to
+JIT intermediates and JAX runtime overhead.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_rows</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows in the dataset.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_cols</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_clusters</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum clusters per view.</p>
+              </div>
+            </td>
+            <td>
+                  <code>32</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_views</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum number of views.</p>
+              </div>
+            </td>
+            <td>
+                  <code>16</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_categories</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum categories for categorical/ordinal columns.</p>
+              </div>
+            </td>
+            <td>
+                  <code>16</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_cols_per_view</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Max columns per view (defaults to n_cols).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="int">int</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dict with per-component byte estimates and <code>"total"</code> sum.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 
@@ -3650,7 +4117,7 @@ All states must have identical static fields.</p>
 <p>Dataclass with all fields as JAX arrays with fixed padding dimensions. Registered as a JAX pytree for automatic differentiation and JIT compilation.</p>
 <p>Key fields include <code>column_assignments</code>, <code>view_row_assignments</code>, <code>view_n_clusters</code>, sufficient statistics arrays (<code>ss_counts</code>, <code>ss_sum_x</code>, <code>ss_sum_x_sq</code>, etc.), hyperparameters, and metadata (<code>n_rows</code>, <code>n_cols</code>, <code>max_views</code>, <code>max_clusters</code>).</p>
 <h2 id="pack_state"><code>pack_state</code><a class="headerlink" href="#pack_state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">pack_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_views</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">max_clusters</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">max_categories</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">pack_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_views</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">max_clusters</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">max_categories</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">max_cols_per_view</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
 </span></code></pre></div>
 <p>Convert <code>CrossCatState</code> to JIT-compatible <code>PackedCrossCatState</code> with padded arrays.</p>
 <table>
@@ -3725,6 +4192,82 @@ All states must have identical static fields.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="suggest_max_clusters"><code>suggest_max_clusters</code><a class="headerlink" href="#suggest_max_clusters" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">suggest_max_clusters</span><span class="p">(</span><span class="n">n_rows</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span>
+</span></code></pre></div>
+<p>Heuristic for choosing <code>max_clusters</code> based on dataset size. Returns <code>min(32, max(4, int(sqrt(n_rows))))</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n_rows</code></td>
+<td><code>int</code></td>
+<td>Number of rows in the dataset</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Suggested <code>max_clusters</code> value.</p>
+<h2 id="estimate_packed_memory"><code>estimate_packed_memory</code><a class="headerlink" href="#estimate_packed_memory" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">estimate_packed_memory</span><span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">max_clusters</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">max_views</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">max_categories</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">max_cols_per_view</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Estimate GPU memory usage for a packed state in bytes. Covers all <code>PackedCrossCatState</code> array fields plus the data matrix.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n_rows</code></td>
+<td><code>int</code></td>
+<td>Number of rows</td>
+</tr>
+<tr>
+<td><code>n_cols</code></td>
+<td><code>int</code></td>
+<td>Number of columns</td>
+</tr>
+<tr>
+<td><code>max_clusters</code></td>
+<td><code>int</code></td>
+<td>Maximum clusters per view</td>
+</tr>
+<tr>
+<td><code>max_views</code></td>
+<td><code>int</code></td>
+<td>Maximum number of views</td>
+</tr>
+<tr>
+<td><code>max_categories</code></td>
+<td><code>int</code></td>
+<td>Maximum categories for categorical/ordinal columns</td>
+</tr>
+<tr>
+<td><code>max_cols_per_view</code></td>
+<td><code>int \| None</code></td>
+<td>Max columns per view (defaults to <code>n_cols</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Dict with per-component byte estimates (e.g., <code>column_assignments</code>, <code>ss_counts</code>, <code>ss_sum_x</code>, <code>view_row_assignments</code>, <code>data_matrix</code>, etc.) and a <code>"total"</code> key summing all components.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">estimate_packed_memory</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">mem</span> <span class="o">=</span> <span class="n">estimate_packed_memory</span><span class="p">(</span><span class="mi">100_000</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="n">max_clusters</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Estimated: </span><span class="si">{</span><span class="n">mem</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+</span></code></pre></div>
 <h2 id="type-id-constants">Type ID Constants<a class="headerlink" href="#type-id-constants" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

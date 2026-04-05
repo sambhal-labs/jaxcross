@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,6 +1696,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2177,6 +2241,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.packed.kernels.packed_transition_row_assignments_minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_minibatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.packed.kernels.packed_transition_row_assignments_parallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_parallel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.packed.kernels.packed_transition_column_assignments" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2285,6 +2371,28 @@
     <span class="md-ellipsis">
       
         packed_transition_row_assignments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packed_transition_row_assignments_minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_minibatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packed_transition_row_assignments_parallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_parallel
       
     </span>
   </a>
@@ -2482,6 +2590,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3105,6 +3269,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.packed.kernels.packed_transition_row_assignments_minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_minibatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.packed.kernels.packed_transition_row_assignments_parallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_parallel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.packed.kernels.packed_transition_column_assignments" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3213,6 +3399,28 @@
     <span class="md-ellipsis">
       
         packed_transition_row_assignments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packed_transition_row_assignments_minibatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_minibatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packed_transition_row_assignments_parallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packed_transition_row_assignments_parallel
       
     </span>
   </a>
@@ -3759,6 +3967,268 @@ subsequent kernel (e.g., column assignments) will recompute anyway.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="crosscat.packed.kernels.packed_transition_row_assignments_minibatch" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">packed_transition_row_assignments_minibatch</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span></code>
+
+<a href="#crosscat.packed.kernels.packed_transition_row_assignments_minibatch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Mini-batch Gibbs sweep over a random subset of row assignments.</p>
+<p>Instead of updating all N rows per sweep, randomly samples <code>batch_size</code>
+rows and only updates their cluster assignments. This reduces per-sweep
+cost from O(N<em>K</em>C) to O(B<em>K</em>C) where B &lt;&lt; N, enabling practical
+inference on million-row datasets.</p>
+<p>Suffstats are recomputed from scratch after the sweep since only a
+subset of rows were updated.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Current packed state.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(n_rows, n_cols) data matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows to update per sweep (static for JIT).
+If &gt;= n_rows, falls back to full sweep.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10000</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Updated PackedCrossCatState with new row assignments and suffstats.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.packed.kernels.packed_transition_row_assignments_parallel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">packed_transition_row_assignments_parallel</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span></code>
+
+<a href="#crosscat.packed.kernels.packed_transition_row_assignments_parallel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Batch-parallel Gibbs sweep: scores ALL rows simultaneously via vmap.</p>
+<p>Each row is scored against shared sufficient statistics with its OWN
+contribution removed (per-row leave-one-out). This is correct collapsed
+Gibbs — the only approximation is that rows don't see each other's
+reassignment within the same sweep (synchronous Gibbs).</p>
+<p>New cluster creation is blocked in this kernel because parallel rows
+cannot coordinate distinct free slots. Run the sequential kernel
+periodically (e.g., every 5th sweep) to allow cluster birth/death.</p>
+<p>Tradeoffs vs sequential kernel:
+- Much faster on GPU (full parallelism via vmap)
+- Cannot create new clusters (only reassigns among existing ones)
+- Best for large N where GPU parallelism dominates</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Current packed state.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(n_rows, n_cols) data matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Updated PackedCrossCatState with new row assignments and suffstats.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="crosscat.packed.kernels.packed_transition_column_assignments" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">packed_transition_column_assignments</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span></code>
 
@@ -3961,8 +4431,8 @@ type-specific results to keep.</p>
 1. Score the row against existing clusters via CRP prior + posterior predictive
 2. Sample a cluster assignment (may create a new cluster)
 3. Update sufficient statistics</p>
-<p>This function operates outside JIT since n_rows is a static field.
-The scoring uses JIT-compiled functions for speed.</p>
+<p>Uses JIT-compiled lax.scan over rows and views for efficient batch insertion.
+The outer function remains non-JIT since n_rows is a static field.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4070,29 +4540,6 @@ The scoring uses JIT-compiled functions for speed.</p>
             <td>
               <div class="doc-md-description">
                 <p>Tuple of (updated_packed_state, updated_data).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="ValueError">ValueError</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If inserting rows would exceed max_clusters.</p>
               </div>
             </td>
           </tr>
@@ -4273,45 +4720,117 @@ The scoring uses JIT-compiled functions for speed.</p>
 <p class="admonition-title">recompute_suffstats</p>
 <p>The <code>recompute_suffstats</code> parameter controls whether sufficient statistics are recomputed from scratch after the sweep. Set to <code>False</code> when a subsequent kernel (e.g., <code>packed_transition_column_assignments</code>) will recompute them anyway. Both <code>packed_gibbs_sweep</code> and <code>packed_gibbs_step</code> pass <code>recompute_suffstats=False</code> internally since column assignments always recomputes suffstats.</p>
 </div>
+<h2 id="packed_transition_row_assignments_minibatch"><code>packed_transition_row_assignments_minibatch</code><a class="headerlink" href="#packed_transition_row_assignments_minibatch" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">packed_transition_row_assignments_minibatch</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+</span></code></pre></div>
+<p>Mini-batch row assignment kernel. Randomly selects <code>batch_size</code> rows and updates only their cluster assignments. Cost is O(B<em>K</em>C) instead of O(N<em>K</em>C). Useful for datasets with 10K+ rows.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PackedCrossCatState</code></td>
+<td>Current packed state</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Data matrix</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td><code>int</code></td>
+<td>Number of rows to update per call</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Updated <code>PackedCrossCatState</code>.</p>
+<h2 id="packed_transition_row_assignments_parallel"><code>packed_transition_row_assignments_parallel</code><a class="headerlink" href="#packed_transition_row_assignments_parallel" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">packed_transition_row_assignments_parallel</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+</span></code></pre></div>
+<p>Parallel row assignment kernel. Uses <code>vmap</code> over all rows simultaneously with leave-one-out suffstat correction. Faster than sequential on wide datasets but cannot create new clusters.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PackedCrossCatState</code></td>
+<td>Current packed state</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Data matrix</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Updated <code>PackedCrossCatState</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The parallel kernel cannot create new clusters — it only reassigns rows to existing clusters. Alternate with sequential or minibatch sweeps periodically for cluster birth/death.</p>
+</div>
 <h2 id="packed_transition_column_assignments"><code>packed_transition_column_assignments</code><a class="headerlink" href="#packed_transition_column_assignments" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">packed_transition_column_assignments</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">packed_transition_column_assignments</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
 </span></code></pre></div>
 <p>Resample column-to-view assignments (outer DP Gibbs). Uses <code>lax.scan</code> over columns, <code>vmap</code> over views for scoring, bounded CRP sampling for new-view proposals, and automatic view compaction.</p>
 <h2 id="packed_transition_column_hypers"><code>packed_transition_column_hypers</code><a class="headerlink" href="#packed_transition_column_hypers" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">packed_transition_column_hypers</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">packed_transition_column_hypers</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
 </span></code></pre></div>
 <p>Grid-based Gibbs sampling for column hyperparameters, <code>vmap</code>-ed over all columns with unified type dispatch.</p>
 <h2 id="packed_transition_crp_alphas"><code>packed_transition_crp_alphas</code><a class="headerlink" href="#packed_transition_crp_alphas" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">packed_transition_crp_alphas</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">packed_transition_crp_alphas</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
 </span></code></pre></div>
 <p>Sample CRP concentration parameters (row and column) using <code>vmap</code> over a log-spaced grid.</p>
 <h2 id="packed_log_joint"><code>packed_log_joint</code><a class="headerlink" href="#packed_log_joint" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">packed_log_joint</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">packed_log_joint</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
 </span></code></pre></div>
 <p>JIT-compatible log-joint probability on packed state. Computes CRP priors + data log-marginal likelihoods + Exp(1) alpha priors.</p>
 <p><strong>Returns</strong>: Scalar log probability.</p>
 <h2 id="packed_insert_rows"><code>packed_insert_rows</code><a class="headerlink" href="#packed_insert_rows" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">packed_insert_rows</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">new_rows</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">packed_insert_rows</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">new_rows</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span>
 </span></code></pre></div>
 <p>Insert new rows into packed state via CRP predictive assignment.</p>
 <p><strong>Returns</strong>: <code>(updated_packed, updated_data)</code>.</p>
 <hr />
 <h2 id="multi-chain">Multi-Chain<a class="headerlink" href="#multi-chain" title="Permanent link">&para;</a></h2>
 <h3 id="multi_chain_packed_gibbs_sweep"><code>multi_chain_packed_gibbs_sweep</code><a class="headerlink" href="#multi_chain_packed_gibbs_sweep" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed_list</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">packed_list</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span>
 </span></code></pre></div>
 <p>Run <code>packed_gibbs_sweep</code> across N chains in parallel via <code>jax.vmap</code>. Batches the states, vmaps the sweep, and scores each chain.</p>
 <p><strong>Returns</strong>: <code>(batched_result, log_joint_scores)</code> where scores is <code>(n_chains,)</code>.</p>
 <p><strong>Example:</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize</span><span class="p">,</span> <span class="n">pack_state</span><span class="p">,</span> <span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">,</span> <span class="n">select_best_chain</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">states</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">column_types</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">packed_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">pack_state</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">states</span><span class="p">]</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">key</span><span class="p">,</span> <span class="n">subkey</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">batched</span><span class="p">,</span> <span class="n">scores</span> <span class="o">=</span> <span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">(</span><span class="n">subkey</span><span class="p">,</span> <span class="n">packed_list</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">best</span> <span class="o">=</span> <span class="n">select_best_chain</span><span class="p">(</span><span class="n">batched</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">initialize</span><span class="p">,</span> <span class="n">pack_state</span><span class="p">,</span> <span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">,</span> <span class="n">select_best_chain</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">column_types</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">states</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">packed_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">pack_state</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">states</span><span class="p">]</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">key</span><span class="p">,</span> <span class="n">subkey</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="n">batched</span><span class="p">,</span> <span class="n">scores</span> <span class="o">=</span> <span class="n">multi_chain_packed_gibbs_sweep</span><span class="p">(</span><span class="n">subkey</span><span class="p">,</span> <span class="n">packed_list</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="n">best</span> <span class="o">=</span> <span class="n">select_best_chain</span><span class="p">(</span><span class="n">batched</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
 </span></code></pre></div>
 
 

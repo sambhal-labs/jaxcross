@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,6 +1696,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2677,6 +2741,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -4333,6 +4453,13 @@ Hyperparameters: dirichlet_alpha (symmetric concentration)</p>
 <p>NaN values are filtered before accumulation.</p>
 
 
+<details class="note" open>
+  <summary>Note</summary>
+  <p>Unlike NormalGamma/BetaBernoulli/VonMises, this method requires
+<code>n_categories</code> because the category count vector size cannot be
+inferred from data alone (unobserved categories need slots).</p>
+</details>
+
 <p><span class="doc-section-title">Parameters:</span></p>
     <table>
       <thead>
@@ -4842,6 +4969,12 @@ Hyperparameters: cutpoints, mu (prior mean), s (prior variance)</p>
 
         <p>Compute sufficient statistics from ordinal data. NaN-aware.</p>
 
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>Requires <code>n_levels</code> because the level count vector size cannot
+be inferred from data alone (unobserved levels need slots).</p>
+</details>
 
     </div>
 

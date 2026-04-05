@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3007,7 +3127,7 @@
 </li>
 </ol>
 <p align="center">
-  <img src="../diagrams/two-level-dp.svg" alt="Two-Level DP" width="800" />
+  <img src="../diagrams/two-level-dp.svg" alt="Two-Level DP" width="900" />
 </p>
 
 <h3 id="why-two-levels">Why Two Levels?<a class="headerlink" href="#why-two-levels" title="Permanent link">&para;</a></h3>
@@ -3020,7 +3140,7 @@
 </ul>
 <h2 id="state-structure">State Structure<a class="headerlink" href="#state-structure" title="Permanent link">&para;</a></h2>
 <p align="center">
-  <img src="../diagrams/crosscat-state.svg" alt="CrossCatState Data Structure" width="650" />
+  <img src="../diagrams/crosscat-state.svg" alt="CrossCatState Data Structure" width="800" />
 </p>
 
 <p>The full state contains:</p>
@@ -3040,7 +3160,7 @@
 <p>This means the state only stores cluster assignments, hyperparameters, and sufficient statistics. No per-observation parameters. This is why CrossCat scales well.</p>
 <h2 id="component-models">Component Models<a class="headerlink" href="#component-models" title="Permanent link">&para;</a></h2>
 <p align="center">
-  <img src="../diagrams/component-models.svg" alt="Component Models" width="780" />
+  <img src="../diagrams/component-models.svg" alt="Component Models" width="850" />
 </p>
 
 <p>Each column type uses a conjugate Bayesian model:</p>

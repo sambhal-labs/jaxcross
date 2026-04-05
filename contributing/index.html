@@ -737,6 +737,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1431,6 +1435,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1632,6 +1692,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2187,6 +2251,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2872,6 +2992,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#project-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project Modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3011,6 +3142,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#project-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project Modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3087,6 +3229,7 @@
 <h3 id="test-markers">Test Markers<a class="headerlink" href="#test-markers" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>@pytest.mark.slow</code> — GPU-heavy tests (30+ Gibbs sweeps)</li>
+<li><code>@pytest.mark.cpu</code> — Tests that run on CPU only (no GPU required)</li>
 <li><code>@pytest.mark.xfail</code> — Known flaky tests (stochastic recovery)</li>
 </ul>
 <h3 id="property-tests">Property Tests<a class="headerlink" href="#property-tests" title="Permanent link">&para;</a></h3>
@@ -3102,7 +3245,74 @@
 <li>Add tests in <code>tests/</code></li>
 </ol>
 <h2 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h2>
-<p>GitHub Actions runs lint + format + type check only (~1 min). No pytest in CI (GPU required). Note that free-tier GitHub Actions quota is limited.</p>
+<p>GitHub Actions runs lint + format + type check + <code>@pytest.mark.cpu</code> tests (~2 min). GPU tests are not run in CI — use Kaggle (P100) for the full suite. Note that free-tier GitHub Actions quota is limited.</p>
+<h2 id="project-modules">Project Modules<a class="headerlink" href="#project-modules" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>crosscat/types.py</code></td>
+<td>Core dataclasses (<code>CrossCatState</code>, <code>ViewState</code>, <code>ColumnType</code>, <code>InitResult</code>)</td>
+</tr>
+<tr>
+<td><code>crosscat/components.py</code></td>
+<td>5 Bayesian component models</td>
+</tr>
+<tr>
+<td><code>crosscat/model.py</code></td>
+<td>Initialization, scoring, row insertion</td>
+</tr>
+<tr>
+<td><code>crosscat/gibbs.py</code></td>
+<td>Collapsed Gibbs kernels (unpacked path)</td>
+</tr>
+<tr>
+<td><code>crosscat/inference.py</code></td>
+<td>15 posterior predictive queries (unpacked)</td>
+</tr>
+<tr>
+<td><code>crosscat/packed/</code></td>
+<td>JIT-compiled packed state sub-package</td>
+</tr>
+<tr>
+<td><code>crosscat/packed_inference.py</code></td>
+<td>15 packed queries + multi-chain wrappers</td>
+</tr>
+<tr>
+<td><code>crosscat/scaling.py</code></td>
+<td>Large dataset workflows (subsample, minibatch, early stopping)</td>
+</tr>
+<tr>
+<td><code>crosscat/tb_logger.py</code></td>
+<td>TensorBoard logging</td>
+</tr>
+<tr>
+<td><code>crosscat/constraints.py</code></td>
+<td>Column/row dependency enforcement</td>
+</tr>
+<tr>
+<td><code>crosscat/diagnostics.py</code></td>
+<td>Convergence metrics</td>
+</tr>
+<tr>
+<td><code>crosscat/serialization.py</code></td>
+<td>Save/load in <code>.jxc</code> format</td>
+</tr>
+<tr>
+<td><code>crosscat/data_utils.py</code></td>
+<td>CSV/Parquet/Arrow/NPY I/O, type detection</td>
+</tr>
+<tr>
+<td><code>crosscat/validate.py</code></td>
+<td>State consistency checking</td>
+</tr>
+</tbody>
+</table>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--extra<span class="w"> </span>docs
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>serve<span class="w">  </span><span class="c1"># local preview at localhost:8000</span>

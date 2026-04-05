@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2793,8 +2913,51 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="0101-2026-03-30-diff">[0.10.1] - 2026-03-30 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.10.0...v0.10.1">diff</a><a class="headerlink" href="#0101-2026-03-30-diff" title="Permanent link">&para;</a></h2>
+<h2 id="0110-2026-04-05-diff">[0.11.0] - 2026-04-05 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.10.1...v0.11.0">diff</a><a class="headerlink" href="#0110-2026-04-05-diff" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Phase 1: Scaling quick wins</strong> (#83)</li>
+<li>JIT-compiled <code>packed_insert_rows</code> for online/streaming inference</li>
+<li><code>subsample_rows</code> parameter in <code>initialize()</code> — CRP-sample a subset for
+    fast initialization on large datasets</li>
+<li><code>suggest_max_clusters(n_rows)</code> heuristic for automatic <code>max_clusters</code></li>
+<li>Frozen <code>InitResult</code> dataclass returned from <code>initialize()</code></li>
+<li><strong>Phase 2: Memory optimization</strong> (#84)</li>
+<li><code>read_csv_chunked()</code> — streaming CSV reader for large files with bounded
+    memory, warnings on unparseable values and mismatched row lengths</li>
+<li><code>save_npy()</code> / <code>load_npy_mmap()</code> — uncompressed <code>.npy</code> save with true
+    NumPy memory-mapped loading for multi-GB datasets (formerly <code>save_npz</code>
+    / <code>load_npz_mmap</code>, which are now deprecated aliases)</li>
+<li><code>read_parquet()</code> / <code>write_parquet()</code> — Apache Parquet integration via
+    pyarrow (optional dependency)</li>
+<li>Memory-efficient column scoring in <code>_score_column_in_view</code>: replaced
+    O(N*K) membership matrix with O(K)-output <code>jnp.bincount</code> operations —
+    reduces per-column scoring memory from 128 MB to 4 MB at 1M rows (K=32)</li>
+<li><strong>Phase 3: Algorithmic scaling</strong> (#84)</li>
+<li><code>packed_transition_row_assignments_minibatch</code> — mini-batch Gibbs kernel
+    that samples <code>batch_size</code> rows per sweep (O(B) instead of O(N))</li>
+<li><code>subsample_anneal()</code> — gradually grows dataset during inference (init on
+    small sample, double active rows per stage, insert + sweep)</li>
+<li><code>minibatch_gibbs_sweep()</code> — mini-batch row + full column/hyper/CRP sweeps</li>
+<li><code>gibbs_sweep_early_stopping()</code> — convergence-based early stopping with
+    NaN/inf detection and previous-checkpoint relative improvement</li>
+<li>New <code>crosscat.scaling</code> module for all scaling utilities</li>
+<li>100K-row scaling benchmark (<code>benchmarks/scaling_100k_benchmark.py</code>)</li>
+<li>33 new tests covering all Phase 2+3 features including structural
+  invariants, CSV edge cases, mmap verification, and NaN bail-out</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>read_csv()</code> refactored to use shared <code>_parse_rows()</code> with warnings on
+  unparseable values and mismatched row lengths (parity with <code>read_csv_chunked</code>)</li>
+<li><code>_parse_rows()</code> tracks exact unparseable count (not capped at 5)</li>
+<li><code>save_npy</code> / <code>load_npy_mmap</code> warn when input file extension differs from
+  <code>.npy</code> (suffix is silently rewritten for true mmap support)</li>
+<li><code>save_npz</code> / <code>load_npz_mmap</code> are now deprecated aliases that emit
+  <code>DeprecationWarning</code> and delegate to the new names</li>
+</ul>
+<h2 id="0101-2026-03-30-diff">[0.10.1] - 2026-03-30 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.10.0...v0.10.1">diff</a><a class="headerlink" href="#0101-2026-03-30-diff" title="Permanent link">&para;</a></h2>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Von Mises batch fast path</strong> (<code>batch_vm_posterior_predictive_logp</code>) for
   cyclic-dominant views — bypasses 5-way <code>jnp.where</code> dispatch, matching the
@@ -2810,7 +2973,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   Von Mises dispatch parity, expanded diagnostics coverage
   (<code>random_holdout_mask</code>, <code>mean_test_log_likelihood</code>, <code>evaluate_imputation</code>)</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Ordinal cutpoint sampling bounds widened from [-10, +10] to [-100, +100]
   to support data with larger ordinal ranges</li>
@@ -2835,7 +2998,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>packed/kernels.py</code></li>
 </ul>
 <h2 id="0100-2026-03-26-diff">[0.10.0] - 2026-03-26 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.9.0...v0.10.0">diff</a><a class="headerlink" href="#0100-2026-03-26-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>True ordered logistic component model</strong> with cumulative link function:
   P(Y=k | μ, cutpoints) = σ(c_k - μ) - σ(c_{k-1} - μ). Replaces the
@@ -2852,7 +3015,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>Property-based tests</strong> via Hypothesis (28 tests): suffstat roundtrips,
   component scoring invariants, type dispatch parity, NaN transparency</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>OrderedLogistic</code> class rewritten with cumulative link (non-conjugate,
   grid integration) instead of Dirichlet-Categorical alias</li>
@@ -2871,7 +3034,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Missing <code>hyper_vm_a</code> argument in <code>packed_inference.py</code> <code>_sample_one_column</code></li>
 </ul>
 <h2 id="090-2026-03-24-diff">[0.9.0] - 2026-03-24 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.8.0...v0.9.0">diff</a><a class="headerlink" href="#090-2026-03-24-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>12x faster packed Gibbs kernels</strong> via three optimizations:</li>
 <li>Vectorized column scanning: replaced <code>lax.scan</code> over columns with
@@ -2889,7 +3052,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   and <code>load_latest_checkpoint()</code> — sessions resume from last saved state</li>
 <li><code>_compute_dominant_type()</code> helper for detecting uniform-type views</li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>_score_row_one_cluster</code>: sequential <code>lax.scan</code> over columns replaced with
   parallel <code>jax.vmap(unified_posterior_predictive_logp)</code> over all columns</li>
@@ -2919,7 +3082,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   inverse-variance measure <code>1/(1+std)</code></li>
 </ul>
 <h2 id="080-2026-03-20-diff">[0.8.0] - 2026-03-20 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.7.0...v0.8.0">diff</a><a class="headerlink" href="#080-2026-03-20-diff" title="Permanent link">&para;</a></h2>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>VonMises sampling: rejection sampling (uniform proposal on [0, 2π), accept/reject
   against predictive logp) matching original <code>CyclicComponentModel::get_draw_constrained()</code></li>
@@ -2937,7 +3100,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>tests/test_new_features.py</code>: VonMises tests missing <code>vm_a</code> hyperparameter</li>
 </ul>
 <h2 id="070-2026-03-20-diff">[0.7.0] - 2026-03-20 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.6.0...v0.7.0">diff</a><a class="headerlink" href="#070-2026-03-20-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Benchmark results infrastructure: JSON metrics + matplotlib PNG charts saved to <code>results/</code></li>
 <li>Shared benchmark utilities (<code>benchmarks/utils.py</code>): result persistence, convergence plots, Z-matrix heatmaps</li>
@@ -2947,7 +3110,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>New optional dependency group <code>benchmark</code> (matplotlib, scikit-learn)</li>
 </ul>
 <h2 id="060-2026-03-20-diff">[0.6.0] - 2026-03-20 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.5.0...v0.6.0">diff</a><a class="headerlink" href="#060-2026-03-20-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Synthetic recovery benchmark (<code>benchmarks/paper_synthetic_benchmark.py</code>) reproducing
   the paper's Figure 7 experiment — measures column ARI, row ARI, and Z-matrix recovery</li>
@@ -2960,7 +3123,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Components: added note clarifying collapsed-only inference (no Neal Algorithm 8)</li>
 </ul>
 <h2 id="050-2026-03-20-diff">[0.5.0] - 2026-03-20 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.4.0...v0.5.0">diff</a><a class="headerlink" href="#050-2026-03-20-diff" title="Permanent link">&para;</a></h2>
-<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>BREAKING</strong>: Von Mises component model now uses separate <code>vm_a</code> (prior concentration)
   and <code>kappa</code> (likelihood concentration). Previously <code>kappa</code> was incorrectly used for both.
@@ -2976,7 +3139,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Von Mises <code>kappa</code>: log-spaced [0.01, N] (was 7 fixed values)</li>
 <li>Binary <code>a</code>, <code>b</code>: 8×8 log-spaced [1/N, N] (was 5×5 fixed)</li>
 </ul>
-<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Von Mises <code>vm_a</code> hyperparameter (prior concentration on mean direction)
   in <code>ColumnHypers</code>, <code>PackedCrossCatState</code>, and all scoring functions</li>
@@ -2990,12 +3153,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   and <code>kappa</code> for likelihood (was conflating both as <code>kappa</code>)</li>
 </ul>
 <h2 id="040-2026-03-19-diff">[0.4.0] - 2026-03-19 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.3.0...v0.4.0">diff</a><a class="headerlink" href="#040-2026-03-19-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Interactive Streamlit dashboard for CrossCat analysis (<code>dashboard/</code>)</li>
 </ul>
 <h2 id="030-2026-03-18-diff">[0.3.0] - 2026-03-18 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.2.0...v0.3.0">diff</a><a class="headerlink" href="#030-2026-03-18-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li>JIT-compiled packed Gibbs kernels using <code>jax.lax.scan</code> and <code>jax.vmap</code>:</li>
 <li><code>packed_transition_row_assignments</code> — nested lax.scan over views and rows</li>
@@ -3013,7 +3176,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><code>tests/test_integration_queries.py</code>: 17 tests (anomaly, MI, constraints, similarity)</li>
 <li>CI: coverage tracking (60% min), mypy, slow test gate, release workflow, pre-commit hooks</li>
 </ul>
-<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>BREAKING</strong>: Split <code>crosscat/packed_state.py</code> into <code>crosscat/packed/</code> sub-package:</li>
 <li><code>packed/state.py</code> — PackedCrossCatState, pack/unpack</li>
@@ -3030,7 +3193,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>v1 packed kernels (Python for-loop implementations) — replaced by JIT-compiled versions</li>
 </ul>
 <h2 id="020-2026-03-17-diff">[0.2.0] - 2026-03-17 — <a href="https://github.com/sambhal-labs/jaxcross/compare/v0.1.0...v0.2.0">diff</a><a class="headerlink" href="#020-2026-03-17-diff" title="Permanent link">&para;</a></h2>
-<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Packed state representation for JIT-compatible inference</li>
 <li><code>PackedCrossCatState</code> dataclass registered as JAX pytree</li>
@@ -3042,7 +3205,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Performance benchmark (<code>benchmarks/jit_benchmark.py</code>)</li>
 </ul>
 <h2 id="010-2025-01-15">[0.1.0] - 2025-01-15<a class="headerlink" href="#010-2025-01-15" title="Permanent link">&para;</a></h2>
-<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Initial release with full CrossCat feature parity</li>
 <li>Five conjugate component models: NormalGamma, DirichletCategorical, BetaBernoulli, OrderedLogistic, VonMises</li>

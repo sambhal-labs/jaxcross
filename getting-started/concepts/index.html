@@ -922,6 +922,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1616,6 +1620,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1817,6 +1877,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2372,6 +2436,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3207,10 +3327,11 @@
 <li>Used for: running Gibbs sweeps, GPU-accelerated inference</li>
 </ul>
 <p><strong>Typical workflow:</strong> Initialize unpacked → pack → run inference → unpack → query.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">state</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">)</span>       <span class="c1"># unpacked</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">packed</span> <span class="o">=</span> <span class="n">pack_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>                       <span class="c1"># pack</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">packed</span> <span class="o">=</span> <span class="n">packed_gibbs_sweep</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>   <span class="c1"># fast inference</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">state</span> <span class="o">=</span> <span class="n">unpack_state</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>  <span class="c1"># unpack for queries</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">)</span>       <span class="c1"># unpacked</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">state</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">packed</span> <span class="o">=</span> <span class="n">pack_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>                       <span class="c1"># pack</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">packed</span> <span class="o">=</span> <span class="n">packed_gibbs_sweep</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>   <span class="c1"># fast inference</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">state</span> <span class="o">=</span> <span class="n">unpack_state</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>  <span class="c1"># unpack for queries</span>
 </span></code></pre></div>
 <h2 id="what-can-you-ask">What Can You Ask?<a class="headerlink" href="#what-can-you-ask" title="Permanent link">&para;</a></h2>
 <p>After running inference, CrossCat supports a rich set of posterior queries:</p>

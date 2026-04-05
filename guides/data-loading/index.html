@@ -741,6 +741,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -957,6 +961,61 @@
     <span class="md-ellipsis">
       
         Column Metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#large-csv-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Large CSV Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parquet-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parquet Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#arrow-ipc-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arrow IPC Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-mapped-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory-Mapped Loading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#format-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format Comparison
       
     </span>
   </a>
@@ -1596,6 +1655,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1797,6 +1912,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2352,6 +2471,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3029,6 +3204,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#large-csv-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Large CSV Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parquet-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parquet Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#arrow-ipc-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arrow IPC Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-mapped-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory-Mapped Loading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#format-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3181,9 +3411,97 @@
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">metadata</span> <span class="o">=</span> <span class="n">gen_column_metadata</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">col_names</span><span class="p">)</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Contains: name_to_idx, idx_to_name, per-column type and category info</span>
 </span></code></pre></div>
+<h2 id="large-csv-files">Large CSV Files<a class="headerlink" href="#large-csv-files" title="Permanent link">&para;</a></h2>
+<p>For datasets that don't fit in memory as Python lists, use chunked reading. It reads <code>chunk_size</code> rows at a time into NumPy internally, then returns a single concatenated JAX array:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_csv_chunked</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">data</span><span class="p">,</span> <span class="n">col_names</span> <span class="o">=</span> <span class="n">read_csv_chunked</span><span class="p">(</span><span class="s2">&quot;large_data.csv&quot;</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">50_000</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="parquet-files">Parquet Files<a class="headerlink" href="#parquet-files" title="Permanent link">&para;</a></h2>
+<p>Parquet is the recommended format for large datasets — columnar storage with compression (requires <code>pip install pyarrow</code>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_parquet</span><span class="p">,</span> <span class="n">write_parquet</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># Read</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">data</span><span class="p">,</span> <span class="n">col_names</span> <span class="o">=</span> <span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Read specific columns only</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">data</span><span class="p">,</span> <span class="n">col_names</span> <span class="o">=</span> <span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;salary&quot;</span><span class="p">,</span> <span class="s2">&quot;age&quot;</span><span class="p">])</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="c1"># Write</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">write_parquet</span><span class="p">(</span><span class="s2">&quot;output.parquet&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_names</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="arrow-ipc-format">Arrow IPC Format<a class="headerlink" href="#arrow-ipc-format" title="Permanent link">&para;</a></h2>
+<p>Arrow IPC (Feather v2) is faster than Parquet for read-heavy workflows (requires <code>pip install pyarrow</code>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_arrow</span><span class="p">,</span> <span class="n">load_arrow</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">save_arrow</span><span class="p">(</span><span class="s2">&quot;data.arrow&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_names</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;lz4&quot;</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">data</span><span class="p">,</span> <span class="n">col_names</span> <span class="o">=</span> <span class="n">load_arrow</span><span class="p">(</span><span class="s2">&quot;data.arrow&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="memory-mapped-loading">Memory-Mapped Loading<a class="headerlink" href="#memory-mapped-loading" title="Permanent link">&para;</a></h2>
+<p>For multi-GB datasets, use NumPy memory-mapping to avoid loading everything into RAM. Returns a <strong>NumPy memmap</strong>, not a JAX array — convert slices as needed:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_npy</span><span class="p">,</span> <span class="n">load_npy_mmap</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Save once (uncompressed .npy)</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">save_npy</span><span class="p">(</span><span class="s2">&quot;data.npy&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_names</span><span class="p">)</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Load as memory-mapped NumPy array (OS pages on demand)</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="n">data_np</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="n">load_npy_mmap</span><span class="p">(</span><span class="s2">&quot;data.npy&quot;</span><span class="p">)</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">data_np</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">10_000</span><span class="p">])</span>  <span class="c1"># only this slice hits RAM/GPU</span>
+</span></code></pre></div>
+<h2 id="format-comparison">Format Comparison<a class="headerlink" href="#format-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Speed</th>
+<th>Size</th>
+<th>Random Access</th>
+<th>Dependencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CSV</td>
+<td>Slow</td>
+<td>Large</td>
+<td>No</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Parquet</td>
+<td>Fast</td>
+<td>Small (compressed)</td>
+<td>Column-level</td>
+<td><code>pyarrow</code></td>
+</tr>
+<tr>
+<td>Arrow IPC</td>
+<td>Fastest</td>
+<td>Medium</td>
+<td>Column-level</td>
+<td><code>pyarrow</code></td>
+</tr>
+<tr>
+<td>NPY</td>
+<td>Fast</td>
+<td>Medium</td>
+<td>Memory-mapped</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>For production workflows with repeated reads, save your data as <code>.npy</code> (for memory-mapping) or <code>.arrow</code> (for fast columnar access). Use Parquet for interchange with other tools.</p>
+</div>
 <h2 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../api/data-utils/#read_csv"><code>read_csv</code></a></li>
+<li><a href="../../api/data-utils/#read_csv"><code>read_csv</code></a> / <a href="../../api/data-utils/#write_csv"><code>write_csv</code></a></li>
+<li><a href="../../api/data-utils/#read_csv_chunked"><code>read_csv_chunked</code></a></li>
+<li><a href="../../api/data-utils/#read_parquet"><code>read_parquet</code></a> / <a href="../../api/data-utils/#write_parquet"><code>write_parquet</code></a></li>
+<li><a href="../../api/data-utils/#save_arrow"><code>save_arrow</code></a> / <a href="../../api/data-utils/#load_arrow"><code>load_arrow</code></a></li>
+<li><a href="../../api/data-utils/#save_npy"><code>save_npy</code></a> / <a href="../../api/data-utils/#load_npy_mmap"><code>load_npy_mmap</code></a></li>
 <li><a href="../../api/data-utils/#guess_column_types"><code>guess_column_types</code></a></li>
 <li><a href="../../api/data-utils/#gen_column_metadata"><code>gen_column_metadata</code></a></li>
 <li><a href="../../api/data-utils/#discretize_column"><code>discretize_column</code></a></li>

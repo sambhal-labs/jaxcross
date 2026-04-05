@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/api/validation/">
+        <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/api/tb-logger/">
       
       
-        <link rel="prev" href="../synthetic/">
+        <link rel="prev" href="../scaling/">
       
       
-        <link rel="next" href="../packed-state/">
+        <link rel="next" href="../../architecture/overview/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Validation - JAX-CrossCat</title>
+        <title>TensorBoard Logger - JAX-CrossCat</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#validation" class="md-skip">
+        <a href="#tensorboard-logger" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Validation
+              TensorBoard Logger
             
           </span>
         </div>
@@ -2077,37 +2077,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Validation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
         
   
   
@@ -2123,109 +2096,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#crosscat.validate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="validate">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.ValidationError" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ValidationError
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.validate_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate_state
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.assert_valid_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        assert_valid_state
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#validate_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate_state
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#assert_valid_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        assert_valid_state
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2431,10 +2301,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../tb-logger/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2450,6 +2347,132 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#crosscat.tb_logger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tb_logger
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="tb_logger">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TBLogger
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TBLogger">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger.log_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        close
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tblogger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TBLogger
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TBLogger">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3020,22 +3043,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#crosscat.validate" class="md-nav__link">
+  <a href="#crosscat.tb_logger" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate
+        tb_logger
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="validate">
+    <nav class="md-nav" aria-label="tb_logger">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#crosscat.validate.ValidationError" class="md-nav__link">
+  <a href="#crosscat.tb_logger.TBLogger" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ValidationError
+        TBLogger
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TBLogger">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger.log_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_sweep
       
     </span>
   </a>
@@ -3043,24 +3078,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#crosscat.validate.validate_state" class="md-nav__link">
+  <a href="#crosscat.tb_logger.TBLogger.close" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate_state
+        close
       
     </span>
   </a>
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.assert_valid_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        assert_valid_state
-      
-    </span>
-  </a>
+      </ul>
+    </nav>
   
 </li>
         
@@ -3081,24 +3110,41 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validate_state" class="md-nav__link">
+  <a href="#tblogger" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate_state
+        TBLogger
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TBLogger">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_sweep
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#assert_valid_state" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        assert_valid_state
+        Usage
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3122,24 +3168,37 @@
   
 
 
-<h1 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h1>
+<h1 id="tensorboard-logger">TensorBoard Logger<a class="headerlink" href="#tensorboard-logger" title="Permanent link">&para;</a></h1>
 
 
 <div class="doc doc-object doc-module">
 
 
 
-<h2 id="crosscat.validate" class="doc doc-heading">
-            <code>crosscat.validate</code>
+<h2 id="crosscat.tb_logger" class="doc doc-heading">
+            <code>crosscat.tb_logger</code>
 
 
-<a href="#crosscat.validate" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#crosscat.tb_logger" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents first">
 
-        <p>State validation utilities.</p>
-<p>Maps to original CrossCat validate_utils.py.
-Provides consistency checks for CrossCat state, hyperparameters, and suffstats.</p>
+        <p>TensorBoard logging for CrossCat inference monitoring.</p>
+<p>Provides a thin wrapper around <code>tensorboardX.SummaryWriter</code> to log
+per-sweep diagnostics from :func:<code>crosscat.diagnostics.collect_diagnostics</code>.</p>
+<p>Requires the optional <code>tensorboardX</code> dependency::</p>
+<div class="language-text highlight"><pre><span></span><code>pip install tensorboardX
+</code></pre></div>
+<p>Usage::</p>
+<div class="language-text highlight"><pre><span></span><code>from crosscat.tb_logger import TBLogger
+
+with TBLogger(&quot;runs/experiment1&quot;) as tb:
+    for sweep in range(n_sweeps):
+        packed = packed_gibbs_sweep(key, packed, data, n_sweeps=1)
+        state = unpack_state(packed, column_types, data=data)
+        metrics = collect_diagnostics(state, data)
+        tb.log_sweep(metrics, sweep)
+</code></pre></div>
 
 
 
@@ -3164,47 +3223,18 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
 
 
 
-<h3 id="crosscat.validate.ValidationError" class="doc doc-heading">
-            <code>ValidationError</code>
+<h3 id="crosscat.tb_logger.TBLogger" class="doc doc-heading">
+            <code>TBLogger</code>
 
 
-<a href="#crosscat.validate.ValidationError" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><span title="ValueError">ValueError</span></code></p>
-
-
-
-        <p>Raised when state validation fails.</p>
-
-
-
-
-
-
-
-
-
-    </div>
-
-</div>
-
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="crosscat.validate.validate_state" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">validate_state</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">CrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></code>
-
-<a href="#crosscat.validate.validate_state" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#crosscat.tb_logger.TBLogger" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Validate consistency of a CrossCatState.</p>
-<p>Maps to original validate_utils.py consistency checks.</p>
+
+
+        <p>Thin wrapper for logging CrossCat diagnostics to TensorBoard.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3220,19 +3250,97 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>state</code>
+                <code>log_dir</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="CrossCatState
-
-
-  
-      dataclass
-   (crosscat.types.CrossCatState)" href="../types/#crosscat.types.CrossCatState">CrossCatState</a></code>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>CrossCat state to validate.</p>
+                <p>Directory for TensorBoard event files.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;runs&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Extra arguments passed to <code>SummaryWriter</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.tb_logger.TBLogger.log_sweep" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_sweep</span><span class="p">(</span><span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#crosscat.tb_logger.TBLogger.log_sweep" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log a diagnostics dict from <code>collect_diagnostics()</code>.</p>
+<p>Scalar metrics are logged directly. List/array metrics are logged
+as their mean value with a <code>mean/</code> prefix.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>metrics</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dict from :func:<code>crosscat.diagnostics.collect_diagnostics</code>.</p>
               </div>
             </td>
             <td>
@@ -3241,40 +3349,18 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>data</code>
+                <code>step</code>
             </td>
             <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Optional data array for additional checks.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+                  <code><span title="int">int</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>List of error messages (empty if valid).</p>
+                <p>Sweep number (used as the x-axis in TensorBoard).</p>
               </div>
+            </td>
+            <td>
+                <em>required</em>
             </td>
           </tr>
       </tbody>
@@ -3288,38 +3374,15 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
 <div class="doc doc-object doc-function">
 
 
-<h3 id="crosscat.validate.assert_valid_state" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">assert_valid_state</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">CrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+<h4 id="crosscat.tb_logger.TBLogger.close" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">close</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
 
-<a href="#crosscat.validate.assert_valid_state" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#crosscat.tb_logger.TBLogger.close" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
 
-        <p>Assert that a CrossCatState is valid.</p>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="ValidationError (crosscat.validate.ValidationError)" href="#crosscat.validate.ValidationError">ValidationError</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If validation fails.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+        <p>Flush and close the underlying writer.</p>
 
 
     </div>
@@ -3332,18 +3395,89 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
 
     </div>
 
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
 </div><h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>State consistency checking utilities.</p>
-<h2 id="validate_state"><code>validate_state</code><a class="headerlink" href="#validate_state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">validate_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<p>Thin wrapper around <code>tensorboardX.SummaryWriter</code> to log per-sweep diagnostics from <a href="../diagnostics/"><code>collect_diagnostics()</code></a>. Requires the optional <code>tensorboardX</code> dependency:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>tensorboardX
 </span></code></pre></div>
-<p>Check state consistency. Verifies column assignments, view states, sufficient statistics, and hyperparameters.</p>
-<p><strong>Returns</strong>: List of error messages (empty if valid).</p>
-<h2 id="assert_valid_state"><code>assert_valid_state</code><a class="headerlink" href="#assert_valid_state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">assert_valid_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<p>See the <a href="../../guides/tb-logger/">TensorBoard Logging Guide</a> for usage patterns.</p>
+<hr />
+<h2 id="tblogger"><code>TBLogger</code><a class="headerlink" href="#tblogger" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">TBLogger</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">log_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;runs&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">log_sweep</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TBLogger</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
 </span></code></pre></div>
-<p>Raise <code>ValidationError</code> if state is invalid. Calls <code>validate_state</code> and raises on any errors.</p>
-<p><strong>Raises</strong>: <code>ValidationError</code> (subclass of <code>ValueError</code>).</p>
+<p>Context manager for logging CrossCat diagnostics to TensorBoard.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>log_dir</code></td>
+<td><code>str</code></td>
+<td>Directory for TensorBoard event files (default <code>"runs"</code>)</td>
+</tr>
+<tr>
+<td><code>**kwargs</code></td>
+<td></td>
+<td>Extra arguments passed to <code>tensorboardX.SummaryWriter</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="log_sweep"><code>log_sweep</code><a class="headerlink" href="#log_sweep" title="Permanent link">&para;</a></h3>
+<p>Log a diagnostics dict from <code>collect_diagnostics()</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>metrics</code></td>
+<td><code>dict</code></td>
+<td>Dict from <code>collect_diagnostics(state, data)</code></td>
+</tr>
+<tr>
+<td><code>step</code></td>
+<td><code>int</code></td>
+<td>Sweep number (x-axis in TensorBoard)</td>
+</tr>
+</tbody>
+</table>
+<p>Scalar metrics are logged directly. Array/list metrics are logged as their mean value with a <code>mean/</code> prefix and as histograms.</p>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.tb_logger</span><span class="w"> </span><span class="kn">import</span> <span class="n">TBLogger</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">collect_diagnostics</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">with</span> <span class="n">TBLogger</span><span class="p">(</span><span class="s2">&quot;runs/experiment1&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tb</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">for</span> <span class="n">sweep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_sweeps</span><span class="p">):</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">packed</span> <span class="o">=</span> <span class="n">packed_gibbs_sweep</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">state</span> <span class="o">=</span> <span class="n">unpack_state</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">column_types</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="n">metrics</span> <span class="o">=</span> <span class="n">collect_diagnostics</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">tb</span><span class="o">.</span><span class="n">log_sweep</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">sweep</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Then visualize with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tensorboard<span class="w"> </span>--logdir<span class="w"> </span>runs
+</span></code></pre></div>
 
 
 

@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2799,10 +2919,14 @@
 :   A prior distribution that, when combined with a particular likelihood, yields a posterior in the same family. For example, a Normal-Gamma prior is conjugate to a Normal likelihood. Conjugacy enables closed-form computation of marginal likelihoods and posterior predictives — the foundation of collapsed inference in CrossCat.</p>
 <p><strong>Credible Interval</strong>
 :   The Bayesian analog of a confidence interval. A 95% credible interval means there is a 95% posterior probability that the true value falls within the interval. Computed via <code>credible_interval()</code> by sampling from the posterior predictive.</p>
+<p><strong>Early Stopping</strong>
+:   A convergence strategy that monitors log-joint probability during Gibbs sweeps and halts when improvement plateaus. Implemented in <code>gibbs_sweep_early_stopping()</code> with configurable patience and minimum improvement threshold.</p>
 <p><strong>Dependence Matrix (Z-matrix)</strong>
 :   An N x N matrix (where N = number of columns) showing the posterior probability that each pair of columns belongs to the same view. Values near 1.0 indicate strong statistical dependence; values near 0.0 indicate independence. Computed via <code>dependence_matrix()</code>.</p>
 <p><strong>Dirichlet Process (DP)</strong>
 :   A distribution over probability distributions, used as a nonparametric prior that allows the number of clusters to grow with the data. The CRP is the sequential representation of a DP. CrossCat uses a two-level DP: outer (columns into views) and inner (rows into clusters per view).</p>
+<p><strong>InitResult</strong>
+:   Frozen dataclass returned by <code>initialize()</code>. Wraps the state(s) and optional subsample metadata. Access the CrossCat state via <code>result.state</code> and subsample indices via <code>result.subsample_idx</code>.</p>
 <p><strong>Gibbs Sampling</strong>
 :   A Markov Chain Monte Carlo (MCMC) method that samples each variable in turn from its conditional distribution given the current values of all other variables. In CrossCat, Gibbs sampling is used to update row assignments, column assignments, hyperparameters, and CRP concentration parameters.</p>
 <p><strong>Gibbs Sweep</strong>
@@ -2811,6 +2935,10 @@
 :   Parameters of the prior distributions on component model parameters. For example, the Normal-Gamma model has hyperparameters <code>mu</code> (prior mean), <code>r</code> (prior precision scale), <code>s</code> (prior variance scale), and <code>nu</code> (prior degrees of freedom). These are sampled during inference via grid-based Gibbs transitions.</p>
 <p><strong>Log-Joint</strong>
 :   The log probability of the data and all latent variables (cluster assignments, hyperparameters) under the model. Used as a convergence diagnostic — when log-joint plateaus across multiple chains, the sampler has likely converged. Computed via <code>log_joint()</code>.</p>
+<p><strong>Memory Estimation</strong>
+:   Pre-inference calculation of GPU memory required for a packed state with given dimensions. Use <code>estimate_packed_memory()</code> to plan <code>max_clusters</code> and <code>max_views</code> before packing.</p>
+<p><strong>Mini-Batch Gibbs</strong>
+:   A variant of Gibbs sampling where each sweep updates only a random subset of rows (the "mini-batch"), reducing per-sweep cost from O(N) to O(B). Implemented in <code>minibatch_gibbs_sweep()</code> and <code>packed_transition_row_assignments_minibatch()</code>.</p>
 <p><strong>Marginal Likelihood</strong>
 :   The probability of the observed data in a cluster after integrating out all component parameters. Used to score how well a cluster explains its assigned data points. Each component model provides <code>log_marginal_likelihood()</code>.</p>
 <p><strong>Mutual Information (MI)</strong>
@@ -2819,6 +2947,8 @@
 :   A representation of CrossCat state as fixed-size JAX arrays with padding, enabling JIT compilation. Variable-size Python lists (views, clusters) are converted to padded arrays with known maximum dimensions. See <code>pack_state()</code> / <code>unpack_state()</code>.</p>
 <p><strong>Posterior Predictive</strong>
 :   The distribution over new data points, integrating over all posterior uncertainty in cluster assignments and parameters. Used by all query functions (sampling, probability, CDF, anomaly scoring). "Fully Bayesian" means predictions account for parameter uncertainty, not just point estimates.</p>
+<p><strong>Subsample Annealing</strong>
+:   A scaling strategy that initializes the model on a small subsample of rows, runs Gibbs sweeps to discover structure, then progressively inserts more rows and refines. Implemented in <code>subsample_anneal()</code>. Combines the benefits of fast initialization with full-data inference.</p>
 <p><strong>Sufficient Statistics</strong>
 :   Compact summaries of the data in each cluster that are sufficient to compute likelihoods. For example, the Normal-Gamma model tracks <code>(count, sum, sum_of_squares)</code> per cluster. Sufficient statistics enable efficient incremental updates when rows are added or removed from clusters.</p>
 <p><strong>View</strong>

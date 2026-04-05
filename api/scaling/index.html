@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/api/validation/">
+        <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/api/scaling/">
       
       
-        <link rel="prev" href="../synthetic/">
+        <link rel="prev" href="../aot-cache/">
       
       
-        <link rel="next" href="../packed-state/">
+        <link rel="next" href="../tb-logger/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Validation - JAX-CrossCat</title>
+        <title>Scaling - JAX-CrossCat</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#validation" class="md-skip">
+        <a href="#scaling" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Validation
+              Scaling
             
           </span>
         </div>
@@ -2077,37 +2077,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Validation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
         
   
   
@@ -2123,109 +2096,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#crosscat.validate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="validate">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.ValidationError" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ValidationError
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.validate_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate_state
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#crosscat.validate.assert_valid_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        assert_valid_state
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#validate_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        validate_state
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#assert_valid_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        assert_valid_state
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2403,10 +2273,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../scaling/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2422,6 +2319,142 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#crosscat.scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scaling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="scaling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.scaling.subsample_anneal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subsample_anneal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.scaling.minibatch_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        minibatch_gibbs_sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.scaling.gibbs_sweep_early_stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gibbs_sweep_early_stopping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.scaling.parallel_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parallel_gibbs_sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsample_anneal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subsample_anneal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minibatch_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        minibatch_gibbs_sweep
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gibbs_sweep_early_stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gibbs_sweep_early_stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parallel_gibbs_sweep
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3020,22 +3053,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#crosscat.validate" class="md-nav__link">
+  <a href="#crosscat.scaling" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate
+        scaling
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="validate">
+    <nav class="md-nav" aria-label="scaling">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#crosscat.validate.ValidationError" class="md-nav__link">
+  <a href="#crosscat.scaling.subsample_anneal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ValidationError
+        subsample_anneal
       
     </span>
   </a>
@@ -3043,10 +3076,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#crosscat.validate.validate_state" class="md-nav__link">
+  <a href="#crosscat.scaling.minibatch_gibbs_sweep" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate_state
+        minibatch_gibbs_sweep
       
     </span>
   </a>
@@ -3054,10 +3087,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#crosscat.validate.assert_valid_state" class="md-nav__link">
+  <a href="#crosscat.scaling.gibbs_sweep_early_stopping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        assert_valid_state
+        gibbs_sweep_early_stopping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.scaling.parallel_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parallel_gibbs_sweep
       
     </span>
   </a>
@@ -3081,10 +3125,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validate_state" class="md-nav__link">
+  <a href="#subsample_anneal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        validate_state
+        subsample_anneal
       
     </span>
   </a>
@@ -3092,10 +3136,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#assert_valid_state" class="md-nav__link">
+  <a href="#minibatch_gibbs_sweep" class="md-nav__link">
     <span class="md-ellipsis">
       
-        assert_valid_state
+        minibatch_gibbs_sweep
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gibbs_sweep_early_stopping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gibbs_sweep_early_stopping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel_gibbs_sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parallel_gibbs_sweep
       
     </span>
   </a>
@@ -3122,24 +3188,24 @@
   
 
 
-<h1 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h1>
+<h1 id="scaling">Scaling<a class="headerlink" href="#scaling" title="Permanent link">&para;</a></h1>
 
 
 <div class="doc doc-object doc-module">
 
 
 
-<h2 id="crosscat.validate" class="doc doc-heading">
-            <code>crosscat.validate</code>
+<h2 id="crosscat.scaling" class="doc doc-heading">
+            <code>crosscat.scaling</code>
 
 
-<a href="#crosscat.validate" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#crosscat.scaling" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents first">
 
-        <p>State validation utilities.</p>
-<p>Maps to original CrossCat validate_utils.py.
-Provides consistency checks for CrossCat state, hyperparameters, and suffstats.</p>
+        <p>Scaling utilities for large-dataset inference.</p>
+<p>Provides higher-level workflows that combine subsample initialization,
+batch insertion, and mini-batch Gibbs sweeps for datasets with 10K+ rows.</p>
 
 
 
@@ -3160,51 +3226,253 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
 
 
 
-<div class="doc doc-object doc-class">
+
+<div class="doc doc-object doc-function">
 
 
+<h3 id="crosscat.scaling.subsample_anneal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">subsample_anneal</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">column_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ColumnType</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">initial_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">growth_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">sweeps_per_stage</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">max_clusters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_views</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span><span class="p">,</span> <span class="n">insert_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span></code>
 
-<h3 id="crosscat.validate.ValidationError" class="doc doc-heading">
-            <code>ValidationError</code>
-
-
-<a href="#crosscat.validate.ValidationError" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#crosscat.scaling.subsample_anneal" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><span title="ValueError">ValueError</span></code></p>
+
+        <p>Subsample-annealing: gradually grow the dataset during inference.</p>
+<p>Starts with a small subsample, runs Gibbs sweeps to find structure,
+then progressively inserts more rows and refines. Convergence quality
+depends on <code>sweeps_per_stage</code> — more sweeps per stage allow the
+chain to mix before new data arrives.</p>
 
 
+<details class="stages" open>
+  <summary>Stages</summary>
+  <ol>
+<li>Initialize on <code>initial_size</code> rows, run sweeps</li>
+<li>Grow active rows by <code>growth_factor</code>, insert new batch, run sweeps</li>
+<li>Repeat step 2 until all rows are included (last iteration
+   serves as the final refinement on the full dataset)</li>
+</ol>
+</details>
 
-        <p>Raised when state validation fails.</p>
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Full data matrix, shape (n_rows, n_cols).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_types</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="ColumnType (crosscat.types.ColumnType)" href="../types/#crosscat.types.ColumnType">ColumnType</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type specification per column.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>initial_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows for initial subsample.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>growth_factor</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Multiplicative growth per stage (default 2x).</p>
+              </div>
+            </td>
+            <td>
+                  <code>2.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sweeps_per_stage</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Gibbs sweeps per annealing stage.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_clusters</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Max clusters for pack_state. If None, uses heuristic.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_views</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Max views for pack_state.</p>
+              </div>
+            </td>
+            <td>
+                  <code>16</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>insert_batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Batch size for packed_insert_rows calls.</p>
+              </div>
+            </td>
+            <td>
+                  <code>5000</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
 
 
-
-
-
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tuple of (packed_state, reordered_data) where reordered_data has</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>subsample rows first, then remaining rows in insertion order.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
 
 </div>
 
-
 <div class="doc doc-object doc-function">
 
 
-<h3 id="crosscat.validate.validate_state" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">validate_state</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">CrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span></code>
+<h3 id="crosscat.scaling.minibatch_gibbs_sweep" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">minibatch_gibbs_sweep</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span></code>
 
-<a href="#crosscat.validate.validate_state" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#crosscat.scaling.minibatch_gibbs_sweep" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Validate consistency of a CrossCatState.</p>
-<p>Maps to original validate_utils.py consistency checks.</p>
+        <p>Run multiple mini-batch Gibbs sweeps.</p>
+<p>Each sweep updates <code>batch_size</code> randomly sampled rows, then runs
+full column assignment, column hyper, and CRP alpha transitions.
+The row kernel cost is O(B) instead of O(N); column/hyper/CRP
+transitions still operate on the full dataset. Uses a Python
+for-loop over sweeps (separate JIT dispatch per sweep).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3220,19 +3488,35 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>state</code>
+                <code>rng_key</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="CrossCatState
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
 
 
   
       dataclass
-   (crosscat.types.CrossCatState)" href="../types/#crosscat.types.CrossCatState">CrossCatState</a></code>
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>CrossCat state to validate.</p>
+                <p>Current packed state.</p>
               </div>
             </td>
             <td>
@@ -3244,10 +3528,245 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
                 <code>data</code>
             </td>
             <td>
+                  <code><span title="jax.Array">Array</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional data array for additional checks.</p>
+                <p>(n_rows, n_cols) data matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows to update per sweep.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_sweeps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of sweeps to run.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Updated PackedCrossCatState.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.scaling.gibbs_sweep_early_stopping" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">gibbs_sweep_early_stopping</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_sweeps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span> <span class="n">check_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">patience</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">min_improvement</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span></code>
+
+<a href="#crosscat.scaling.gibbs_sweep_early_stopping" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Run Gibbs sweeps with convergence-based early stopping.</p>
+<p>Monitors log-joint probability every <code>check_interval</code> sweeps. Stops
+when the relative improvement compared to the <strong>previous checkpoint</strong>
+falls below <code>min_improvement</code> for <code>patience</code> consecutive checks.
+This avoids premature stopping during healthy MCMC mixing where the
+log-joint fluctuates around equilibrium.</p>
+<p>If the log-joint becomes NaN or infinite, the loop stops immediately
+with a warning.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Current packed state.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(n_rows, n_cols) data matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_sweeps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum number of sweeps.</p>
+              </div>
+            </td>
+            <td>
+                  <code>200</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>check_interval</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Sweeps between convergence checks.</p>
+              </div>
+            </td>
+            <td>
+                  <code>10</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>patience</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of checks with insufficient improvement before stopping.</p>
+              </div>
+            </td>
+            <td>
+                  <code>3</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>min_improvement</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Minimum relative improvement threshold.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.001</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_size</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If set, use mini-batch row transitions with this batch size.
+If None, use full sweeps.</p>
               </div>
             </td>
             <td>
@@ -3269,11 +3788,16 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+                  <code><span title="tuple">tuple</span>[<a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a>, <span title="list">list</span>[<span title="float">float</span>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>List of error messages (empty if valid).</p>
+                <p>Tuple of (final_packed_state, log_joint_history).</p>
               </div>
             </td>
           </tr>
@@ -3288,18 +3812,110 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
 <div class="doc doc-object doc-function">
 
 
-<h3 id="crosscat.validate.assert_valid_state" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">assert_valid_state</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">CrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+<h3 id="crosscat.scaling.parallel_gibbs_sweep" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parallel_gibbs_sweep</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span></code>
 
-<a href="#crosscat.validate.assert_valid_state" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#crosscat.scaling.parallel_gibbs_sweep" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Assert that a CrossCatState is valid.</p>
+        <p>Run Gibbs sweeps using parallel row scoring (single device).</p>
+<p>Uses <code>packed_transition_row_assignments_parallel</code> for row assignments
+(vmap over all rows with leave-one-out suffstat correction) and standard
+kernels for column/hyper/CRP transitions. This maximizes GPU utilization
+for large datasets.</p>
+<p>The parallel row kernel cannot create new clusters. For cluster
+birth/death, alternate with a sequential or minibatch sweep
+periodically. Uses a Python for-loop over sweeps (separate JIT
+dispatch per sweep).</p>
 
 
-<p><span class="doc-section-title">Raises:</span></p>
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Current packed state.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(n_rows, n_cols) data matrix.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_sweeps</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of sweeps to run.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
     <table>
       <thead>
         <tr>
@@ -3310,11 +3926,16 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="ValidationError (crosscat.validate.ValidationError)" href="#crosscat.validate.ValidationError">ValidationError</a></code>
+                  <code><a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.state.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If validation fails.</p>
+                <p>Updated PackedCrossCatState.</p>
               </div>
             </td>
           </tr>
@@ -3333,17 +3954,235 @@ Provides consistency checks for CrossCat state, hyperparameters, and suffstats.<
     </div>
 
 </div><h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>State consistency checking utilities.</p>
-<h2 id="validate_state"><code>validate_state</code><a class="headerlink" href="#validate_state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">validate_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<p>Higher-level workflows that combine subsample initialization, batch insertion, and mini-batch Gibbs sweeps for datasets with 10K+ rows. See the <a href="../../guides/scaling/">Scaling Guide</a> for usage patterns.</p>
+<hr />
+<h2 id="subsample_anneal"><code>subsample_anneal</code><a class="headerlink" href="#subsample_anneal" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">subsample_anneal</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">rng_key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">column_types</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">initial_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">growth_factor</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">sweeps_per_stage</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">max_clusters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">max_views</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">insert_batch_size</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span>
 </span></code></pre></div>
-<p>Check state consistency. Verifies column assignments, view states, sufficient statistics, and hyperparameters.</p>
-<p><strong>Returns</strong>: List of error messages (empty if valid).</p>
-<h2 id="assert_valid_state"><code>assert_valid_state</code><a class="headerlink" href="#assert_valid_state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">assert_valid_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<p>Gradually grow the dataset during inference. Starts with a small subsample, runs Gibbs sweeps to find structure, then progressively inserts more rows and refines.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Full data matrix</td>
+</tr>
+<tr>
+<td><code>column_types</code></td>
+<td><code>list[ColumnType]</code></td>
+<td>Type per column</td>
+</tr>
+<tr>
+<td><code>initial_size</code></td>
+<td><code>int</code></td>
+<td>Number of rows for initial subsample (default 1000)</td>
+</tr>
+<tr>
+<td><code>growth_factor</code></td>
+<td><code>float</code></td>
+<td>Multiplicative growth per stage (default 2x)</td>
+</tr>
+<tr>
+<td><code>sweeps_per_stage</code></td>
+<td><code>int</code></td>
+<td>Gibbs sweeps per annealing stage</td>
+</tr>
+<tr>
+<td><code>max_clusters</code></td>
+<td><code>int \| None</code></td>
+<td>Max clusters for <code>pack_state</code>. If None, uses <code>suggest_max_clusters</code> heuristic</td>
+</tr>
+<tr>
+<td><code>max_views</code></td>
+<td><code>int</code></td>
+<td>Max views for <code>pack_state</code></td>
+</tr>
+<tr>
+<td><code>insert_batch_size</code></td>
+<td><code>int</code></td>
+<td>Batch size for <code>packed_insert_rows</code> calls</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: <code>(packed_state, reordered_data)</code> — subsample rows first, then remaining rows in insertion order.</p>
+<p><strong>Stages:</strong></p>
+<ol>
+<li>Initialize on <code>initial_size</code> rows, run sweeps</li>
+<li>Grow active rows by <code>growth_factor</code>, insert new batch, run sweeps</li>
+<li>Repeat step 2 until all rows are included</li>
+</ol>
+<hr />
+<h2 id="minibatch_gibbs_sweep"><code>minibatch_gibbs_sweep</code><a class="headerlink" href="#minibatch_gibbs_sweep" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">minibatch_gibbs_sweep</span><span class="p">(</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
 </span></code></pre></div>
-<p>Raise <code>ValidationError</code> if state is invalid. Calls <code>validate_state</code> and raises on any errors.</p>
-<p><strong>Raises</strong>: <code>ValidationError</code> (subclass of <code>ValueError</code>).</p>
+<p>Mini-batch Gibbs sweeps. Each sweep updates <code>batch_size</code> randomly sampled rows, then runs full column assignment, column hyper, and CRP alpha transitions. Row kernel cost is O(B) instead of O(N).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PackedCrossCatState</code></td>
+<td>Current packed state</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Data matrix</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td><code>int</code></td>
+<td>Number of rows to update per sweep</td>
+</tr>
+<tr>
+<td><code>n_sweeps</code></td>
+<td><code>int</code></td>
+<td>Number of sweeps to run</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Updated <code>PackedCrossCatState</code>.</p>
+<hr />
+<h2 id="gibbs_sweep_early_stopping"><code>gibbs_sweep_early_stopping</code><a class="headerlink" href="#gibbs_sweep_early_stopping" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">gibbs_sweep_early_stopping</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">max_sweeps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">check_interval</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">patience</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">min_improvement</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span>
+</span></code></pre></div>
+<p>Run Gibbs sweeps with convergence-based early stopping. Monitors log-joint probability every <code>check_interval</code> sweeps. Stops when the relative improvement falls below <code>min_improvement</code> for <code>patience</code> consecutive checks.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PackedCrossCatState</code></td>
+<td>Current packed state</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Data matrix</td>
+</tr>
+<tr>
+<td><code>max_sweeps</code></td>
+<td><code>int</code></td>
+<td>Maximum number of sweeps</td>
+</tr>
+<tr>
+<td><code>check_interval</code></td>
+<td><code>int</code></td>
+<td>Sweeps between convergence checks</td>
+</tr>
+<tr>
+<td><code>patience</code></td>
+<td><code>int</code></td>
+<td>Checks with insufficient improvement before stopping</td>
+</tr>
+<tr>
+<td><code>min_improvement</code></td>
+<td><code>float</code></td>
+<td>Minimum relative improvement threshold</td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td><code>int \| None</code></td>
+<td>If set, use mini-batch row transitions. If None, use full sweeps</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: <code>(final_packed_state, log_joint_history)</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If the log-joint becomes NaN or infinite, the loop stops immediately with a warning. The state may be degenerate.</p>
+</div>
+<hr />
+<h2 id="parallel_gibbs_sweep"><code>parallel_gibbs_sweep</code><a class="headerlink" href="#parallel_gibbs_sweep" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">parallel_gibbs_sweep</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">rng_key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackedCrossCatState</span>
+</span></code></pre></div>
+<p>Gibbs sweeps using parallel row scoring (single device). Uses <code>packed_transition_row_assignments_parallel</code> for row assignments (vmap over all rows with leave-one-out suffstat correction) and standard kernels for column/hyper/CRP transitions.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rng_key</code></td>
+<td><code>Array</code></td>
+<td>JAX PRNG key</td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PackedCrossCatState</code></td>
+<td>Current packed state</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>Array (n_rows, n_cols)</code></td>
+<td>Data matrix</td>
+</tr>
+<tr>
+<td><code>n_sweeps</code></td>
+<td><code>int</code></td>
+<td>Number of sweeps to run</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns</strong>: Updated <code>PackedCrossCatState</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The parallel row kernel cannot create new clusters. Alternate with a sequential or minibatch sweep periodically for cluster birth/death.</p>
+</div>
 
 
 

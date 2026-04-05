@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2803,6 +2923,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#v0110-scaling-production-apr-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.11.0 — Scaling &amp; Production (Apr 2026)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3046,6 +3177,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#v0110-scaling-production-apr-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.11.0 — Scaling &amp; Production (Apr 2026)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3159,6 +3301,8 @@
 <p>Vectorized column scoring, type-specialized fast paths, XLA persistent compilation cache. MNIST (1000x257) dropped from 238s to 20s per sweep.</p>
 <h3 id="v0100v0101-ordinal-polish-mar-2026">v0.10.0–v0.10.1 — Ordinal &amp; Polish (Mar 2026)<a class="headerlink" href="#v0100v0101-ordinal-polish-mar-2026" title="Permanent link">&para;</a></h3>
 <p>True ordered logistic component model. Kernel splitting for independent JIT compilation. Property-based tests via Hypothesis. Von Mises batch fast path.</p>
+<h3 id="v0110-scaling-production-apr-2026">v0.11.0 — Scaling &amp; Production (Apr 2026)<a class="headerlink" href="#v0110-scaling-production-apr-2026" title="Permanent link">&para;</a></h3>
+<p>Subsample initialization (<code>subsample_rows</code>), <code>InitResult</code> wrapper, mini-batch Gibbs sweeps, parallel row scoring, early stopping, subsample annealing. TensorBoard logging for inference monitoring. Parquet I/O (<code>read_parquet</code>/<code>write_parquet</code>), Arrow IPC I/O (<code>save_arrow</code>/<code>load_arrow</code>), memory-mapped NumPy (<code>save_npy</code>/<code>load_npy_mmap</code>), chunked CSV reader. Memory estimation (<code>estimate_packed_memory</code>) and <code>suggest_max_clusters</code> heuristic.</p>
 <h2 id="current-focus">Current Focus<a class="headerlink" href="#current-focus" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Documentation overhaul and developer experience improvements</li>
@@ -3169,9 +3313,9 @@
 <p>These are areas of active interest. Priority depends on community feedback — <a href="https://github.com/sambhal-labs/jaxcross/discussions">open a discussion</a> or <a href="https://github.com/sambhal-labs/jaxcross/issues">upvote an issue</a> to signal what matters to you.</p>
 <h3 id="performance-scale">Performance &amp; Scale<a class="headerlink" href="#performance-scale" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Larger dataset support (10k+ rows) via memory-efficient kernels</li>
+<li>~~Larger dataset support (10k+ rows) via memory-efficient kernels~~ (done in v0.11.0)</li>
 <li>Multi-device inference (data parallelism across GPUs)</li>
-<li>Adaptive sweep scheduling (early stopping when converged)</li>
+<li>~~Adaptive sweep scheduling (early stopping when converged)~~ (done in v0.11.0)</li>
 </ul>
 <h3 id="new-capabilities">New Capabilities<a class="headerlink" href="#new-capabilities" title="Permanent link">&para;</a></h3>
 <ul>

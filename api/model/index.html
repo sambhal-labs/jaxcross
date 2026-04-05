@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,6 +1696,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2333,6 +2397,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3071,7 +3191,7 @@ dispatching, and state serialization. Here we separate concerns:
 
 
 <h3 id="crosscat.model.initialize" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">initialize</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">column_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ColumnType</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column_crp_alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">row_crp_alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">initialization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;from_the_prior&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CrossCatState</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">CrossCatState</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">initialize</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">column_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ColumnType</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_chains</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">column_crp_alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">row_crp_alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">initialization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;from_the_prior&#39;</span><span class="p">,</span> <span class="n">subsample_rows</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InitResult</span></code>
 
 <a href="#crosscat.model.initialize" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -3209,6 +3329,28 @@ with initialization='from_the_prior'.</p>
                   <code>&#39;from_the_prior&#39;</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>subsample_rows</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If set, initialize on a random subsample of this many
+rows. Hyperparameters are computed from the full data for accurate
+priors, but CRP row assignments and sufficient statistics use only
+the subsample. The returned <code>InitResult.state</code> has
+n_rows=subsample_rows. Remaining rows can be streamed in via
+<code>packed_insert_rows</code>. If subsample_rows &gt;= n_rows, the full
+dataset is used (subsample_idx will be None).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -3224,21 +3366,46 @@ with initialization='from_the_prior'.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="CrossCatState
+                  <code><a class="autorefs autorefs-internal" title="InitResult
 
 
   
       dataclass
-   (crosscat.types.CrossCatState)" href="../types/#crosscat.types.CrossCatState">CrossCatState</a> | <span title="list">list</span>[<a class="autorefs autorefs-internal" title="CrossCatState
-
-
-  
-      dataclass
-   (crosscat.types.CrossCatState)" href="../types/#crosscat.types.CrossCatState">CrossCatState</a>]</code>
+   (crosscat.types.InitResult)" href="../types/#crosscat.types.InitResult">InitResult</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Single CrossCatState if n_chains=1, else list of states.</p>
+                <p>InitResult with <code>.state</code> (single CrossCatState if n_chains=1,</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="InitResult
+
+
+  
+      dataclass
+   (crosscat.types.InitResult)" href="../types/#crosscat.types.InitResult">InitResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>else list) and <code>.subsample_idx</code> (Array of row indices used,</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="InitResult
+
+
+  
+      dataclass
+   (crosscat.types.InitResult)" href="../types/#crosscat.types.InitResult">InitResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>or None if full data was used).</p>
               </div>
             </td>
           </tr>
@@ -3261,8 +3428,8 @@ with initialization='from_the_prior'.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If data is empty, column_types length mismatches data, or
-invalid initialization mode.</p>
+                <p>If data is empty, column_types length mismatches data,
+invalid initialization mode, or subsample_rows &lt; 1.</p>
               </div>
             </td>
           </tr>
@@ -3520,8 +3687,9 @@ via the CRP predictive distribution (no re-inference on existing rows).</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">n_chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">column_crp_alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">row_crp_alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">initialization</span><span class="o">=</span><span class="s2">&quot;from_the_prior&quot;</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CrossCatState</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">CrossCatState</span><span class="p">]</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">initialization</span><span class="o">=</span><span class="s2">&quot;from_the_prior&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">subsample_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InitResult</span>
 </span></code></pre></div>
 <p>Create initial CrossCat state(s).</p>
 <table>
@@ -3568,9 +3736,14 @@ via the CRP predictive distribution (no re-inference on existing rows).</p>
 <td><code>str</code></td>
 <td><code>"from_the_prior"</code>, <code>"together"</code>, or <code>"apart"</code></td>
 </tr>
+<tr>
+<td><code>subsample_rows</code></td>
+<td><code>int \| None</code></td>
+<td>If set, CRP-sample this many rows for fast initialization on large datasets. The selected indices are stored in <code>InitResult.subsample_idx</code>.</td>
+</tr>
 </tbody>
 </table>
-<p><strong>Returns</strong>: <code>CrossCatState</code> if <code>n_chains=1</code>, else <code>list[CrossCatState]</code>.</p>
+<p><strong>Returns</strong>: <a href="../types/#initresult"><code>InitResult</code></a> — access the state via <code>result.state</code> (<code>CrossCatState</code> if <code>n_chains=1</code>, else <code>list[CrossCatState]</code>). When <code>subsample_rows</code> is set, <code>result.subsample_idx</code> contains the selected row indices.</p>
 <p><strong>Initialization modes:</strong></p>
 <ul>
 <li><code>"from_the_prior"</code> — sample column and row assignments from CRP priors</li>

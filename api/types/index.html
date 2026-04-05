@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,6 +1696,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -1880,6 +1944,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.types.InitResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InitResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.types.log_bessel_i0" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1955,6 +2030,17 @@
     <span class="md-ellipsis">
       
         SufficientStats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InitResult
       
     </span>
   </a>
@@ -2416,6 +2502,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -3078,6 +3220,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.types.InitResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InitResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.types.log_bessel_i0" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3153,6 +3306,17 @@
     <span class="md-ellipsis">
       
         SufficientStats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InitResult
       
     </span>
   </a>
@@ -3540,6 +3704,106 @@ per-observation parameters.</p>
 
 </div>
 
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="crosscat.types.InitResult" class="doc doc-heading">
+            <code>InitResult</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#crosscat.types.InitResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Result of <code>initialize()</code> — wraps state(s) with optional subsample info.</p>
+<p>Always returned by <code>initialize()</code>, regardless of whether subsampling
+is used. This avoids polymorphic return types that change based on
+runtime parameters.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="crosscat.types.InitResult.state">state</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CrossCatState
+
+
+  
+      dataclass
+   (crosscat.types.CrossCatState)" href="#crosscat.types.CrossCatState">CrossCatState</a> | <span title="list">list</span>[<a class="autorefs autorefs-internal" title="CrossCatState
+
+
+  
+      dataclass
+   (crosscat.types.CrossCatState)" href="#crosscat.types.CrossCatState">CrossCatState</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Single CrossCatState (n_chains=1) or list of states (n_chains&gt;1).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="crosscat.types.InitResult.subsample_idx">subsample_idx</span></code></td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Row indices used for subsampling, or None if full data
+was used. Shape <code>(subsample_rows,)</code> when set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
 
 <div class="doc doc-object doc-function">
 
@@ -3760,7 +4024,7 @@ matching the original CrossCat numerics.cpp::log_bessel_0().</p>
 <tr>
 <td><code>sum_x</code></td>
 <td><code>Array \| None</code></td>
-<td>CONTINUOUS, ORDINAL</td>
+<td>CONTINUOUS, BINARY</td>
 </tr>
 <tr>
 <td><code>sum_x_sq</code></td>
@@ -3770,7 +4034,7 @@ matching the original CrossCat numerics.cpp::log_bessel_0().</p>
 <tr>
 <td><code>category_counts</code></td>
 <td><code>Array \| None</code></td>
-<td>CATEGORICAL, BINARY, ORDINAL</td>
+<td>CATEGORICAL, ORDINAL</td>
 </tr>
 <tr>
 <td><code>sum_sin</code>, <code>sum_cos</code></td>
@@ -3779,9 +4043,43 @@ matching the original CrossCat numerics.cpp::log_bessel_0().</p>
 </tr>
 </tbody>
 </table>
+<h2 id="initresult"><code>InitResult</code><a class="headerlink" href="#initresult" title="Permanent link">&para;</a></h2>
+<p>Frozen dataclass returned by <a href="../model/#initialize"><code>initialize()</code></a>. Wraps state(s) with optional subsample info.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state</code></td>
+<td><code>CrossCatState \| list[CrossCatState]</code></td>
+<td>Single state (<code>n_chains=1</code>) or list of states (<code>n_chains&gt;1</code>)</td>
+</tr>
+<tr>
+<td><code>subsample_idx</code></td>
+<td><code>Array \| None</code></td>
+<td>Row indices used for subsampling, shape <code>(subsample_rows,)</code>. <code>None</code> if full data was used.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">state</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>  <span class="c1"># CrossCatState</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">states</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>  <span class="c1"># list[CrossCatState]</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">subsample_rows</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">state</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">sub_idx</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">subsample_idx</span>  <span class="c1"># Array (5000,)</span>
+</span></code></pre></div>
 <h2 id="constants">Constants<a class="headerlink" href="#constants" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>LOG_EPS = 1e-30</code> — Numerical stability constant used throughout for underflow protection in <code>log()</code> and division operations.</li>
+<li><code>ORDINAL_N_GRID = 31</code> — Grid points for ordinal logistic location parameter integration. Override to trade accuracy for speed (captured at import time).</li>
 </ul>
 
 

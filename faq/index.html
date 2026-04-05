@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2965,6 +3085,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#scaling-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaling &amp; Production
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaling &amp; Production">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-handle-datasets-with-10k-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I handle datasets with 10K+ rows?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-estimate-gpu-memory-usage-before-packing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I estimate GPU memory usage before packing?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-initresult-and-why-did-initialize-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's InitResult and why did initialize() change?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-monitor-inference-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I monitor inference progress?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-i-load-parquet-files-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can I load Parquet files directly?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3401,6 +3593,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#scaling-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaling &amp; Production
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaling &amp; Production">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-handle-datasets-with-10k-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I handle datasets with 10K+ rows?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-estimate-gpu-memory-usage-before-packing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I estimate GPU memory usage before packing?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whats-initresult-and-why-did-initialize-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's InitResult and why did initialize() change?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-monitor-inference-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I monitor inference progress?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-i-load-parquet-files-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can I load Parquet files directly?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3526,9 +3790,9 @@
 <h3 id="how-can-i-reduce-memory-usage">How can I reduce memory usage?<a class="headerlink" href="#how-can-i-reduce-memory-usage" title="Permanent link">&para;</a></h3>
 <p>Tune the padding parameters in <code>pack_state()</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">packed</span> <span class="o">=</span> <span class="n">pack_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">max_views</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>        <span class="c1"># Default: n_cols (often too large)</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">max_clusters</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>    <span class="c1"># Default: n_rows (often too large)</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">max_categories</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>  <span class="c1"># Default: auto-detected</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">max_views</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>        <span class="c1"># Default: 16</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">max_clusters</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>    <span class="c1"># Default: 32</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">max_categories</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>  <span class="c1"># Default: 16</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Smaller padding = less GPU memory. Set these to the maximum you expect during inference, not the theoretical maximum.</p>
@@ -3563,8 +3827,9 @@
 </tbody>
 </table>
 <p><strong>Use multi-chain inference</strong> to assess convergence:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">states</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># Run each chain, then compare with diagnostics</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">states</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Run each chain, then compare with diagnostics</span>
 </span></code></pre></div>
 <p>Monitor <code>log_joint</code> — when it plateaus across chains, you've likely converged. See the <a href="../guides/diagnostics/">Diagnostics Guide</a>.</p>
 <h3 id="how-do-i-choose-column-types">How do I choose column types?<a class="headerlink" href="#how-do-i-choose-column-types" title="Permanent link">&para;</a></h3>
@@ -3735,6 +4000,46 @@
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Unpacked (slow) — only for debugging</span>
 </span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">gibbs_sweep</span>
 </span></code></pre></div>
+<hr />
+<h2 id="scaling-production">Scaling &amp; Production<a class="headerlink" href="#scaling-production" title="Permanent link">&para;</a></h2>
+<h3 id="how-do-i-handle-datasets-with-10k-rows">How do I handle datasets with 10K+ rows?<a class="headerlink" href="#how-do-i-handle-datasets-with-10k-rows" title="Permanent link">&para;</a></h3>
+<p>Use the <code>crosscat.scaling</code> module, which provides four strategies:</p>
+<ol>
+<li><strong>Subsample annealing</strong> — start small, grow progressively (<code>subsample_anneal</code>)</li>
+<li><strong>Mini-batch Gibbs</strong> — update a random subset of rows per sweep (<code>minibatch_gibbs_sweep</code>)</li>
+<li><strong>Parallel row scoring</strong> — <code>vmap</code> over all rows simultaneously (<code>parallel_gibbs_sweep</code>)</li>
+<li><strong>Early stopping</strong> — stop when log-joint converges (<code>gibbs_sweep_early_stopping</code>)</li>
+</ol>
+<p>See the <a href="../guides/scaling/">Scaling Guide</a> for full details.</p>
+<h3 id="how-do-i-estimate-gpu-memory-usage-before-packing">How do I estimate GPU memory usage before packing?<a class="headerlink" href="#how-do-i-estimate-gpu-memory-usage-before-packing" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">estimate_packed_memory</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">mem</span> <span class="o">=</span> <span class="n">estimate_packed_memory</span><span class="p">(</span><span class="mi">100_000</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="n">max_clusters</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Estimated: </span><span class="si">{</span><span class="n">mem</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="whats-initresult-and-why-did-initialize-change">What's <code>InitResult</code> and why did <code>initialize()</code> change?<a class="headerlink" href="#whats-initresult-and-why-did-initialize-change" title="Permanent link">&para;</a></h3>
+<p><code>initialize()</code> now returns an <code>InitResult</code> instead of a bare state. Access the state via <code>result.state</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">initialize</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">col_types</span><span class="p">)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">state</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">state</span>  <span class="c1"># CrossCatState (same as before)</span>
+</span></code></pre></div>
+<p>This wrapper also carries <code>subsample_idx</code> when <code>subsample_rows</code> is set.</p>
+<h3 id="how-do-i-monitor-inference-progress">How do I monitor inference progress?<a class="headerlink" href="#how-do-i-monitor-inference-progress" title="Permanent link">&para;</a></h3>
+<p>Use the TensorBoard logger:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.tb_logger</span><span class="w"> </span><span class="kn">import</span> <span class="n">TBLogger</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="k">with</span> <span class="n">TBLogger</span><span class="p">(</span><span class="s2">&quot;runs/my_experiment&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tb</span><span class="p">:</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="k">for</span> <span class="n">sweep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_sweeps</span><span class="p">):</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>        <span class="n">packed</span> <span class="o">=</span> <span class="n">packed_gibbs_sweep</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">n_sweeps</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="n">state</span> <span class="o">=</span> <span class="n">unpack_state</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="n">tb</span><span class="o">.</span><span class="n">log_sweep</span><span class="p">(</span><span class="n">collect_diagnostics</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span> <span class="n">sweep</span><span class="p">)</span>
+</span></code></pre></div>
+<p>See the <a href="../guides/tb-logger/">TensorBoard Guide</a>.</p>
+<h3 id="can-i-load-parquet-files-directly">Can I load Parquet files directly?<a class="headerlink" href="#can-i-load-parquet-files-directly" title="Permanent link">&para;</a></h3>
+<p>Yes, if <code>pyarrow</code> is installed:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_parquet</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">data</span><span class="p">,</span> <span class="n">col_names</span> <span class="o">=</span> <span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p>See <a href="../guides/data-loading/#parquet-files">Data Loading Guide</a> for Parquet, Arrow IPC, and NPY formats.</p>
 
 
 

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://sambhal-labs.github.io/jaxcross/architecture/overview/">
       
       
-        <link rel="prev" href="../../api/aot-cache/">
+        <link rel="prev" href="../../api/tb-logger/">
       
       
         <link rel="next" href="../model/">
@@ -739,6 +739,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1433,6 +1437,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling to Large Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1634,6 +1694,10 @@
       
         
           
+        
+      
+        
+      
         
       
         
@@ -2189,6 +2253,62 @@
     
   
     AOT Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scaling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tb-logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TensorBoard Logger
   
 
     
@@ -2928,12 +3048,12 @@
 <p>This section explains the internal design of jax-crosscat: how the CrossCat model maps to JAX, how modules fit together, and the performance optimizations that enable GPU-scale inference.</p>
 <h2 id="pipeline">Pipeline<a class="headerlink" href="#pipeline" title="Permanent link">&para;</a></h2>
 <p align="center">
-  <img src="../diagrams/architecture-pipeline.svg" alt="JAX-CrossCat Architecture" width="800" />
+  <img src="../diagrams/architecture-pipeline.svg" alt="JAX-CrossCat Architecture" width="900" />
 </p>
 
 <h2 id="module-map">Module Map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
 <p align="center">
-  <img src="../diagrams/module-architecture.svg" alt="Module Architecture" width="800" />
+  <img src="../diagrams/module-architecture.svg" alt="Module Architecture" width="900" />
 </p>
 
 <table>
@@ -3006,30 +3126,35 @@
 </tr>
 <tr>
 <td><code>data_utils.py</code></td>
-<td>CSV I/O, column type detection</td>
+<td>CSV/Parquet/Arrow/NPY I/O, column type detection</td>
 </tr>
 <tr>
 <td><code>validate.py</code></td>
 <td>State consistency checking</td>
+</tr>
+<tr>
+<td><code>scaling.py</code></td>
+<td>Large-dataset strategies: subsample annealing, minibatch, parallel, early stopping</td>
+</tr>
+<tr>
+<td><code>tb_logger.py</code></td>
+<td>TensorBoard logging for inference monitoring</td>
 </tr>
 </tbody>
 </table>
 <h2 id="data-flow">Data Flow<a class="headerlink" href="#data-flow" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
-<p><strong><code>initialize()</code></strong> creates a <code>CrossCatState</code> by sampling from CRP priors and computing data-driven hyperparameter defaults.</p>
+<p><strong><code>initialize()</code></strong> creates an <code>InitResult</code> wrapping a <code>CrossCatState</code> by sampling from CRP priors and computing data-driven hyperparameter defaults.</p>
 </li>
 <li>
 <p><strong><code>pack_state()</code></strong> converts to fixed-size padded arrays for JIT compilation.</p>
 </li>
 <li>
-<p><strong><code>packed_gibbs_sweep()</code></strong> runs compiled Gibbs kernels (row assignments → column assignments → hyperparameters → CRP alphas).</p>
+<p><strong><code>packed_gibbs_sweep()</code></strong> runs compiled Gibbs kernels (row assignments → column assignments → hyperparameters → CRP alphas). For large datasets, use <code>scaling.py</code> alternatives (minibatch, subsample annealing, early stopping).</p>
 </li>
 <li>
-<p><strong><code>unpack_state()</code></strong> converts back to Python-friendly state for queries and inspection.</p>
-</li>
-<li>
-<p><strong>Queries</strong> read the posterior state to answer questions via mixture-weighted posterior predictives.</p>
+<p><strong>Packed queries</strong> (<code>packed_inference.py</code>) run directly on the packed state — no unpacking needed. Use <code>unpack_state()</code> only if you need the unpacked <code>inference.py</code> functions or want to inspect the state structure.</p>
 </li>
 </ol>
 <h2 id="sections">Sections<a class="headerlink" href="#sections" title="Permanent link">&para;</a></h2>
