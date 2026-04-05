@@ -91,7 +91,7 @@ def benchmark_parallel_vs_sequential(key, n_rows=100_000, n_cols=20):
     data, col_types = _make_data(k1, n_rows, n_cols)
     max_k = suggest_max_clusters(n_rows)
 
-    state = initialize(k2, data, col_types)
+    state = initialize(k2, data, col_types).state
     packed = pack_state(state, max_clusters=max_k)
     packed = packed_gibbs_sweep(k3, packed, data, n_sweeps=3)
     packed.column_assignments.block_until_ready()
