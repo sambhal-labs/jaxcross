@@ -8,13 +8,14 @@ Maps to original CrossCat data_utils.py:
 
 Scaling additions:
 - read_csv_chunked: streaming CSV reader for large files
-- load_npz_mmap: memory-mapped NPZ loading
+- load_npy_mmap: memory-mapped NPY loading
 - read_parquet: Apache Parquet/Arrow integration
 """
 
 from __future__ import annotations
 
 import csv
+import warnings
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -44,8 +45,6 @@ def read_csv(
     """
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
-
-    import warnings
 
     filepath = Path(filepath)
     with open(filepath, newline="") as f:
@@ -269,8 +268,6 @@ def read_csv_chunked(
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
 
-    import warnings
-
     filepath = Path(filepath)
     chunks: list[np.ndarray] = []
     all_bad_examples: list[str] = []
@@ -305,7 +302,7 @@ def read_csv_chunked(
             if len(batch) >= chunk_size:
                 arr, bad, nb, mis = _parse_rows(batch, n_cols, nan_values)
                 chunks.append(arr)
-                all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
+                all_bad_examples.extend(bad[: 5 - len(all_bad_examples)])
                 total_bad += nb
                 total_mismatched += mis
                 batch = []
@@ -313,7 +310,7 @@ def read_csv_chunked(
         if batch:
             arr, bad, nb, mis = _parse_rows(batch, n_cols, nan_values)
             chunks.append(arr)
-            all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
+            all_bad_examples.extend(bad[: 5 - len(all_bad_examples)])
             total_bad += nb
             total_mismatched += mis
 
@@ -370,19 +367,16 @@ def _parse_rows(
     return out, bad_examples, n_bad, n_mismatched
 
 
-def save_npz(
+def save_npy(
     filepath: str | Path,
     data: Array,
     column_names: list[str] | None = None,
 ) -> None:
     """Save data array to uncompressed ``.npy`` for fast memory-mapped reloading.
 
-    Despite the name (retained to match ``load_npz_mmap``), this saves an
-    uncompressed ``.npy`` file — not a compressed ``.npz`` — so that
-    ``load_npz_mmap`` can truly memory-map the result.
-
-    Column names are stored in a separate JSON sidecar file to avoid
-    pickle serialization.
+    Saves an uncompressed ``.npy`` file so that ``load_npy_mmap`` can
+    truly memory-map the result. Column names are stored in a separate
+    JSON sidecar file.
 
     Args:
         filepath: Output path. The ``.npy`` suffix is used regardless of
@@ -391,12 +385,11 @@ def save_npz(
         column_names: Optional column names (saved as JSON sidecar).
     """
     import json
-    import warnings
 
     filepath = Path(filepath)
     if filepath.suffix and filepath.suffix != ".npy":
         warnings.warn(
-            f"save_npz writes .npy (not {filepath.suffix}). "
+            f"save_npy writes .npy (not {filepath.suffix}). "
             f"Output file: {filepath.with_suffix('.npy')}",
             stacklevel=2,
         )
@@ -408,7 +401,25 @@ def save_npz(
             json.dump({"column_names": column_names}, f)
 
 
-def load_npz_mmap(
+def save_npz(
+    filepath: str | Path,
+    data: Array,
+    column_names: list[str] | None = None,
+) -> None:
+    """Deprecated: use ``save_npy`` instead.
+
+    This function saves ``.npy`` files despite its name. The ``save_npy``
+    alias is preferred for clarity.
+    """
+    warnings.warn(
+        "save_npz is deprecated — use save_npy instead (saves .npy files, not .npz).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    save_npy(filepath, data, column_names)
+
+
+def load_npy_mmap(
     filepath: str | Path,
     *,
     mmap_mode: str = "r",
@@ -419,11 +430,11 @@ def load_npz_mmap(
     demand, so peak RAM stays low for multi-GB files.  Convert slices to
     JAX when needed::
 
-        data_np, names = load_npz_mmap("data.npy")
+        data_np, names = load_npy_mmap("data.npy")
         batch = jnp.array(data_np[1000:2000])   # only this slice hits RAM/GPU
 
     Args:
-        filepath: Path to ``.npy`` file (created by ``save_npz``).
+        filepath: Path to ``.npy`` file (created by ``save_npy``).
         mmap_mode: NumPy mmap mode ('r' for read-only, 'r+' for read-write).
 
     Returns:
@@ -433,12 +444,11 @@ def load_npz_mmap(
         If the JSON sidecar with column names is missing.
     """
     import json
-    import warnings
 
     filepath = Path(filepath)
     if filepath.suffix and filepath.suffix != ".npy":
         warnings.warn(
-            f"load_npz_mmap reads .npy (not {filepath.suffix}). "
+            f"load_npy_mmap reads .npy (not {filepath.suffix}). "
             f"Loading: {filepath.with_suffix('.npy')}",
             stacklevel=2,
         )
@@ -456,6 +466,24 @@ def load_npz_mmap(
             stacklevel=2,
         )
     return data_np, col_names
+
+
+def load_npz_mmap(
+    filepath: str | Path,
+    *,
+    mmap_mode: str = "r",
+) -> tuple[np.ndarray, list[str] | None]:
+    """Deprecated: use ``load_npy_mmap`` instead.
+
+    This function loads ``.npy`` files despite its name. The ``load_npy_mmap``
+    alias is preferred for clarity.
+    """
+    warnings.warn(
+        "load_npz_mmap is deprecated — use load_npy_mmap instead (loads .npy files).",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return load_npy_mmap(filepath, mmap_mode=mmap_mode)
 
 
 def read_parquet(
@@ -608,7 +636,7 @@ def load_arrow(
     When ``memory_map=True`` (default), pyarrow memory-maps the file.
     However, the data is still fully materialized into a JAX array,
     so peak RAM includes Arrow + NumPy + JAX copies.  For truly
-    lazy loading, use ``load_npz_mmap`` which returns a NumPy memmap.
+    lazy loading, use ``load_npy_mmap`` which returns a NumPy memmap.
 
     Args:
         filepath: Path to .arrow/.feather file (created by ``save_arrow``).
