@@ -14,6 +14,7 @@ from crosscat.model import initialize
 from crosscat.packed.kernels import (
     packed_gibbs_sweep,
     packed_insert_rows,
+    packed_log_joint,
     packed_transition_column_assignments,
     packed_transition_column_hypers,
     packed_transition_crp_alphas,
@@ -44,7 +45,7 @@ def subsample_anneal(
 
     Stages:
       1. Initialize on ``initial_size`` rows, run sweeps
-      2. Double the active rows, insert new batch, run sweeps
+      2. Grow active rows by ``growth_factor``, insert new batch, run sweeps
       3. Repeat step 2 until all rows are included (last iteration
          serves as the final refinement on the full dataset)
 
@@ -202,8 +203,6 @@ def gibbs_sweep_early_stopping(
     """
     import math
     import warnings
-
-    from crosscat.packed.kernels import packed_log_joint
 
     log_joints: list[float] = []
     stale_count = 0
