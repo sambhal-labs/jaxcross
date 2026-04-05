@@ -38,15 +38,15 @@ def subsample_anneal(
     """Subsample-annealing: gradually grow the dataset during inference.
 
     Starts with a small subsample, runs Gibbs sweeps to find structure,
-    then progressively inserts more rows and refines. This maintains
-    exactness in the limit while avoiding the cost of full sweeps on
-    all rows during early exploration.
+    then progressively inserts more rows and refines. Convergence quality
+    depends on ``sweeps_per_stage`` — more sweeps per stage allow the
+    chain to mix before new data arrives.
 
     Stages:
       1. Initialize on ``initial_size`` rows, run sweeps
       2. Double the active rows, insert new batch, run sweeps
-      3. Repeat until all rows are included
-      4. Final sweeps on full dataset
+      3. Repeat step 2 until all rows are included (last iteration
+         serves as the final refinement on the full dataset)
 
     Args:
         rng_key: JAX PRNG key.
@@ -135,7 +135,9 @@ def minibatch_gibbs_sweep(
 
     Each sweep updates ``batch_size`` randomly sampled rows, then runs
     full column assignment, column hyper, and CRP alpha transitions.
-    This provides O(B) per-sweep cost instead of O(N) for the row kernel.
+    The row kernel cost is O(B) instead of O(N); column/hyper/CRP
+    transitions still operate on the full dataset. Uses a Python
+    for-loop over sweeps (separate JIT dispatch per sweep).
 
     Args:
         rng_key: JAX PRNG key.
@@ -175,8 +177,13 @@ def gibbs_sweep_early_stopping(
     """Run Gibbs sweeps with convergence-based early stopping.
 
     Monitors log-joint probability every ``check_interval`` sweeps. Stops
-    when the relative improvement falls below ``min_improvement`` for
-    ``patience`` consecutive checks.
+    when the relative improvement compared to the **previous checkpoint**
+    falls below ``min_improvement`` for ``patience`` consecutive checks.
+    This avoids premature stopping during healthy MCMC mixing where the
+    log-joint fluctuates around equilibrium.
+
+    If the log-joint becomes NaN or infinite, the loop stops immediately
+    with a warning.
 
     Args:
         rng_key: JAX PRNG key.
@@ -192,11 +199,14 @@ def gibbs_sweep_early_stopping(
     Returns:
         Tuple of (final_packed_state, log_joint_history).
     """
+    import math
+    import warnings
+
     from crosscat.packed.kernels import packed_log_joint
 
     log_joints: list[float] = []
     stale_count = 0
-    best_lj = float("-inf")
+    prev_lj: float | None = None
     total_sweeps = 0
 
     while total_sweeps < max_sweeps:
@@ -216,16 +226,24 @@ def gibbs_sweep_early_stopping(
         lj = float(packed_log_joint(packed, data))
         log_joints.append(lj)
 
-        # Check convergence
-        if best_lj > float("-inf"):
-            rel_improvement = (lj - best_lj) / (abs(best_lj) + 1e-10)
+        # Bail on degenerate state
+        if not math.isfinite(lj):
+            warnings.warn(
+                f"Log-joint became {lj} after {total_sweeps} sweeps. "
+                f"Stopping early — state may be degenerate.",
+                stacklevel=2,
+            )
+            break
+
+        # Check convergence against previous checkpoint (not all-time best)
+        if prev_lj is not None:
+            rel_improvement = (lj - prev_lj) / (abs(prev_lj) + 1e-10)
             if rel_improvement < min_improvement:
                 stale_count += 1
             else:
                 stale_count = 0
 
-        if lj > best_lj:
-            best_lj = lj
+        prev_lj = lj
 
         if stale_count >= patience:
             break

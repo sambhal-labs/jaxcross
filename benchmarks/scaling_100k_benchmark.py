@@ -5,7 +5,7 @@ Tests:
   2. Data connector roundtrip (save_npz / load_npz_mmap)
   3. Memory estimation at 100K scale
 
-Designed for Kaggle 2xT4 (32GB VRAM). Not runnable on small GPUs.
+Designed for Kaggle T4 (16GB VRAM). Not runnable on small GPUs.
 
 Usage:
     uv run python benchmarks/scaling_100k_benchmark.py
