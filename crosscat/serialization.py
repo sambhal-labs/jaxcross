@@ -9,7 +9,9 @@ No external dependencies beyond ``json`` and ``numpy`` (both already required).
 
 from __future__ import annotations
 
+import fcntl
 import json
+import logging
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -24,6 +26,8 @@ from crosscat.packed.state import (
     unpack_state,
 )
 from crosscat.types import ColumnType, CrossCatState
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA_VERSION = 3
 
@@ -57,6 +61,7 @@ def save_packed_state(
     # Metadata
     metadata: dict = {
         "schema_version": _SCHEMA_VERSION,
+        "min_reader_version": _SCHEMA_VERSION,
         "state_type": "packed",
     }
     for name in _STATIC_FIELDS:
@@ -64,13 +69,20 @@ def save_packed_state(
     if column_types is not None:
         metadata["column_types"] = [ct.value for ct in column_types]
 
-    with open(path / "metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2)
+    # Write under exclusive lock to prevent concurrent corruption
+    lock_path = path / ".lock"
+    with open(lock_path, "w") as lock_f:
+        fcntl.flock(lock_f, fcntl.LOCK_EX)
+        try:
+            with open(path / "metadata.json", "w") as f:
+                json.dump(metadata, f, indent=2)
 
-    # Arrays
-    arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
-    np.savez_compressed(path / "arrays.npz", **arrays)
+            arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
+            np.savez_compressed(path / "arrays.npz", **arrays)
+        finally:
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
 
+    logger.info("Saved packed state to %s (schema v%d)", path, _SCHEMA_VERSION)
     return path
 
 
@@ -100,6 +112,12 @@ def load_packed_state(
         metadata = json.load(f)
 
     version = metadata.get("schema_version", 0)
+    min_reader = metadata.get("min_reader_version", 0)
+    if min_reader > _SCHEMA_VERSION:
+        raise ValueError(
+            f"This state requires reader version >={min_reader} but this "
+            f"installation supports <={_SCHEMA_VERSION}. Upgrade jax-crosscat."
+        )
     if version > _SCHEMA_VERSION:
         raise ValueError(
             f"Unsupported schema version {version} (expected <={_SCHEMA_VERSION}). "
@@ -137,6 +155,7 @@ def load_packed_state(
     if "column_types" in metadata:
         column_types = [ColumnType(v) for v in metadata["column_types"]]
 
+    logger.info("Loaded packed state from %s (schema v%d)", path, version)
     return packed, column_types
 
 

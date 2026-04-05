@@ -585,6 +585,9 @@ docs = [
 gpu = [
     { name = "jax", extra = ["cuda13"] },
 ]
+tensorboard = [
+    { name = "tensorboardx" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -610,9 +613,10 @@ requires-dist = [
     { name = "scipy", marker = "extra == 'dev'", specifier = ">=1.11" },
     { name = "seaborn", marker = "extra == 'benchmark'", specifier = ">=0.13" },
     { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.30" },
+    { name = "tensorboardx", marker = "extra == 'tensorboard'", specifier = ">=2.6" },
     { name = "wbgapi", marker = "extra == 'benchmark'", specifier = ">=1.0" },
 ]
-provides-extras = ["dev", "coverage", "gpu", "dashboard", "benchmark", "docs"]
+provides-extras = ["dev", "coverage", "gpu", "dashboard", "benchmark", "tensorboard", "docs"]
 
 [[package]]
 name = "jax-cuda13-pjrt"
@@ -2366,6 +2370,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
+]
+
+[[package]]
+name = "tensorboardx"
+version = "2.6.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/a9/fc520ea91ab1f3ba51cbf3fe24f2b6364ed3b49046969e0868d46d6da372/tensorboardx-2.6.5.tar.gz", hash = "sha256:ca176db3997ee8c07d2eb77381225956a3fd1c10c91beafab1f17069adc47017", size = 4770195, upload-time = "2026-04-03T15:40:23.803Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/0f/69fbab4c30b2f3a76e6de67585ea72a8eccf381751f5c0046b966fde9658/tensorboardx-2.6.5-py3-none-any.whl", hash = "sha256:c10b891d00af306537cb8b58a039b2ba41571f0da06f433a41c4ca8d6abe1373", size = 87510, upload-time = "2026-04-03T15:40:22.111Z" },
 ]
 
 [[package]]

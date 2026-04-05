@@ -1,6 +1,6 @@
 """jax-crosscat: GPU-accelerated nonparametric cross-categorization in JAX."""
 
-__version__ = "0.10.1"
+__version__ = "0.11.0"
 
 from crosscat.constraints import (
     check_all_column_constraints,
@@ -58,6 +58,7 @@ from crosscat.model import initialize, insert_rows, log_joint
 from crosscat.packed import (
     PackedCrossCatState,
     batch_packed_states,
+    estimate_packed_memory,
     multi_chain_packed_gibbs_sweep,
     pack_state,
     packed_gibbs_step,
@@ -215,6 +216,7 @@ __all__ = [
     "save_state",
     # Packed state
     "batch_packed_states",
+    "estimate_packed_memory",
     "multi_chain_packed_gibbs_sweep",
     "pack_state",
     "packed_gibbs_step",

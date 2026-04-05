@@ -15,6 +15,7 @@ Scaling additions:
 from __future__ import annotations
 
 import csv
+import logging
 import warnings
 from pathlib import Path
 
@@ -23,6 +24,25 @@ import numpy as np
 from jax import Array
 
 from crosscat.types import ColumnType
+
+logger = logging.getLogger(__name__)
+
+_FLOAT32_WARNING_ISSUED = False
+
+
+def _warn_float32_coercion(data: np.ndarray) -> None:
+    """Emit a one-time warning when float64 data is coerced to float32."""
+    global _FLOAT32_WARNING_ISSUED
+    if _FLOAT32_WARNING_ISSUED:
+        return
+    if hasattr(data, "dtype") and data.dtype == np.float64:
+        warnings.warn(
+            "Input data has dtype float64 and will be stored as float32. "
+            "This may cause loss of precision for values requiring >7 significant digits.",
+            UserWarning,
+            stacklevel=3,
+        )
+        _FLOAT32_WARNING_ISSUED = True
 
 
 def read_csv(
@@ -80,7 +100,9 @@ def read_csv(
             stacklevel=2,
         )
 
-    return jnp.array(parsed), col_names
+    result = jnp.array(parsed)
+    logger.debug("read_csv: loaded %s from %s", result.shape, filepath)
+    return result, col_names
 
 
 def write_csv(
@@ -394,6 +416,7 @@ def save_npy(
             stacklevel=2,
         )
     filepath = filepath.with_suffix(".npy")
+    _warn_float32_coercion(np.asarray(data))
     np.save(filepath, np.asarray(data, dtype=np.float32))
     if column_names is not None:
         meta_path = filepath.with_suffix(".json")
@@ -542,6 +565,7 @@ def write_parquet(
             "pyarrow is required for Parquet support. Install with: pip install pyarrow"
         ) from None
 
+    _warn_float32_coercion(np.asarray(data))
     data_np = np.asarray(data, dtype=np.float32)
     table = pa.table({name: data_np[:, j] for j, name in enumerate(column_names)})
     pq.write_table(table, filepath)
@@ -613,6 +637,7 @@ def save_arrow(
     pa = _require_pyarrow()
 
     filepath = Path(filepath)
+    _warn_float32_coercion(np.asarray(data))
     data_np = np.asarray(data, dtype=np.float32)
     n_cols = data_np.shape[1]
 

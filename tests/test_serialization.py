@@ -21,6 +21,8 @@ from crosscat.serialization import (
 from crosscat.synthetic import generate_crosscat_data
 from crosscat.types import ColumnType
 
+pytestmark = pytest.mark.cpu
+
 
 @pytest.fixture
 def mixed_state():

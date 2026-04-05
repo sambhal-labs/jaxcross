@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 from crosscat.data_utils import (
     discretize_column,
@@ -14,6 +15,8 @@ from crosscat.data_utils import (
     write_csv,
 )
 from crosscat.types import ColumnType
+
+pytestmark = pytest.mark.cpu
 
 # ---------------------------------------------------------------------------
 # guess_column_type
