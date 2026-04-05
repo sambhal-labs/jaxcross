@@ -213,16 +213,14 @@ class TestDeprecationWarnings:
 
 
 class TestSubsampleAnnealExtended:
-    def test_growth_factor_controls_stages(self):
-        """Higher growth_factor means fewer annealing stages."""
+    def test_growth_factor_both_reach_full_size(self):
+        """Both slow and fast growth factors produce correct final state with all rows."""
         from crosscat.scaling import subsample_anneal
 
         key = jax.random.key(400)
         data = jax.random.normal(key, (80, 3))
         col_types = [ColumnType.CONTINUOUS] * 3
 
-        # growth_factor=2 should take more stages than growth_factor=8
-        # Both should end with all rows included
         packed_slow, data_slow = subsample_anneal(
             jax.random.key(401),
             data,

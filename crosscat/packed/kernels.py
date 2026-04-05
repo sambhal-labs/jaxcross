@@ -1013,8 +1013,10 @@ def packed_transition_row_assignments_parallel(
         # shared baseline simultaneously. This means if two rows share a
         # cluster with count=2, both see count=1 after their own removal
         # (not count=0 as sequential Gibbs would produce for the second).
-        # This is a well-known approximation — it does not bias the
-        # stationary distribution but can slow mixing vs sequential Gibbs.
+        # This is a well-known approximation that targets a slightly
+        # different distribution (product of conditionals vs the joint)
+        # but converges to the same posterior in practice. It can slow
+        # mixing vs sequential Gibbs for highly overlapping clusters.
         def score_one_row(row_data, old_cluster):
             # Remove this row from counts (CRP prior correction).
             # The jnp.maximum clamp to 0 is load-bearing for two reasons:
