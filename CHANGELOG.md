@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-04-05 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.10.1...v0.11.0)
+
+### Added
+- **Phase 1: Scaling quick wins** (#83)
+  - JIT-compiled `packed_insert_rows` for online/streaming inference
+  - `subsample_rows` parameter in `initialize()` — CRP-sample a subset for
+    fast initialization on large datasets
+  - `suggest_max_clusters(n_rows)` heuristic for automatic `max_clusters`
+  - Frozen `InitResult` dataclass returned from `initialize()`
+- **Phase 2: Memory optimization** (#84)
+  - `read_csv_chunked()` — streaming CSV reader for large files with bounded
+    memory, warnings on unparseable values and mismatched row lengths
+  - `save_npz()` / `load_npz_mmap()` — uncompressed `.npy` save with true
+    NumPy memory-mapped loading for multi-GB datasets
+  - `read_parquet()` / `write_parquet()` — Apache Parquet integration via
+    pyarrow (optional dependency)
+  - Memory-efficient column scoring in `_score_column_in_view`: replaced
+    O(N*K) membership matrix with O(K)-output `jnp.bincount` operations —
+    reduces per-column scoring memory from 128 MB to 4 MB at 1M rows (K=32)
+- **Phase 3: Algorithmic scaling** (#84)
+  - `packed_transition_row_assignments_minibatch` — mini-batch Gibbs kernel
+    that samples `batch_size` rows per sweep (O(B) instead of O(N))
+  - `subsample_anneal()` — gradually grows dataset during inference (init on
+    small sample, double active rows per stage, insert + sweep)
+  - `minibatch_gibbs_sweep()` — mini-batch row + full column/hyper/CRP sweeps
+  - `gibbs_sweep_early_stopping()` — convergence-based early stopping with
+    NaN/inf detection and previous-checkpoint relative improvement
+  - New `crosscat.scaling` module for all scaling utilities
+- 100K-row scaling benchmark (`benchmarks/scaling_100k_benchmark.py`)
+- 33 new tests covering all Phase 2+3 features including structural
+  invariants, CSV edge cases, mmap verification, and NaN bail-out
+
+### Changed
+- `read_csv()` refactored to use shared `_parse_rows()` with warnings on
+  unparseable values and mismatched row lengths (parity with `read_csv_chunked`)
+- `_parse_rows()` tracks exact unparseable count (not capped at 5)
+- `save_npz` / `load_npz_mmap` warn when input file extension differs from
+  `.npy` (suffix is silently rewritten for true mmap support)
+
 ## [0.10.1] - 2026-03-30 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.10.0...v0.10.1)
 
 ### Added
