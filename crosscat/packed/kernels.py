@@ -1517,8 +1517,8 @@ def _score_column_in_view(
 ) -> Array:
     """Log marginal likelihood of one column's data under a view's clustering.
 
-    Computes per-cluster sufficient statistics via matrix ops, then vmaps
-    unified_log_marginal over clusters.
+    Computes per-cluster sufficient statistics via ``jnp.bincount`` (O(N)
+    memory), then vmaps ``unified_log_marginal`` over clusters.
 
     Args:
         data_col: (n_rows,) column data (may contain NaN).
@@ -1535,7 +1535,7 @@ def _score_column_in_view(
     clean = jnp.where(valid, data_col, 0.0)
     valid_f = valid.astype(jnp.float32)
 
-    # Use bincount for O(N) memory instead of O(N*K) membership matrix.
+    # Use bincount (O(K) output) instead of O(N*K) membership matrix.
     # Mask invalid rows to cluster 0 with zero weight so they don't contribute.
     safe_assigns = jnp.where(valid, row_assignments, 0)
 
