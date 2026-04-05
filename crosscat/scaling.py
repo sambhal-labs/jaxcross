@@ -267,7 +267,8 @@ def parallel_gibbs_sweep(
 
     The parallel row kernel cannot create new clusters. For cluster
     birth/death, alternate with a sequential or minibatch sweep
-    periodically.
+    periodically. Uses a Python for-loop over sweeps (separate JIT
+    dispatch per sweep).
 
     Args:
         rng_key: JAX PRNG key.
