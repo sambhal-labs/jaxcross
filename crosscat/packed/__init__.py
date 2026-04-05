@@ -24,6 +24,7 @@ from crosscat.packed.kernels import (
     packed_transition_column_hypers,
     packed_transition_crp_alphas,
     packed_transition_row_assignments,
+    packed_transition_row_assignments_minibatch,
 )
 from crosscat.packed.state import (
     _ARRAY_FIELDS,
@@ -90,6 +91,7 @@ __all__ = [
     "packed_transition_column_hypers",
     "packed_transition_crp_alphas",
     "packed_transition_row_assignments",
+    "packed_transition_row_assignments_minibatch",
     "recompute_all_suffstats",
     "select_best_chain",
     "suggest_max_clusters",
