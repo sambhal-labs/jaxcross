@@ -86,26 +86,31 @@ Heuristic for choosing `max_clusters` based on dataset size. Returns `min(32, ma
 ## `estimate_packed_memory`
 
 ```python
-estimate_packed_memory(n_rows, n_cols, *, max_views=16, max_clusters=32, max_categories=16) -> dict
+estimate_packed_memory(
+    n_rows, n_cols, *,
+    max_clusters=32, max_views=16,
+    max_categories=16, max_cols_per_view=None,
+) -> dict[str, int]
 ```
 
-Estimate GPU memory usage for a packed state with the given dimensions. Useful for planning `max_clusters` and `max_views` before packing.
+Estimate GPU memory usage for a packed state in bytes. Covers all `PackedCrossCatState` array fields plus the data matrix.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `n_rows` | `int` | Number of rows |
 | `n_cols` | `int` | Number of columns |
-| `max_views` | `int` | Maximum views |
 | `max_clusters` | `int` | Maximum clusters per view |
-| `max_categories` | `int` | Maximum categories per column |
+| `max_views` | `int` | Maximum number of views |
+| `max_categories` | `int` | Maximum categories for categorical/ordinal columns |
+| `max_cols_per_view` | `int \| None` | Max columns per view (defaults to `n_cols`) |
 
-**Returns**: Dict with keys `total` (bytes), `assignments` (bytes), `suffstats` (bytes), `hypers` (bytes), and `human` (formatted string).
+**Returns**: Dict with per-component byte estimates (e.g., `column_assignments`, `ss_counts`, `ss_sum_x`, `view_row_assignments`, `data_matrix`, etc.) and a `"total"` key summing all components.
 
 ```python
 from crosscat import estimate_packed_memory
 
 mem = estimate_packed_memory(100_000, 50, max_clusters=16)
-print(mem['human'])  # e.g., "~245.3 MB"
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
 ```
 
 ## Type ID Constants
