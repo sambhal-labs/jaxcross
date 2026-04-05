@@ -1988,13 +1988,6 @@ def _insert_rows_jit(
 
             # Block new cluster if budget exhausted
             budget_exhausted = n_cl >= max_k
-            jax.debug.callback(
-                _warn_cluster_budget_exhausted,
-                v_idx,
-                n_cl,
-                jnp.int32(max_k),
-                ordered=False,
-            )
             log_scores = log_scores.at[max_k].set(
                 jnp.where(budget_exhausted, -jnp.inf, log_scores[max_k])
             )
@@ -2191,6 +2184,10 @@ def packed_insert_rows(
         max_views,
         packed.max_categories,
     )
+
+    # Warn if any view hit the cluster budget (post-scan, outside JIT)
+    for v in range(int(packed.n_views)):
+        _warn_cluster_budget_exhausted(v, final_nc[v], max_k)
 
     # Build new packed state
     new_packed = PackedCrossCatState(
