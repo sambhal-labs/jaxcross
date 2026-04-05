@@ -20,8 +20,9 @@ initialize(
     n_chains=1,
     column_crp_alpha=1.0,
     row_crp_alpha=1.0,
-    initialization="from_the_prior"
-) -> CrossCatState | list[CrossCatState]
+    initialization="from_the_prior",
+    subsample_rows=None,
+) -> InitResult
 ```
 
 Create initial CrossCat state(s).
@@ -35,8 +36,9 @@ Create initial CrossCat state(s).
 | `column_crp_alpha` | `float` | Outer DP concentration parameter |
 | `row_crp_alpha` | `float` | Inner DP concentration parameter |
 | `initialization` | `str` | `"from_the_prior"`, `"together"`, or `"apart"` |
+| `subsample_rows` | `int \| None` | If set, CRP-sample this many rows for fast initialization on large datasets. The selected indices are stored in `InitResult.subsample_idx`. |
 
-**Returns**: `CrossCatState` if `n_chains=1`, else `list[CrossCatState]`.
+**Returns**: [`InitResult`](types.md#initresult) — access the state via `result.state` (`CrossCatState` if `n_chains=1`, else `list[CrossCatState]`). When `subsample_rows` is set, `result.subsample_idx` contains the selected row indices.
 
 **Initialization modes:**
 

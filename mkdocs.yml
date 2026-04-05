@@ -113,6 +113,8 @@ nav:
     - XLA Compilation Caching: guides/xla-cache.md
     - Streamlit Dashboard: guides/dashboard.md
     - Tips & Tricks: guides/tips-and-tricks.md
+    - Scaling to Large Datasets: guides/scaling.md
+    - TensorBoard Logging: guides/tb-logger.md
   - Use Cases:
     - Customer Segmentation: use-cases/customer-segmentation.md
     - Anomaly Detection: use-cases/anomaly-detection.md
@@ -137,6 +139,8 @@ nav:
     - Packed Inference: api/packed-inference.md
     - Packed Suffstats: api/packed-suffstats.md
     - AOT Cache: api/aot-cache.md
+    - Scaling: api/scaling.md
+    - TensorBoard Logger: api/tb-logger.md
   - Architecture:
     - Overview: architecture/overview.md
     - The CrossCat Model: architecture/model.md

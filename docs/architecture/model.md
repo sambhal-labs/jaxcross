@@ -11,7 +11,7 @@ CrossCat is a **two-level Dirichlet Process mixture model** for heterogeneous ta
 3. **Component models**: Each (cluster, column) pair uses a conjugate Bayesian model. Parameters are analytically integrated out — only cluster assignments and hyperparameters are stored.
 
 <p align="center">
-  <img src="../diagrams/two-level-dp.svg" alt="Two-Level DP" width="800" />
+  <img src="../diagrams/two-level-dp.svg" alt="Two-Level DP" width="900" />
 </p>
 
 ### Why Two Levels?
@@ -27,7 +27,7 @@ CrossCat solves this by:
 ## State Structure
 
 <p align="center">
-  <img src="../diagrams/crosscat-state.svg" alt="CrossCatState Data Structure" width="650" />
+  <img src="../diagrams/crosscat-state.svg" alt="CrossCatState Data Structure" width="800" />
 </p>
 
 The full state contains:
@@ -50,7 +50,7 @@ This means the state only stores cluster assignments, hyperparameters, and suffi
 ## Component Models
 
 <p align="center">
-  <img src="../diagrams/component-models.svg" alt="Component Models" width="780" />
+  <img src="../diagrams/component-models.svg" alt="Component Models" width="850" />
 </p>
 
 Each column type uses a conjugate Bayesian model:

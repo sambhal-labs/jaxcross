@@ -29,7 +29,8 @@ diagnostics = collect_diagnostics(state, data)
 
 ```python
 # Initialize 4 chains
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 
 # Run each chain independently
 packed_states = []

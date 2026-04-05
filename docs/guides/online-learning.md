@@ -102,7 +102,8 @@ from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 from crosscat.packed.kernels import packed_insert_rows
 
 # 1. Train on initial batch
-state = initialize(jax.random.key(0), initial_data, col_types)
+result = initialize(jax.random.key(0), initial_data, col_types)
+state = result.state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, initial_data, n_sweeps=100)
 
@@ -126,8 +127,12 @@ for i, new_batch in enumerate(data_stream):
 - New rows can contain NaN values — they are handled transparently during cluster assignment
 - If the new data has different value ranges than the training data, consider re-running hyperparameter transitions
 
+!!! tip "Large initial datasets"
+    For large initial datasets (10K+ rows), use `subsample_rows` during initialization to speed up the initial training phase. Then insert remaining rows incrementally. See the [Scaling Guide](scaling.md) for the full pattern, or use [`subsample_anneal`](../api/scaling.md#subsample_anneal) for an automated version.
+
 ## API Reference
 
 - [`insert_rows`](../api/model.md#insert_rows)
 - [`packed_insert_rows`](../api/packed-kernels.md#packed_insert_rows)
 - [`sample_and_insert`](../api/inference.md#sample_and_insert)
+- [`subsample_anneal`](../api/scaling.md#subsample_anneal)
