@@ -193,7 +193,7 @@ class CrossCatState:
         return len(self.views)
 
 
-@dataclass
+@dataclass(frozen=True)
 class InitResult:
     """Result of ``initialize()`` — wraps state(s) with optional subsample info.
 

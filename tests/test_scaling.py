@@ -158,9 +158,7 @@ class TestSubsampleRows:
         mu = float(result.state.column_hypers[0].mu)
         full_mean = float(jnp.mean(data[:, 0]))
         # Allow tolerance since it's a prior mean, but it should NOT be 0 or 100
-        assert abs(mu - full_mean) < 10.0, (
-            f"Hyper mu={mu} should be near full-data mean={full_mean}"
-        )
+        assert abs(mu - full_mean) < 1.0, f"Hyper mu={mu} should equal full-data mean={full_mean}"
 
     def test_subsample_e2e_workflow(self):
         """End-to-end: subsample init -> pack -> insert remaining -> validate."""
