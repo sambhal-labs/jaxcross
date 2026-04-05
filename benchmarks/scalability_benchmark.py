@@ -65,7 +65,7 @@ def time_sweep(key, data, col_types, n_sweeps=5, n_warmup=1):
     First call includes JIT compilation. Subsequent calls measure steady-state.
     """
     k1, k2, k3 = jax.random.split(key, 3)
-    state = initialize(k1, data, col_types)
+    state = initialize(k1, data, col_types).state
     packed = pack_state(state)
 
     # Warmup / compile
@@ -142,7 +142,7 @@ def benchmark_sweeps(base_key):
     key = jax.random.fold_in(base_key, 77777)
     data, col_types = _make_data(key, n_rows, n_cols)
     k_init = jax.random.fold_in(key, 0)
-    state = initialize(k_init, data, col_types)
+    state = initialize(k_init, data, col_types).state
     packed = pack_state(state)
 
     # Pre-compile

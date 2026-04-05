@@ -70,7 +70,7 @@ class TestMeanTestLogLikelihood:
         key = jax.random.key(44)
         data = jax.random.normal(key, (30, 3))
         column_types = [ColumnType.CONTINUOUS] * 3
-        state = initialize(jax.random.key(45), data, column_types)
+        state = initialize(jax.random.key(45).state, data, column_types)
         test_rows = jnp.array([25, 26, 27, 28, 29])
         ll = mean_test_log_likelihood(state, data, test_rows)
         assert jnp.isfinite(ll)
@@ -83,7 +83,7 @@ class TestEvaluateImputation:
         key = jax.random.key(46)
         data = jax.random.normal(key, (30, 3))
         column_types = [ColumnType.CONTINUOUS] * 3
-        state = initialize(jax.random.key(47), data, column_types)
+        state = initialize(jax.random.key(47).state, data, column_types)
         mask = random_holdout_mask(jax.random.key(48), 30, 3, holdout_fraction=0.1)
         result = evaluate_imputation(state, data, mask, column_types, rng_key=jax.random.key(49))
         assert "mae" in result or "accuracy" in result

@@ -40,7 +40,7 @@ def mixed_state():
         n_clusters=2,
     )
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, result["data"], column_types)
+    state = initialize(k1, result["data"], column_types).state
     return state, result["data"], column_types
 
 

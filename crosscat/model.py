@@ -27,6 +27,7 @@ from crosscat.types import (
     ColumnHypers,
     ColumnType,
     CrossCatState,
+    InitResult,
     SufficientStats,
     ViewState,
 )
@@ -226,7 +227,7 @@ def initialize(
     row_crp_alpha: float = 1.0,
     initialization: str = "from_the_prior",
     subsample_rows: int | None = None,
-) -> CrossCatState | list[CrossCatState]:
+) -> InitResult:
     """Initialize CrossCat state(s).
 
     Maps to original LocalEngine.initialize() which calls State.__init__
@@ -246,18 +247,19 @@ def initialize(
         subsample_rows: If set, initialize on a random subsample of this many
             rows. Hyperparameters are computed from the full data for accurate
             priors, but CRP row assignments and sufficient statistics use only
-            the subsample. The returned state has n_rows=subsample_rows.
-            Remaining rows can be streamed in via ``packed_insert_rows``.
+            the subsample. The returned ``InitResult.state`` has
+            n_rows=subsample_rows. Remaining rows can be streamed in via
+            ``packed_insert_rows``. If subsample_rows >= n_rows, the full
+            dataset is used (subsample_idx will be None).
 
     Returns:
-        Single CrossCatState if n_chains=1, else list of states.
-        When subsample_rows is set, also returns the subsample indices as a
-        second element: ``(state, subsample_idx)`` or
-        ``(states_list, subsample_idx)``.
+        InitResult with ``.state`` (single CrossCatState if n_chains=1,
+        else list) and ``.subsample_idx`` (Array of row indices used,
+        or None if full data was used).
 
     Raises:
-        ValueError: If data is empty, column_types length mismatches data, or
-            invalid initialization mode.
+        ValueError: If data is empty, column_types length mismatches data,
+            invalid initialization mode, or subsample_rows < 1.
     """
     if data.ndim != 2:
         raise ValueError(f"Data must be 2-dimensional, got shape {data.shape}")
@@ -350,14 +352,12 @@ def initialize(
         )
 
     if n_chains == 1:
-        result = _init_one(rng_key)
+        state = _init_one(rng_key)
     else:
         keys = jax.random.split(rng_key, n_chains)
-        result = [_init_one(keys[i]) for i in range(n_chains)]
+        state = [_init_one(keys[i]) for i in range(n_chains)]
 
-    if subsample_idx is not None:
-        return result, subsample_idx
-    return result
+    return InitResult(state=state, subsample_idx=subsample_idx)
 
 
 def insert_rows(

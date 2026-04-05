@@ -28,7 +28,7 @@ class TestInitializationModes:
 
         data = jax.random.normal(rng_key, (50, 4))
         column_types = [ColumnType.CONTINUOUS] * 4
-        state = initialize(rng_key, data, column_types, initialization=mode)
+        state = initialize(rng_key, data, column_types, initialization=mode).state
         assert state.n_views == expected_views
 
     def test_from_the_prior(self, rng_key):
@@ -36,7 +36,7 @@ class TestInitializationModes:
 
         data = jax.random.normal(rng_key, (50, 4))
         column_types = [ColumnType.CONTINUOUS] * 4
-        state = initialize(rng_key, data, column_types, initialization="from_the_prior")
+        state = initialize(rng_key, data, column_types, initialization="from_the_prior").state
         assert state.n_views >= 1
 
 
@@ -176,7 +176,7 @@ class TestInitializeColumnTypes:
         from crosscat.model import initialize, log_joint
 
         data = data_fn(rng_key)
-        state = initialize(rng_key, data, [col_type, col_type])
+        state = initialize(rng_key, data, [col_type, col_type]).state
         assert state.n_rows == 30
         assert state.n_cols == 2
         lj = log_joint(state, data)
