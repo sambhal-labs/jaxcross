@@ -67,9 +67,9 @@ Sufficient statistics for a (cluster, column) pair.
 |-------|------|---------|
 | `column_type` | `ColumnType` | All |
 | `count` | `Array` | All |
-| `sum_x` | `Array \| None` | CONTINUOUS, ORDINAL |
+| `sum_x` | `Array \| None` | CONTINUOUS, BINARY |
 | `sum_x_sq` | `Array \| None` | CONTINUOUS |
-| `category_counts` | `Array \| None` | CATEGORICAL, BINARY, ORDINAL |
+| `category_counts` | `Array \| None` | CATEGORICAL, ORDINAL |
 | `sum_sin`, `sum_cos` | `Array \| None` | CYCLIC |
 
 ## `InitResult`

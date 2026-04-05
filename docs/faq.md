@@ -101,9 +101,9 @@ Tune the padding parameters in `pack_state()`:
 
 ```python
 packed = pack_state(state,
-    max_views=5,        # Default: n_cols (often too large)
-    max_clusters=20,    # Default: n_rows (often too large)
-    max_categories=10,  # Default: auto-detected
+    max_views=5,        # Default: 16
+    max_clusters=20,    # Default: 32
+    max_categories=10,  # Default: 16
 )
 ```
 

@@ -79,11 +79,11 @@ Hyperparameters are initialized automatically from the data:
 
 | Type | Hyperparameters | Default Initialization |
 |------|----------------|----------------------|
-| CONTINUOUS | `mu`, `r`, `s`, `nu` | `mu=mean(data)`, `r=1`, `s=var(data)`, `nu=1` |
+| CONTINUOUS | `mu`, `r`, `s`, `nu` | `mu=mean(data)`, `r=1`, `s=var(data)`, `nu=2` |
 | CATEGORICAL | `dirichlet_alpha` | `dirichlet_alpha=1.0` |
 | BINARY | `alpha`, `beta` | `alpha=1.0`, `beta=1.0` |
 | ORDINAL | `cutpoints`, `mu`, `s` | `cutpoints=linspace(-2, 2, K-1)`, `mu=0`, `s=4` |
-| CYCLIC | `kappa`, `vm_a`, `vm_mu` | Data-driven MLE estimates |
+| CYCLIC | `kappa`, `vm_a`, `vm_mu` | `kappa=1.0`, `vm_a=1.0`, `vm_mu=π` |
 
 !!! info "Ordinal columns are non-conjugate"
     The OrderedLogistic model uses grid integration (31-point grid over latent location), which is slower than conjugate models. This is expected and correct.
