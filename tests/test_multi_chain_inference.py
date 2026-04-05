@@ -45,7 +45,7 @@ def multi_chain_states():
     packed_list = []
     for i in range(3):
         k = jax.random.fold_in(key, i)
-        state = initialize(k, data, column_types)
+        state = initialize(k, data, column_types).state
         packed = pack_state(state)
         packed = packed_gibbs_sweep(jax.random.fold_in(key, i + 100), packed, data, n_sweeps=2)
         packed_list.append(packed)

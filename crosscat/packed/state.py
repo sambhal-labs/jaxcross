@@ -7,6 +7,7 @@ and jax.lax.scan without Python-level branching.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import jax
@@ -155,13 +156,24 @@ def suggest_max_clusters(n_rows: int) -> int:
     cost manageable at scale while allowing enough clusters for structure
     discovery on smaller datasets.
 
+    .. warning::
+
+        The cap of 32 means datasets with more than 32 true clusters will
+        lose fidelity. If you know your data has more clusters, pass a
+        higher ``max_clusters`` to ``pack_state()`` directly — e.g.
+        ``pack_state(state, max_clusters=64)``.
+
     Args:
-        n_rows: Number of rows in the dataset.
+        n_rows: Number of rows in the dataset (must be >= 0).
 
     Returns:
         Suggested ``max_clusters`` value for ``pack_state()``.
+
+    Raises:
+        ValueError: If n_rows is negative.
     """
-    import math
+    if n_rows < 0:
+        raise ValueError(f"n_rows must be >= 0, got {n_rows}")
 
     return min(32, max(4, int(math.sqrt(n_rows))))
 

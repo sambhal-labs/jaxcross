@@ -51,7 +51,7 @@ def inferred_continuous_state():
     data = jnp.column_stack([col0, col1, col2, col3])
     column_types = [ColumnType.CONTINUOUS] * 4
 
-    init_states = initialize(k5, data, column_types, n_chains=4)
+    init_states = initialize(k5, data, column_types, n_chains=4).state
     final_states = []
     for i, state in enumerate(init_states):
         k = jax.random.fold_in(k5, i + 100)
@@ -199,7 +199,7 @@ def test_check_column_dep_constraint_basic():
     k1, k2 = jax.random.split(key)
     data = jax.random.normal(k1, (n_rows, 4))
     column_types = [ColumnType.CONTINUOUS] * 4
-    state = initialize(k2, data, column_types, initialization="together")
+    state = initialize(k2, data, column_types, initialization="together").state
     # All columns in one view -> columns 0 and 1 are in the same view
     same_view = int(state.column_assignments[0]) == int(state.column_assignments[1])
     assert check_column_dep_constraint(state, 0, 1, dependent=True) == same_view
@@ -212,7 +212,7 @@ def test_check_all_column_constraints():
     k1, k2 = jax.random.split(key)
     data = jax.random.normal(k1, (30, 4))
     column_types = [ColumnType.CONTINUOUS] * 4
-    state = initialize(k2, data, column_types, initialization="together")
+    state = initialize(k2, data, column_types, initialization="together").state
     same_01 = int(state.column_assignments[0]) == int(state.column_assignments[1])
     constraints = [(0, 1, same_01)]
     assert check_all_column_constraints(state, constraints) is True
@@ -226,7 +226,7 @@ def test_check_row_dep_constraint():
     k1, k2 = jax.random.split(key)
     data = jax.random.normal(k1, (30, 4))
     column_types = [ColumnType.CONTINUOUS] * 4
-    state = initialize(k2, data, column_types)
+    state = initialize(k2, data, column_types).state
     view = state.views[0]
     # Find two rows in the same cluster
     cluster_0_rows = [i for i in range(state.n_rows) if int(view.row_assignments[i]) == 0]

@@ -41,7 +41,7 @@ def multi_chain_setup():
     packed_list = []
     for i in range(4):
         k = jax.random.fold_in(key, i)
-        state = initialize(k, data, column_types)
+        state = initialize(k, data, column_types).state
         packed_list.append(pack_state(state))
 
     return packed_list, data, column_types

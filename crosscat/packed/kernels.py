@@ -61,6 +61,20 @@ def _warn_column_overflow(view_idx, n_in_view, max_cpv):
         )
 
 
+def _warn_cluster_budget_exhausted(view_idx, n_clusters, max_clusters):
+    """Callback to warn when cluster budget is exhausted during row insertion."""
+    if int(n_clusters) >= int(max_clusters):
+        import warnings
+
+        warnings.warn(
+            f"View {int(view_idx)}: cluster budget exhausted "
+            f"({int(n_clusters)}/{int(max_clusters)}). New rows are assigned to "
+            f"the largest existing cluster instead of creating new ones. "
+            f"Increase max_clusters when calling pack_state().",
+            stacklevel=2,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Type specialization helpers
 # ---------------------------------------------------------------------------
@@ -1974,6 +1988,13 @@ def _insert_rows_jit(
 
             # Block new cluster if budget exhausted
             budget_exhausted = n_cl >= max_k
+            jax.debug.callback(
+                _warn_cluster_budget_exhausted,
+                v_idx,
+                n_cl,
+                jnp.int32(max_k),
+                ordered=False,
+            )
             log_scores = log_scores.at[max_k].set(
                 jnp.where(budget_exhausted, -jnp.inf, log_scores[max_k])
             )

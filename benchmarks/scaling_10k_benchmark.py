@@ -69,7 +69,7 @@ def benchmark_full_sweep(key, n_rows=10_000, n_cols=20, n_sweeps=5):
     print(f"  data memory: {_mem_mb(data):.1f} MB")
 
     t0 = time.perf_counter()
-    state = initialize(k2, data, col_types)
+    state = initialize(k2, data, col_types).state
     packed = pack_state(state, max_clusters=max_k)
     init_time = time.perf_counter() - t0
     print(f"  init + pack: {init_time:.2f}s")
@@ -103,7 +103,8 @@ def benchmark_subsample_init(key, n_rows=10_000, n_cols=20, subsample_size=1000)
     # Subsample init
     t0 = time.perf_counter()
     result = initialize(k2, data, col_types, subsample_rows=subsample_size)
-    state, sub_idx = result
+    state = result.state
+    sub_idx = result.subsample_idx
     sub_data = data[sub_idx]
     packed = pack_state(state, max_clusters=max_k)
     init_time = time.perf_counter() - t0
@@ -154,7 +155,7 @@ def benchmark_insert_throughput(key, n_insert=5000, n_cols=20):
     new_rows, _ = _make_data(k2, n_insert, n_cols)
     max_k = suggest_max_clusters(1000 + n_insert)
 
-    state = initialize(k3, base_data, col_types)
+    state = initialize(k3, base_data, col_types).state
     packed = pack_state(state, max_clusters=max_k)
     packed = packed_gibbs_sweep(jax.random.fold_in(k3, 1), packed, base_data, n_sweeps=5)
     packed.column_assignments.block_until_ready()

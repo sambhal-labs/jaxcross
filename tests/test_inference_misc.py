@@ -134,7 +134,7 @@ class TestPredictiveCDF:
             ]
         )
         column_types = [ColumnType.CATEGORICAL]
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
         cdf_all = predictive_cdf(rng_key, state, data, 0, jnp.array(2.0))
         assert float(cdf_all) > 0.99
 
@@ -144,7 +144,7 @@ class TestPredictiveCDF:
 
         data = jnp.array([[0.0], [1.0], [0.0], [1.0], [0.0]])
         column_types = [ColumnType.BINARY]
-        state = initialize(rng_key, data, column_types)
+        state = initialize(rng_key, data, column_types).state
         cdf_1 = predictive_cdf(rng_key, state, data, 0, jnp.array(1.0))
         assert float(cdf_1) > 0.99
 
