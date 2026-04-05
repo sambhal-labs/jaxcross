@@ -249,3 +249,45 @@ def gibbs_sweep_early_stopping(
             break
 
     return packed, log_joints
+
+
+def parallel_gibbs_sweep(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    *,
+    n_sweeps: int = 1,
+) -> PackedCrossCatState:
+    """Run Gibbs sweeps using parallel row scoring (single device).
+
+    Uses ``packed_transition_row_assignments_parallel`` for row assignments
+    (vmap over all rows with leave-one-out suffstat correction) and standard
+    kernels for column/hyper/CRP transitions. This maximizes GPU utilization
+    for large datasets.
+
+    The parallel row kernel cannot create new clusters. For cluster
+    birth/death, alternate with a sequential or minibatch sweep
+    periodically. Uses a Python for-loop over sweeps (separate JIT
+    dispatch per sweep).
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+        n_sweeps: Number of sweeps to run.
+
+    Returns:
+        Updated PackedCrossCatState.
+    """
+    from crosscat.packed.kernels import packed_transition_row_assignments_parallel
+
+    keys = jax.random.split(rng_key, n_sweeps)
+
+    for i in range(n_sweeps):
+        k1, k2, k3, k4 = jax.random.split(keys[i], 4)
+        packed = packed_transition_row_assignments_parallel(k1, packed, data)
+        packed = packed_transition_column_assignments(k2, packed, data)
+        packed = packed_transition_column_hypers(k3, packed, data)
+        packed = packed_transition_crp_alphas(k4, packed)
+
+    return packed

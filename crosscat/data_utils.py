@@ -486,11 +486,7 @@ def read_parquet(
         ) from None
 
     table = pq.read_table(filepath, columns=columns)
-    col_names = table.column_names
-    # Convert to pandas then numpy for reliable NaN handling
-    df = table.to_pandas()
-    data_np = df.to_numpy(dtype=np.float32, na_value=float("nan"))
-    return jnp.array(data_np), col_names
+    return _arrow_table_to_jax(table)
 
 
 def write_parquet(
@@ -521,3 +517,112 @@ def write_parquet(
     data_np = np.asarray(data, dtype=np.float32)
     table = pa.table({name: data_np[:, j] for j, name in enumerate(column_names)})
     pq.write_table(table, filepath)
+
+
+# ---------------------------------------------------------------------------
+# Arrow IPC (Feather v2) format
+# ---------------------------------------------------------------------------
+
+
+def _require_pyarrow():
+    """Import and return pyarrow, raising a clear error if missing."""
+    try:
+        import pyarrow
+
+        return pyarrow
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for Arrow-based data loading. Install with: pip install pyarrow"
+        ) from None
+
+
+def _arrow_table_to_jax(table) -> tuple[Array, list[str]]:
+    """Convert an Arrow Table to a JAX float32 array.
+
+    Reads each column via ``to_numpy()`` into a pre-allocated float32
+    matrix, then converts to JAX. This materializes the full dataset
+    into memory (Arrow + NumPy + JAX copies).
+    """
+    col_names = table.column_names
+    n_rows = table.num_rows
+    n_cols = table.num_columns
+
+    if n_rows == 0:
+        return jnp.zeros((0, n_cols)), col_names
+
+    out = np.empty((n_rows, n_cols), dtype=np.float32)
+    for j in range(n_cols):
+        chunked = table.column(j)
+        arr = chunked.to_numpy(zero_copy_only=False).astype(np.float32)
+        out[:, j] = arr
+
+    return jnp.array(out), col_names
+
+
+def save_arrow(
+    filepath: str | Path,
+    data: Array,
+    column_names: list[str] | None = None,
+    *,
+    compression: str = "lz4",
+) -> None:
+    """Save data array in Arrow IPC (Feather v2) format.
+
+    Arrow IPC is faster than NPZ/Parquet for read-heavy workflows.
+    Note: LZ4-compressed files (the default) cannot be memory-mapped
+    for random access — use ``compression="uncompressed"`` if you
+    need true memory-mapped reads via ``load_arrow(memory_map=True)``.
+
+    Args:
+        filepath: Output path (conventionally .arrow or .feather).
+        data: Data array, shape (n_rows, n_cols).
+        column_names: Column names. Defaults to col_0, col_1, ...
+        compression: Compression codec ("lz4", "zstd", "uncompressed").
+
+    Raises:
+        ImportError: If pyarrow is not installed.
+    """
+    pa = _require_pyarrow()
+
+    filepath = Path(filepath)
+    data_np = np.asarray(data, dtype=np.float32)
+    n_cols = data_np.shape[1]
+
+    if column_names is None:
+        column_names = [f"col_{j}" for j in range(n_cols)]
+
+    table = pa.table({name: data_np[:, j] for j, name in enumerate(column_names)})
+    import pyarrow.feather as pf
+
+    pf.write_feather(table, filepath, compression=compression)
+
+
+def load_arrow(
+    filepath: str | Path,
+    *,
+    memory_map: bool = True,
+    columns: list[str] | None = None,
+) -> tuple[Array, list[str]]:
+    """Load data from Arrow IPC (Feather v2) format.
+
+    When ``memory_map=True`` (default), pyarrow memory-maps the file.
+    However, the data is still fully materialized into a JAX array,
+    so peak RAM includes Arrow + NumPy + JAX copies.  For truly
+    lazy loading, use ``load_npz_mmap`` which returns a NumPy memmap.
+
+    Args:
+        filepath: Path to .arrow/.feather file (created by ``save_arrow``).
+        memory_map: If True, memory-map the file at the Arrow level.
+        columns: Optional subset of columns to load.
+
+    Returns:
+        Tuple of (data_array, column_names).
+
+    Raises:
+        ImportError: If pyarrow is not installed.
+    """
+    _require_pyarrow()
+    import pyarrow.feather as pf
+
+    table = pf.read_table(filepath, memory_map=memory_map, columns=columns)
+    return _arrow_table_to_jax(table)
