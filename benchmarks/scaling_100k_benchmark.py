@@ -2,7 +2,7 @@
 
 Tests:
   1. Subsample init (5K) + batch insert (95K) + Gibbs sweeps
-  2. Data connector roundtrip (save_npz / load_npz_mmap)
+  2. Data connector roundtrip (save_npy / load_npy_mmap)
 
 Designed for Kaggle T4 (16GB VRAM). Not runnable on small GPUs.
 
@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crosscat.data_utils import load_npz_mmap, save_npz
+from crosscat.data_utils import load_npy_mmap, save_npy
 from crosscat.model import initialize
 from crosscat.packed.kernels import packed_gibbs_sweep, packed_insert_rows
 from crosscat.packed.state import pack_state, suggest_max_clusters
@@ -123,7 +123,7 @@ def benchmark_subsample_workflow(key, n_rows=100_000, n_cols=20, subsample_size=
 
 
 def benchmark_data_connectors(key, n_rows=100_000, n_cols=20):
-    """Test save_npz / load_npz_mmap roundtrip at 100K scale."""
+    """Test save_npy / load_npy_mmap roundtrip at 100K scale."""
     print(f"\n--- Data Connector Roundtrip: {n_rows} x {n_cols} ---")
     data, col_types = _make_data(key, n_rows, n_cols)
     col_names = [f"col_{j}" for j in range(n_cols)]
@@ -134,16 +134,16 @@ def benchmark_data_connectors(key, n_rows=100_000, n_cols=20):
 
     # Save
     t0 = time.perf_counter()
-    save_npz(npy_path, data, column_names=col_names)
+    save_npy(npy_path, data, column_names=col_names)
     save_time = time.perf_counter() - t0
     file_size_mb = npy_path.stat().st_size / (1024 * 1024)
-    print(f"  save_npz: {save_time:.2f}s ({file_size_mb:.1f} MB)")
+    print(f"  save_npy: {save_time:.2f}s ({file_size_mb:.1f} MB)")
 
     # Load with mmap
     t0 = time.perf_counter()
-    loaded_data, loaded_names = load_npz_mmap(npy_path)
+    loaded_data, loaded_names = load_npy_mmap(npy_path)
     load_time = time.perf_counter() - t0
-    print(f"  load_npz_mmap: {load_time:.2f}s")
+    print(f"  load_npy_mmap: {load_time:.2f}s")
 
     # Verify (use np.allclose to avoid defeating mmap with JAX conversion)
     assert loaded_data.shape == data.shape, f"Shape mismatch: {loaded_data.shape} vs {data.shape}"

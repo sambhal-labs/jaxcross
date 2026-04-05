@@ -19,6 +19,7 @@ from crosscat.packed.kernels import (
     packed_transition_column_hypers,
     packed_transition_crp_alphas,
     packed_transition_row_assignments_minibatch,
+    packed_transition_row_assignments_parallel,
 )
 from crosscat.packed.state import PackedCrossCatState, pack_state, suggest_max_clusters
 from crosscat.types import ColumnType
@@ -279,7 +280,6 @@ def parallel_gibbs_sweep(
     Returns:
         Updated PackedCrossCatState.
     """
-    from crosscat.packed.kernels import packed_transition_row_assignments_parallel
 
     keys = jax.random.split(rng_key, n_sweeps)
 
