@@ -5,6 +5,11 @@ Maps to original CrossCat data_utils.py:
 - gen_M_c_from_T, gen_M_r_from_T
 - guess_column_type, guess_column_types
 - convert_columns_to_multinomial, convert_columns_to_continuous
+
+Scaling additions:
+- read_csv_chunked: streaming CSV reader for large files
+- load_npz_mmap: memory-mapped NPZ loading
+- read_parquet: Apache Parquet/Arrow integration
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ import csv
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 
 from crosscat.types import ColumnType
@@ -39,10 +45,15 @@ def read_csv(
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
 
+    import warnings
+
     filepath = Path(filepath)
     with open(filepath, newline="") as f:
         reader = csv.reader(f)
         rows = list(reader)
+
+    if not rows:
+        raise ValueError(f"CSV file is empty: {filepath}")
 
     if has_header:
         col_names = rows[0]
@@ -51,23 +62,26 @@ def read_csv(
         data_rows = rows
         col_names = [f"col_{i}" for i in range(len(data_rows[0]))]
 
-    # Convert to float array, replacing nan_values with NaN
-    n_cols = len(col_names)
-    values = []
-    for row in data_rows:
-        row_vals = []
-        for val in row:
-            if val.strip() in nan_values:
-                row_vals.append(float("nan"))
-            else:
-                try:
-                    row_vals.append(float(val))
-                except ValueError:
-                    row_vals.append(float("nan"))
-        row_vals.extend([float("nan")] * (n_cols - len(row_vals)))
-        values.append(row_vals[:n_cols])
+    if not data_rows:
+        return jnp.zeros((0, len(col_names))), col_names
 
-    return jnp.array(values), col_names
+    n_cols = len(col_names)
+    parsed, bad_examples, n_bad, n_mismatched = _parse_rows(data_rows, n_cols, nan_values)
+
+    if n_bad > 0:
+        warnings.warn(
+            f"Could not parse {n_bad} values to float "
+            f"(converted to NaN). Examples: {bad_examples[:5]}",
+            stacklevel=2,
+        )
+    if n_mismatched > 0:
+        warnings.warn(
+            f"{n_mismatched} rows had mismatched column count "
+            f"(expected {n_cols}). Short rows are NaN-padded, long rows truncated.",
+            stacklevel=2,
+        )
+
+    return jnp.array(parsed), col_names
 
 
 def write_csv(
@@ -223,3 +237,287 @@ def discretize_column(
     bin_edges = jnp.linspace(float(jnp.min(clean)), float(jnp.max(clean)), n_bins + 1)
     discretized = jnp.digitize(col_data, bin_edges[1:-1])
     return discretized, bin_edges
+
+
+# ---------------------------------------------------------------------------
+# Scaling: chunked / streaming data loading
+# ---------------------------------------------------------------------------
+
+
+def read_csv_chunked(
+    filepath: str | Path,
+    *,
+    chunk_size: int = 10_000,
+    has_header: bool = True,
+    nan_values: set[str] | None = None,
+) -> tuple[Array, list[str]]:
+    """Read a large CSV file in chunks to limit peak memory.
+
+    Reads ``chunk_size`` rows at a time into NumPy, then converts to a single
+    JAX array at the end. This avoids holding the full Python list-of-lists
+    in memory simultaneously with the final array.
+
+    Args:
+        filepath: Path to CSV file.
+        chunk_size: Number of rows to read per chunk.
+        has_header: Whether first row is a header.
+        nan_values: Strings to interpret as NaN.
+
+    Returns:
+        Tuple of (data_array, column_names).
+    """
+    if nan_values is None:
+        nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
+
+    import warnings
+
+    filepath = Path(filepath)
+    chunks: list[np.ndarray] = []
+    all_bad_examples: list[str] = []
+    total_bad = 0
+    total_mismatched = 0
+
+    with open(filepath, newline="") as f:
+        reader = csv.reader(f)
+
+        try:
+            if has_header:
+                col_names = next(reader)
+            else:
+                first_row = next(reader)
+                col_names = [f"col_{i}" for i in range(len(first_row))]
+        except StopIteration:
+            raise ValueError(f"CSV file is empty: {filepath}") from None
+
+        if not has_header:
+            # Process first row since we already consumed it
+            arr, bad, nb, mis = _parse_rows([first_row], len(col_names), nan_values)
+            chunks.append(arr)
+            all_bad_examples.extend(bad)
+            total_bad += nb
+            total_mismatched += mis
+
+        n_cols = len(col_names)
+        batch: list[list[str]] = []
+
+        for row in reader:
+            batch.append(row)
+            if len(batch) >= chunk_size:
+                arr, bad, nb, mis = _parse_rows(batch, n_cols, nan_values)
+                chunks.append(arr)
+                all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
+                total_bad += nb
+                total_mismatched += mis
+                batch = []
+
+        if batch:
+            arr, bad, nb, mis = _parse_rows(batch, n_cols, nan_values)
+            chunks.append(arr)
+            all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
+            total_bad += nb
+            total_mismatched += mis
+
+    if not chunks:
+        return jnp.zeros((0, len(col_names))), col_names
+
+    if total_bad > 0:
+        warnings.warn(
+            f"Could not parse {total_bad} values to float "
+            f"(converted to NaN). Examples: {all_bad_examples[:5]}",
+            stacklevel=2,
+        )
+    if total_mismatched > 0:
+        warnings.warn(
+            f"{total_mismatched} rows had mismatched column count "
+            f"(expected {n_cols}). Short rows are NaN-padded, long rows truncated.",
+            stacklevel=2,
+        )
+
+    data_np = np.concatenate(chunks, axis=0)
+    return jnp.array(data_np), col_names
+
+
+def _parse_rows(
+    rows: list[list[str]],
+    n_cols: int,
+    nan_values: set[str],
+) -> tuple[np.ndarray, list[str], int, int]:
+    """Parse a batch of CSV string rows into a float32 NumPy array.
+
+    Returns:
+        Tuple of (array, unparseable_examples, n_bad, n_mismatched_rows)
+        where unparseable_examples collects up to 5 sample values that
+        could not be converted to float, n_bad is the total count of
+        unparseable values, and n_mismatched_rows counts rows with wrong
+        column count.
+    """
+    out = np.full((len(rows), n_cols), float("nan"), dtype=np.float32)
+    bad_examples: list[str] = []
+    n_bad = 0
+    n_mismatched = 0
+    for i, row in enumerate(rows):
+        if len(row) != n_cols:
+            n_mismatched += 1
+        for j, val in enumerate(row[:n_cols]):
+            stripped = val.strip()
+            if stripped not in nan_values:
+                try:
+                    out[i, j] = float(stripped)
+                except ValueError:
+                    n_bad += 1
+                    if len(bad_examples) < 5:
+                        bad_examples.append(stripped)
+    return out, bad_examples, n_bad, n_mismatched
+
+
+def save_npz(
+    filepath: str | Path,
+    data: Array,
+    column_names: list[str] | None = None,
+) -> None:
+    """Save data array to uncompressed ``.npy`` for fast memory-mapped reloading.
+
+    Despite the name (retained to match ``load_npz_mmap``), this saves an
+    uncompressed ``.npy`` file — not a compressed ``.npz`` — so that
+    ``load_npz_mmap`` can truly memory-map the result.
+
+    Column names are stored in a separate JSON sidecar file to avoid
+    pickle serialization.
+
+    Args:
+        filepath: Output path. The ``.npy`` suffix is used regardless of
+            what extension is provided.
+        data: Data array, shape (n_rows, n_cols).
+        column_names: Optional column names (saved as JSON sidecar).
+    """
+    import json
+    import warnings
+
+    filepath = Path(filepath)
+    if filepath.suffix and filepath.suffix != ".npy":
+        warnings.warn(
+            f"save_npz writes .npy (not {filepath.suffix}). "
+            f"Output file: {filepath.with_suffix('.npy')}",
+            stacklevel=2,
+        )
+    filepath = filepath.with_suffix(".npy")
+    np.save(filepath, np.asarray(data, dtype=np.float32))
+    if column_names is not None:
+        meta_path = filepath.with_suffix(".json")
+        with open(meta_path, "w") as f:
+            json.dump({"column_names": column_names}, f)
+
+
+def load_npz_mmap(
+    filepath: str | Path,
+    *,
+    mmap_mode: str = "r",
+) -> tuple[np.ndarray, list[str] | None]:
+    """Load data from ``.npy`` file with memory-mapping for large files.
+
+    Returns a **NumPy memmap**, not a JAX array.  The OS pages data in on
+    demand, so peak RAM stays low for multi-GB files.  Convert slices to
+    JAX when needed::
+
+        data_np, names = load_npz_mmap("data.npy")
+        batch = jnp.array(data_np[1000:2000])   # only this slice hits RAM/GPU
+
+    Args:
+        filepath: Path to ``.npy`` file (created by ``save_npz``).
+        mmap_mode: NumPy mmap mode ('r' for read-only, 'r+' for read-write).
+
+    Returns:
+        Tuple of (numpy_memmap, column_names_or_None).
+
+    Warns:
+        If the JSON sidecar with column names is missing.
+    """
+    import json
+    import warnings
+
+    filepath = Path(filepath)
+    if filepath.suffix and filepath.suffix != ".npy":
+        warnings.warn(
+            f"load_npz_mmap reads .npy (not {filepath.suffix}). "
+            f"Loading: {filepath.with_suffix('.npy')}",
+            stacklevel=2,
+        )
+    filepath = filepath.with_suffix(".npy")
+    data_np = np.load(filepath, mmap_mode=mmap_mode)
+    col_names = None
+    meta_path = filepath.with_suffix(".json")
+    if meta_path.exists():
+        with open(meta_path) as f:
+            meta = json.load(f)
+        col_names = meta.get("column_names")
+    else:
+        warnings.warn(
+            f"Column name sidecar {meta_path} not found. Column names will be None.",
+            stacklevel=2,
+        )
+    return data_np, col_names
+
+
+def read_parquet(
+    filepath: str | Path,
+    *,
+    columns: list[str] | None = None,
+) -> tuple[Array, list[str]]:
+    """Read an Apache Parquet file into a JAX array.
+
+    Requires ``pyarrow`` to be installed (``pip install pyarrow``).
+    The full data is loaded into a dense JAX array in memory.
+
+    Args:
+        filepath: Path to .parquet file.
+        columns: Optional subset of columns to read.
+
+    Returns:
+        Tuple of (data_array, column_names).
+
+    Raises:
+        ImportError: If pyarrow is not installed.
+    """
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for Parquet support. Install with: pip install pyarrow"
+        ) from None
+
+    table = pq.read_table(filepath, columns=columns)
+    col_names = table.column_names
+    # Convert to pandas then numpy for reliable NaN handling
+    df = table.to_pandas()
+    data_np = df.to_numpy(dtype=np.float32, na_value=float("nan"))
+    return jnp.array(data_np), col_names
+
+
+def write_parquet(
+    filepath: str | Path,
+    data: Array,
+    column_names: list[str],
+) -> None:
+    """Write JAX array to Apache Parquet file.
+
+    Requires ``pyarrow`` to be installed.
+
+    Args:
+        filepath: Output .parquet path.
+        data: Data array, shape (n_rows, n_cols).
+        column_names: Column header names.
+
+    Raises:
+        ImportError: If pyarrow is not installed.
+    """
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for Parquet support. Install with: pip install pyarrow"
+        ) from None
+
+    data_np = np.asarray(data, dtype=np.float32)
+    table = pa.table({name: data_np[:, j] for j, name in enumerate(column_names)})
+    pq.write_table(table, filepath)
