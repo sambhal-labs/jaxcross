@@ -1939,6 +1939,14 @@ def _insert_rows_jit(
     n_new = new_rows.shape[0]
     row_keys = jax.random.split(rng_key, n_new)
 
+    # Precompute dominant types per view (invariant across rows)
+    dom_types = jnp.array(
+        [
+            _compute_dominant_type(view_column_indices[v], col_type_ids, view_n_columns[v])
+            for v in range(max_views)
+        ]
+    )
+
     def scan_one_row(carry, row_idx):
         (ra, nc, cc, s_c, s_sx, s_sxsq, s_cat, s_sin, s_cos) = carry
         row_data = new_rows[row_idx]
@@ -1950,7 +1958,7 @@ def _insert_rows_jit(
             col_indices = view_column_indices[v_idx]
             n_columns = view_n_columns[v_idx]
             alpha = view_row_crp_alpha[v_idx]
-            dom_type = _compute_dominant_type(col_indices, col_type_ids, n_columns)
+            dom_type = dom_types[v_idx]
             n_cl = v_nc[v_idx]
             counts = v_cc[v_idx]
 
@@ -1995,13 +2003,12 @@ def _insert_rows_jit(
             log_scores = log_scores - jnp.max(log_scores)
             chosen = jax.random.categorical(view_keys[v_idx], log_scores)
 
-            # Handle new cluster: find free slot or fallback to largest
+            # Handle new cluster: use next index (n_cl) or fallback to largest
             is_new = chosen == max_k
-            free_slot = jnp.argmin(counts)
             fallback = jnp.argmax(counts)
             actual_cluster = jnp.where(
                 is_new,
-                jnp.where(budget_exhausted, fallback, free_slot),
+                jnp.where(budget_exhausted, fallback, n_cl),
                 chosen,
             ).astype(jnp.int32)
             new_n_cl = jnp.where(is_new & ~budget_exhausted, n_cl + 1, n_cl)
@@ -2186,8 +2193,9 @@ def packed_insert_rows(
     )
 
     # Warn if any view hit the cluster budget (post-scan, outside JIT)
-    for v in range(int(packed.n_views)):
-        _warn_cluster_budget_exhausted(v, final_nc[v], max_k)
+    if bool(jnp.any(final_nc >= max_k)):
+        for v in range(int(packed.n_views)):
+            _warn_cluster_budget_exhausted(v, final_nc[v], max_k)
 
     # Build new packed state
     new_packed = PackedCrossCatState(
