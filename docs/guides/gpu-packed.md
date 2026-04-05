@@ -18,7 +18,8 @@ from crosscat import initialize, log_joint
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
 # 1. Initialize (unpacked)
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 
 # 2. Pack for JIT compilation
 packed = pack_state(state, max_views=16, max_clusters=32)
@@ -108,14 +109,34 @@ The first call triggers JAX compilation:
 
 Use [XLA Compilation Caching](xla-cache.md) to skip recompilation on subsequent runs.
 
+## Memory Planning
+
+Before packing, estimate GPU memory usage to choose appropriate padding dimensions:
+
+```python
+from crosscat import estimate_packed_memory
+from crosscat.packed import suggest_max_clusters
+
+# Check memory for your dataset
+mem = estimate_packed_memory(data.shape[0], data.shape[1], max_clusters=16)
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
+
+# Data-driven max_clusters suggestion
+k = suggest_max_clusters(data.shape[0])
+packed = pack_state(state, max_clusters=k)
+```
+
 ## Tips
 
 - Always pass `data=data` to `unpack_state` for exact sufficient statistics
 - Changing data shape triggers recompilation — keep shapes consistent
 - Use `packed_gibbs_step` instead of `packed_gibbs_sweep` for interactive/constraint workflows
+- Use `estimate_packed_memory` to plan padding dimensions before running on GPU
 
 ## API Reference
 
 - [`pack_state`](../api/packed-state.md#pack_state)
 - [`unpack_state`](../api/packed-state.md#unpack_state)
 - [`packed_gibbs_sweep`](../api/packed-kernels.md#packed_gibbs_sweep)
+- [`estimate_packed_memory`](../api/packed-state.md#estimate_packed_memory)
+- [`suggest_max_clusters`](../api/packed-state.md#suggest_max_clusters)

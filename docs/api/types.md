@@ -67,11 +67,33 @@ Sufficient statistics for a (cluster, column) pair.
 |-------|------|---------|
 | `column_type` | `ColumnType` | All |
 | `count` | `Array` | All |
-| `sum_x` | `Array \| None` | CONTINUOUS, ORDINAL |
+| `sum_x` | `Array \| None` | CONTINUOUS, BINARY |
 | `sum_x_sq` | `Array \| None` | CONTINUOUS |
-| `category_counts` | `Array \| None` | CATEGORICAL, BINARY, ORDINAL |
+| `category_counts` | `Array \| None` | CATEGORICAL, ORDINAL |
 | `sum_sin`, `sum_cos` | `Array \| None` | CYCLIC |
+
+## `InitResult`
+
+Frozen dataclass returned by [`initialize()`](model.md#initialize). Wraps state(s) with optional subsample info.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | `CrossCatState \| list[CrossCatState]` | Single state (`n_chains=1`) or list of states (`n_chains>1`) |
+| `subsample_idx` | `Array \| None` | Row indices used for subsampling, shape `(subsample_rows,)`. `None` if full data was used. |
+
+```python
+result = initialize(key, data, col_types)
+state = result.state  # CrossCatState
+
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state  # list[CrossCatState]
+
+result = initialize(key, data, col_types, subsample_rows=5000)
+state = result.state
+sub_idx = result.subsample_idx  # Array (5000,)
+```
 
 ## Constants
 
 - `LOG_EPS = 1e-30` — Numerical stability constant used throughout for underflow protection in `log()` and division operations.
+- `ORDINAL_N_GRID = 31` — Grid points for ordinal logistic location parameter integration. Override to trade accuracy for speed (captured at import time).

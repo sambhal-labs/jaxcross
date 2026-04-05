@@ -87,7 +87,8 @@ The library offers two representations of model state:
 **Typical workflow:** Initialize unpacked → pack → run inference → unpack → query.
 
 ```python
-state = initialize(key, data, col_types)       # unpacked
+result = initialize(key, data, col_types)       # unpacked
+state = result.state
 packed = pack_state(state)                       # pack
 packed = packed_gibbs_sweep(key, packed, data)   # fast inference
 state = unpack_state(packed, col_types, data=data)  # unpack for queries

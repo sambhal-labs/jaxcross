@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/diagrams/two-level-dp.svg" alt="JAX-CrossCat" width="720" />
+  <img src="docs/diagrams/two-level-dp.svg" alt="JAX-CrossCat" width="800" />
 </p>
 
 <h1 align="center">jax-crosscat</h1>
@@ -123,7 +123,8 @@ data, col_types = your_data, [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL, ...
 
 # Initialize → Pack → Infer → Unpack → Query
 key = jax.random.key(42)
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)
@@ -191,14 +192,15 @@ Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction 
 | **Query API** | Predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy |
 | **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
 | **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
-| **Data Handling** | Transparent NaN (missing data), CSV I/O with auto type detection, no preprocessing needed for mixed types |
+| **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY I/O, auto type detection, chunked reading, memory-mapped loading |
 | **Production** | Serialization (`.jxc` format), checkpointing, state validation, deterministic RNG for reproducibility |
+| **Scaling** | Subsample initialization, mini-batch Gibbs, parallel row scoring, early stopping, subsample annealing for 10K+ row datasets |
 | **Constraints** | Column dependency enforcement (must-link / cannot-link), row clustering constraints via rejection sampling |
 
 ## Architecture
 
 <p align="center">
-  <img src="docs/diagrams/architecture-pipeline.svg" alt="Architecture Pipeline" width="720" />
+  <img src="docs/diagrams/architecture-pipeline.svg" alt="Architecture Pipeline" width="800" />
 </p>
 
 CrossCat uses a **two-level Dirichlet Process** mixture model:
@@ -237,6 +239,8 @@ crosscat/                            # Core library
 ├── serialization.py                 #   Save/load in .jxc format
 ├── synthetic.py                     #   Synthetic data generation
 ├── data_utils.py                    #   CSV I/O, type detection
+├── scaling.py                       #   Large dataset workflows (subsample, minibatch, early stopping)
+├── tb_logger.py                     #   TensorBoard logging for inference monitoring
 └── validate.py                      #   State consistency checking
 
 tests/                               # 185+ fast tests + 31 slow tests

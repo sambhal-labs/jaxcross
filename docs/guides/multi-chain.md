@@ -17,7 +17,8 @@ import jax
 from crosscat import initialize
 
 key = jax.random.key(42)
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 # Returns a list of 4 CrossCatState objects
 ```
 

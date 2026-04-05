@@ -24,6 +24,9 @@ Vectorized column scoring, type-specialized fast paths, XLA persistent compilati
 ### v0.10.0–v0.10.1 — Ordinal & Polish (Mar 2026)
 True ordered logistic component model. Kernel splitting for independent JIT compilation. Property-based tests via Hypothesis. Von Mises batch fast path.
 
+### v0.11.0 — Scaling & Production (Apr 2026)
+Subsample initialization (`subsample_rows`), `InitResult` wrapper, mini-batch Gibbs sweeps, parallel row scoring, early stopping, subsample annealing. TensorBoard logging for inference monitoring. Parquet I/O (`read_parquet`/`write_parquet`), Arrow IPC I/O (`save_arrow`/`load_arrow`), memory-mapped NumPy (`save_npy`/`load_npy_mmap`), chunked CSV reader. Memory estimation (`estimate_packed_memory`) and `suggest_max_clusters` heuristic.
+
 ## Current Focus
 
 - Documentation overhaul and developer experience improvements
@@ -35,9 +38,9 @@ True ordered logistic component model. Kernel splitting for independent JIT comp
 These are areas of active interest. Priority depends on community feedback — [open a discussion](https://github.com/sambhal-labs/jaxcross/discussions) or [upvote an issue](https://github.com/sambhal-labs/jaxcross/issues) to signal what matters to you.
 
 ### Performance & Scale
-- Larger dataset support (10k+ rows) via memory-efficient kernels
+- ~~Larger dataset support (10k+ rows) via memory-efficient kernels~~ (done in v0.11.0)
 - Multi-device inference (data parallelism across GPUs)
-- Adaptive sweep scheduling (early stopping when converged)
+- ~~Adaptive sweep scheduling (early stopping when converged)~~ (done in v0.11.0)
 
 ### New Capabilities
 - Additional component models (count data, zero-inflated, etc.)

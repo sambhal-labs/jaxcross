@@ -9,7 +9,8 @@ All randomness flows through `jax.random.key()` and `jax.random.split()`. Every 
 ```python
 key = jax.random.key(42)
 key, subkey = jax.random.split(key)
-state = initialize(subkey, data, col_types)
+result = initialize(subkey, data, col_types)
+state = result.state
 
 key, subkey = jax.random.split(key)
 state = gibbs_sweep(subkey, state, data)

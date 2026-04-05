@@ -50,10 +50,12 @@ col_types = [
 key = jax.random.key(42)
 
 # Single chain
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 
 # Multi-chain (recommended — pick best by log_joint)
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 ```
 
 **Initialization modes:**

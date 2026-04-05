@@ -29,7 +29,8 @@ diagnostics = collect_diagnostics(state, data)
 
 ```python
 # Initialize 4 chains
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 
 # Run each chain independently
 packed_states = []
@@ -56,9 +57,9 @@ GPU memory is often the bottleneck. Reduce padding to fit larger datasets:
 
 ```python
 packed = pack_state(state,
-    max_views=5,         # Default: n_cols (wasteful for wide data)
-    max_clusters=20,     # Default: n_rows (most data has <20 real clusters)
-    max_categories=10,   # Default: auto (reduce if your max category is small)
+    max_views=5,         # Default: 16
+    max_clusters=20,     # Default: 32
+    max_categories=10,   # Default: 16
 )
 ```
 

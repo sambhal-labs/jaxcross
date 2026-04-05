@@ -29,7 +29,8 @@ col_types = [ColumnType.CONTINUOUS] * n_cols
 # Multi-chain inference for robust results
 states = []
 for i in range(4):
-    state = initialize(jax.random.key(i), data, col_types)
+    result = initialize(jax.random.key(i), data, col_types)
+    state = result.state
     packed = pack_state(state)
     packed = packed_gibbs_sweep(jax.random.key(i + 100), packed, data, n_sweeps=100)
     states.append(unpack_state(packed, col_types, data=data))
@@ -42,8 +43,8 @@ z_matrix = dependence_matrix(states)
 #   {trade_balance, FDI, exports} — trade indicators
 
 # Quantify specific relationships
-mi = mutual_information(states, col_i=0, col_j=5, n_samples=1000)
-print(f"MI between GDP and life expectancy: {mi:.3f}")
+mi, linfoot = mutual_information(states, col_i=0, col_j=5, n_samples=1000)
+print(f"MI between GDP and life expectancy: {mi:.3f} (Linfoot: {linfoot:.3f})")
 ```
 
 ## What You Get

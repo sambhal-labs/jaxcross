@@ -17,7 +17,7 @@ Key fields include `column_assignments`, `view_row_assignments`, `view_n_cluster
 ## `pack_state`
 
 ```python
-pack_state(state, *, max_views=16, max_clusters=32, max_categories=16) -> PackedCrossCatState
+pack_state(state, *, max_views=16, max_clusters=32, max_categories=16, max_cols_per_view=None, data=None) -> PackedCrossCatState
 ```
 
 Convert `CrossCatState` to JIT-compatible `PackedCrossCatState` with padded arrays.
@@ -68,6 +68,50 @@ Pick the chain with the highest score from a batched state.
 |-----------|------|-------------|
 | `batched` | `PackedCrossCatState` | Batched state with `(n_chains,)` leading dim |
 | `scores` | `Array (n_chains,)` | Score per chain (e.g., from `packed_log_joint`) |
+
+## `suggest_max_clusters`
+
+```python
+suggest_max_clusters(n_rows) -> int
+```
+
+Heuristic for choosing `max_clusters` based on dataset size. Returns `min(32, max(4, int(sqrt(n_rows))))`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `n_rows` | `int` | Number of rows in the dataset |
+
+**Returns**: Suggested `max_clusters` value.
+
+## `estimate_packed_memory`
+
+```python
+estimate_packed_memory(
+    n_rows, n_cols, *,
+    max_clusters=32, max_views=16,
+    max_categories=16, max_cols_per_view=None,
+) -> dict[str, int]
+```
+
+Estimate GPU memory usage for a packed state in bytes. Covers all `PackedCrossCatState` array fields plus the data matrix.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `n_rows` | `int` | Number of rows |
+| `n_cols` | `int` | Number of columns |
+| `max_clusters` | `int` | Maximum clusters per view |
+| `max_views` | `int` | Maximum number of views |
+| `max_categories` | `int` | Maximum categories for categorical/ordinal columns |
+| `max_cols_per_view` | `int \| None` | Max columns per view (defaults to `n_cols`) |
+
+**Returns**: Dict with per-component byte estimates (e.g., `column_assignments`, `ss_counts`, `ss_sum_x`, `view_row_assignments`, `data_matrix`, etc.) and a `"total"` key summing all components.
+
+```python
+from crosscat import estimate_packed_memory
+
+mem = estimate_packed_memory(100_000, 50, max_clusters=16)
+print(f"Estimated: {mem['total'] / 1e6:.1f} MB")
+```
 
 ## Type ID Constants
 

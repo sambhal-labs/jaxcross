@@ -58,6 +58,7 @@ uv run pytest tests/test_packed_state.py -v
 ### Test Markers
 
 - `@pytest.mark.slow` — GPU-heavy tests (30+ Gibbs sweeps)
+- `@pytest.mark.cpu` — Tests that run on CPU only (no GPU required)
 - `@pytest.mark.xfail` — Known flaky tests (stochastic recovery)
 
 ### Property Tests
@@ -76,7 +77,26 @@ uv run pytest tests/test_packed_state.py -v
 
 ## CI
 
-GitHub Actions runs lint + format + type check only (~1 min). No pytest in CI (GPU required). Note that free-tier GitHub Actions quota is limited.
+GitHub Actions runs lint + format + type check + `@pytest.mark.cpu` tests (~2 min). GPU tests are not run in CI — use Kaggle (P100) for the full suite. Note that free-tier GitHub Actions quota is limited.
+
+## Project Modules
+
+| Module | Purpose |
+|--------|---------|
+| `crosscat/types.py` | Core dataclasses (`CrossCatState`, `ViewState`, `ColumnType`, `InitResult`) |
+| `crosscat/components.py` | 5 Bayesian component models |
+| `crosscat/model.py` | Initialization, scoring, row insertion |
+| `crosscat/gibbs.py` | Collapsed Gibbs kernels (unpacked path) |
+| `crosscat/inference.py` | 15 posterior predictive queries (unpacked) |
+| `crosscat/packed/` | JIT-compiled packed state sub-package |
+| `crosscat/packed_inference.py` | 15 packed queries + multi-chain wrappers |
+| `crosscat/scaling.py` | Large dataset workflows (subsample, minibatch, early stopping) |
+| `crosscat/tb_logger.py` | TensorBoard logging |
+| `crosscat/constraints.py` | Column/row dependency enforcement |
+| `crosscat/diagnostics.py` | Convergence metrics |
+| `crosscat/serialization.py` | Save/load in `.jxc` format |
+| `crosscat/data_utils.py` | CSV/Parquet/Arrow/NPY I/O, type detection |
+| `crosscat/validate.py` | State consistency checking |
 
 ## Documentation
 
