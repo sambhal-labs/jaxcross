@@ -249,3 +249,80 @@ def gibbs_sweep_early_stopping(
             break
 
     return packed, log_joints
+
+
+def multi_device_gibbs_sweep(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    *,
+    n_sweeps: int = 1,
+) -> PackedCrossCatState:
+    """Run Gibbs sweeps using parallel row scoring across available devices.
+
+    Uses ``packed_transition_row_assignments_parallel`` for row assignments
+    (vmap over all rows, scoring against shared suffstats) and standard
+    kernels for column/hyper/CRP transitions. This maximizes GPU utilization
+    for large datasets.
+
+    For multi-GPU setups, the parallel row scoring naturally distributes
+    across devices via JAX's XLA compiler when data is sharded.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+        n_sweeps: Number of sweeps to run.
+
+    Returns:
+        Updated PackedCrossCatState.
+    """
+    from crosscat.packed.kernels import packed_transition_row_assignments_parallel
+
+    keys = jax.random.split(rng_key, n_sweeps)
+
+    for i in range(n_sweeps):
+        k1, k2, k3, k4 = jax.random.split(keys[i], 4)
+        packed = packed_transition_row_assignments_parallel(k1, packed, data)
+        packed = packed_transition_column_assignments(k2, packed, data)
+        packed = packed_transition_column_hypers(k3, packed, data)
+        packed = packed_transition_crp_alphas(k4, packed)
+
+    return packed
+
+
+def shard_data_across_devices(data: Array) -> Array:
+    """Shard a data matrix across all available JAX devices.
+
+    Distributes rows evenly across devices using JAX's device_put_sharded.
+    This is useful for multi-GPU setups where the data matrix exceeds
+    single-device memory.
+
+    Args:
+        data: (n_rows, n_cols) data matrix.
+
+    Returns:
+        Sharded data array distributed across devices.
+    """
+    devices = jax.devices()
+    n_devices = len(devices)
+    if n_devices <= 1:
+        return data
+
+    n_rows = data.shape[0]
+    # Pad to make divisible by n_devices
+    remainder = n_rows % n_devices
+    if remainder > 0:
+        pad_rows = n_devices - remainder
+        padding = jnp.full((pad_rows, data.shape[1]), jnp.nan)
+        data = jnp.concatenate([data, padding], axis=0)
+
+    # Distribute via JAX sharding
+    from jax.experimental import mesh_utils
+    from jax.sharding import Mesh, NamedSharding, PartitionSpec
+
+    mesh_devices = mesh_utils.create_device_mesh((n_devices,))
+    mesh = Mesh(mesh_devices, axis_names=("devices",))
+    sharding = NamedSharding(mesh, PartitionSpec("devices", None))
+
+    return jax.device_put(data, sharding)
