@@ -22,7 +22,7 @@ def _run_multi_chain(rng_key, data, column_types, n_chains=4, n_sweeps=30):
     from crosscat.model import initialize, log_joint
     from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
-    states = initialize(rng_key, data, column_types, n_chains=n_chains)
+    states = initialize(rng_key, data, column_types, n_chains=n_chains).state
     best_state, best_score = None, -jnp.inf
     for i, s in enumerate(states):
         key_i = jax.random.fold_in(rng_key, i + 1000)
@@ -46,7 +46,7 @@ def test_single_gibbs_sweep(rng_key, synthetic_continuous_data):
         rng_key,
         synthetic_continuous_data["data"],
         synthetic_continuous_data["column_types"],
-    )
+    ).state
     state_after = gibbs_sweep(rng_key, state, synthetic_continuous_data["data"], n_sweeps=1)
 
     assert state_after.n_rows == synthetic_continuous_data["n_rows"]

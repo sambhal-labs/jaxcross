@@ -37,7 +37,7 @@ def test_cyclic_column_partition_recovery(synthetic_cyclic_data):
     """Inference recovers the 2-view column partition on cyclic data."""
     d = synthetic_cyclic_data
     key = jax.random.key(110)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 500)
@@ -55,7 +55,7 @@ def test_cyclic_row_cluster_recovery(synthetic_cyclic_data):
     """Inference recovers row clusters per view on cyclic data."""
     d = synthetic_cyclic_data
     key = jax.random.key(111)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_row_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 600)
@@ -75,7 +75,7 @@ def test_cyclic_predictive_samples_in_range(synthetic_cyclic_data):
     d = synthetic_cyclic_data
     key = jax.random.key(112)
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
     state = _packed_infer(k2, state, d["data"], d["column_types"], n_sweeps=20)
 
     k3 = jax.random.key(113)
@@ -99,7 +99,7 @@ def test_mixed_type_column_partition_recovery(synthetic_mixed_data):
     """Inference recovers column partition on mixed-type data."""
     d = synthetic_mixed_data
     key = jax.random.key(120)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 700)
@@ -114,7 +114,7 @@ def test_mixed_type_row_cluster_recovery(synthetic_mixed_data):
     """Inference recovers row clusters on mixed-type data."""
     d = synthetic_mixed_data
     key = jax.random.key(121)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_row_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 800)
@@ -134,7 +134,7 @@ def test_mixed_type_state_validity(synthetic_mixed_data):
     d = synthetic_mixed_data
     key = jax.random.key(122)
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
     state = _packed_infer(k2, state, d["data"], d["column_types"], n_sweeps=10)
 
     errors = validate_state(state, d["data"])
@@ -155,7 +155,7 @@ def test_missing_data_inference_runs(synthetic_missing_data):
     d = synthetic_missing_data
     key = jax.random.key(130)
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
     state = _packed_infer(k2, state, d["data"], d["column_types"], n_sweeps=10)
 
     errors = validate_state(state, d["data"])
@@ -170,7 +170,7 @@ def test_missing_data_column_recovery(synthetic_missing_data):
     """Column partition recovery still works with 15% missing data."""
     d = synthetic_missing_data
     key = jax.random.key(131)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 900)
@@ -185,7 +185,7 @@ def test_missing_data_row_cluster_recovery(synthetic_missing_data):
     """Row cluster recovery still works with 15% missing data."""
     d = synthetic_missing_data
     key = jax.random.key(132)
-    states = initialize(key, d["data"], d["column_types"], n_chains=4)
+    states = initialize(key, d["data"], d["column_types"], n_chains=4).state
     best_row_ari = -1.0
     for i, state in enumerate(states):
         k = jax.random.fold_in(key, i + 1000)
@@ -203,7 +203,7 @@ def test_missing_data_predictive_sample_finite(synthetic_missing_data):
     d = synthetic_missing_data
     key = jax.random.key(133)
     k1, k2, k3 = jax.random.split(key, 3)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
     state = _packed_infer(k2, state, d["data"], d["column_types"], n_sweeps=10)
 
     samples = predictive_sample(k3, state, d["data"], [0, 1], n_samples=100)
@@ -221,7 +221,7 @@ def test_log_joint_improves_over_sweeps(synthetic_continuous_data):
     d = synthetic_continuous_data
     key = jax.random.key(140)
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
 
     initial_lj = float(log_joint(state, d["data"]))
     state = _packed_infer(k2, state, d["data"], d["column_types"], n_sweeps=20)
@@ -236,7 +236,7 @@ def test_ari_improves_over_sweeps(synthetic_continuous_data):
     d = synthetic_continuous_data
     key = jax.random.key(141)
     k1, k_run = jax.random.split(key)
-    state = initialize(k1, d["data"], d["column_types"])
+    state = initialize(k1, d["data"], d["column_types"]).state
 
     ari_at_1 = float(column_partition_ari(state, d["true_column_assignments"]))
     state = _packed_infer(k_run, state, d["data"], d["column_types"], n_sweeps=20)

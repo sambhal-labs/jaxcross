@@ -34,7 +34,7 @@ def continuous_state_and_data():
     col1 = jnp.concatenate([jax.random.normal(k1, (25,)) - 2, 3.0 + jax.random.normal(k2, (25,))])
     data = jnp.column_stack([col0, col1])
     column_types = [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS]
-    state = initialize(k3, data, column_types)
+    state = initialize(k3, data, column_types).state
     return state, data, column_types
 
 
@@ -52,7 +52,7 @@ def mixed_state_and_data():
     ]
     result = generate_crosscat_data(key, 60, column_types, n_views=2, n_clusters=2)
     k2 = jax.random.key(78)
-    state = initialize(k2, result["data"], column_types)
+    state = initialize(k2, result["data"], column_types).state
     return state, result["data"], column_types
 
 
@@ -145,7 +145,7 @@ def test_ordinal_cutpoints_roundtrip():
     result = generate_crosscat_data(key, 50, column_types, n_views=1, n_clusters=2, n_categories=5)
     data = result["data"]
 
-    state = initialize(jax.random.key(201), data, column_types)
+    state = initialize(jax.random.key(201), data, column_types).state
     packed = pack_state(state)
 
     # Verify hyper_n_cutpoints is stored correctly
@@ -183,7 +183,7 @@ def test_pack_state_validates_category_values():
     data = data.at[:, 1].set(jax.random.normal(key, (n_rows,)))
 
     column_types = [ColumnType.CATEGORICAL, ColumnType.CONTINUOUS]
-    state = initialize(jax.random.key(100), data, column_types)
+    state = initialize(jax.random.key(100), data, column_types).state
 
     # Should succeed with max_categories=16 (>= 10)
     pack_state(state, max_categories=16, data=data)
@@ -202,7 +202,7 @@ def test_pack_state_no_data_skips_category_validation():
     data = data.at[:, 1].set(jax.random.normal(key, (n_rows,)))
 
     column_types = [ColumnType.CATEGORICAL, ColumnType.CONTINUOUS]
-    state = initialize(jax.random.key(102), data, column_types)
+    state = initialize(jax.random.key(102), data, column_types).state
 
     # Without data, no ValueError even with small max_categories
     # (suffstat-level validation may still catch via category_counts length)

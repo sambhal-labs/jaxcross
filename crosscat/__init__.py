@@ -108,6 +108,7 @@ from crosscat.types import (
     ColumnHypers,
     ColumnType,
     CrossCatState,
+    InitResult,
     SufficientStats,
     ViewState,
 )
@@ -119,6 +120,7 @@ __all__ = [
     "ColumnHypers",
     "ColumnType",
     "CrossCatState",
+    "InitResult",
     "PackedCrossCatState",
     "SufficientStats",
     "ViewState",

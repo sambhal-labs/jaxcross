@@ -27,6 +27,7 @@ from crosscat.types import (
     ColumnHypers,
     ColumnType,
     CrossCatState,
+    InitResult,
     SufficientStats,
     ViewState,
 )
@@ -225,7 +226,8 @@ def initialize(
     column_crp_alpha: float = 1.0,
     row_crp_alpha: float = 1.0,
     initialization: str = "from_the_prior",
-) -> CrossCatState | list[CrossCatState]:
+    subsample_rows: int | None = None,
+) -> InitResult:
     """Initialize CrossCat state(s).
 
     Maps to original LocalEngine.initialize() which calls State.__init__
@@ -242,13 +244,22 @@ def initialize(
             'from_the_prior': Sample assignments from CRP (default).
             'together': All columns in one view.
             'apart': Each column in its own view.
+        subsample_rows: If set, initialize on a random subsample of this many
+            rows. Hyperparameters are computed from the full data for accurate
+            priors, but CRP row assignments and sufficient statistics use only
+            the subsample. The returned ``InitResult.state`` has
+            n_rows=subsample_rows. Remaining rows can be streamed in via
+            ``packed_insert_rows``. If subsample_rows >= n_rows, the full
+            dataset is used (subsample_idx will be None).
 
     Returns:
-        Single CrossCatState if n_chains=1, else list of states.
+        InitResult with ``.state`` (single CrossCatState if n_chains=1,
+        else list) and ``.subsample_idx`` (Array of row indices used,
+        or None if full data was used).
 
     Raises:
-        ValueError: If data is empty, column_types length mismatches data, or
-            invalid initialization mode.
+        ValueError: If data is empty, column_types length mismatches data,
+            invalid initialization mode, or subsample_rows < 1.
     """
     if data.ndim != 2:
         raise ValueError(f"Data must be 2-dimensional, got shape {data.shape}")
@@ -267,6 +278,24 @@ def initialize(
             f"Unknown initialization '{initialization}'. Must be one of {valid_inits}"
         )
 
+    # Handle subsampling
+    subsample_idx = None
+    if subsample_rows is not None:
+        if subsample_rows >= n_rows:
+            subsample_rows = None  # No subsampling needed
+        elif subsample_rows < 1:
+            raise ValueError(f"subsample_rows must be >= 1, got {subsample_rows}")
+        else:
+            rng_key, sub_key = jax.random.split(rng_key)
+            subsample_idx = jax.random.choice(
+                sub_key, n_rows, shape=(subsample_rows,), replace=False
+            )
+            subsample_idx = jnp.sort(subsample_idx)
+
+    # Data for suffstats: subsample if requested, full otherwise
+    init_data = data[subsample_idx] if subsample_idx is not None else data
+    init_n_rows = init_data.shape[0]
+
     def _init_one(key):
         k1, k2 = jax.random.split(key)
 
@@ -281,12 +310,13 @@ def initialize(
 
         n_views = int(jnp.max(col_assignments)) + 1
 
-        # Step 2: Initialize column hyperparameters
+        # Step 2: Initialize column hyperparameters from FULL data
         col_hypers = []
         for j in range(n_cols):
             col_hypers.append(_default_hypers(column_types[j], data[:, j]))
 
         # Step 3: For each view, sample row assignments and compute suffstats
+        # Uses init_data (subsample) for assignments and suffstats
         view_keys = jax.random.split(k2, n_views)
         views = []
         for v in range(n_views):
@@ -294,12 +324,12 @@ def initialize(
             col_indices = jnp.arange(n_cols)[col_mask]
 
             # Sample row-to-cluster assignments for this view
-            row_assigns = _crp_sample(view_keys[v], row_crp_alpha, n_rows)
+            row_assigns = _crp_sample(view_keys[v], row_crp_alpha, init_n_rows)
             n_clusters = int(jnp.max(row_assigns)) + 1
 
-            # Compute sufficient statistics
+            # Compute sufficient statistics on init_data
             suffstats = _compute_suffstats_for_view(
-                data, col_indices, column_types, row_assigns, n_clusters
+                init_data, col_indices, column_types, row_assigns, n_clusters
             )
 
             views.append(
@@ -317,15 +347,17 @@ def initialize(
             column_hypers=col_hypers,
             column_types=column_types,
             views=views,
-            n_rows=n_rows,
+            n_rows=init_n_rows,
             n_cols=n_cols,
         )
 
     if n_chains == 1:
-        return _init_one(rng_key)
+        state = _init_one(rng_key)
+    else:
+        keys = jax.random.split(rng_key, n_chains)
+        state = [_init_one(keys[i]) for i in range(n_chains)]
 
-    keys = jax.random.split(rng_key, n_chains)
-    return [_init_one(keys[i]) for i in range(n_chains)]
+    return InitResult(state=state, subsample_idx=subsample_idx)
 
 
 def insert_rows(

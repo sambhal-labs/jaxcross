@@ -146,7 +146,7 @@ def run_benchmark(
     for chain_idx in range(n_chains):
         print(f"\n--- Chain {chain_idx + 1}/{n_chains} ---")
         k_i, k_sweep = jax.random.split(init_keys[chain_idx])
-        state = initialize(k_i, data_masked, col_types)
+        state = initialize(k_i, data_masked, col_types).state
         packed = pack_state(state)
 
         chain_metrics: list[dict] = []

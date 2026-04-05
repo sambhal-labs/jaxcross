@@ -31,7 +31,7 @@ def trained_state():
     data = result["data"]
 
     k1, k2 = jax.random.split(key)
-    state = initialize(k1, data, column_types)
+    state = initialize(k1, data, column_types).state
     packed = pack_state(state)
     packed = packed_gibbs_sweep(k2, packed, data, n_sweeps=10)
 
