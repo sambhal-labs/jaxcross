@@ -6,6 +6,8 @@
         - packed_gibbs_sweep
         - packed_gibbs_step
         - packed_transition_row_assignments
+        - packed_transition_row_assignments_minibatch
+        - packed_transition_row_assignments_parallel
         - packed_transition_column_assignments
         - packed_transition_column_hypers
         - packed_transition_crp_alphas
@@ -51,6 +53,42 @@ Resample row cluster assignments. Uses nested `lax.scan` (outer over views, inne
 
 !!! tip "recompute_suffstats"
     The `recompute_suffstats` parameter controls whether sufficient statistics are recomputed from scratch after the sweep. Set to `False` when a subsequent kernel (e.g., `packed_transition_column_assignments`) will recompute them anyway. Both `packed_gibbs_sweep` and `packed_gibbs_step` pass `recompute_suffstats=False` internally since column assignments always recomputes suffstats.
+
+## `packed_transition_row_assignments_minibatch`
+
+```python
+packed_transition_row_assignments_minibatch(rng_key, packed, data, *, batch_size=10_000) -> PackedCrossCatState
+```
+
+Mini-batch row assignment kernel. Randomly selects `batch_size` rows and updates only their cluster assignments. Cost is O(B*K*C) instead of O(N*K*C). Useful for datasets with 10K+ rows.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `rng_key` | `Array` | JAX PRNG key |
+| `packed` | `PackedCrossCatState` | Current packed state |
+| `data` | `Array (n_rows, n_cols)` | Data matrix |
+| `batch_size` | `int` | Number of rows to update per call |
+
+**Returns**: Updated `PackedCrossCatState`.
+
+## `packed_transition_row_assignments_parallel`
+
+```python
+packed_transition_row_assignments_parallel(rng_key, packed, data) -> PackedCrossCatState
+```
+
+Parallel row assignment kernel. Uses `vmap` over all rows simultaneously with leave-one-out suffstat correction. Faster than sequential on wide datasets but cannot create new clusters.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `rng_key` | `Array` | JAX PRNG key |
+| `packed` | `PackedCrossCatState` | Current packed state |
+| `data` | `Array (n_rows, n_cols)` | Data matrix |
+
+**Returns**: Updated `PackedCrossCatState`.
+
+!!! warning
+    The parallel kernel cannot create new clusters — it only reassigns rows to existing clusters. Alternate with sequential or minibatch sweeps periodically for cluster birth/death.
 
 ## `packed_transition_column_assignments`
 
@@ -116,7 +154,8 @@ Run `packed_gibbs_sweep` across N chains in parallel via `jax.vmap`. Batches the
 from crosscat import initialize, pack_state, multi_chain_packed_gibbs_sweep, select_best_chain
 
 key = jax.random.key(42)
-states = initialize(key, data, column_types, n_chains=4)
+result = initialize(key, data, column_types, n_chains=4)
+states = result.state
 packed_list = [pack_state(s) for s in states]
 
 key, subkey = jax.random.split(key)

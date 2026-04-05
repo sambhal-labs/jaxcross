@@ -16,11 +16,17 @@ Key terms used throughout the jax-crosscat documentation.
 **Credible Interval**
 :   The Bayesian analog of a confidence interval. A 95% credible interval means there is a 95% posterior probability that the true value falls within the interval. Computed via `credible_interval()` by sampling from the posterior predictive.
 
+**Early Stopping**
+:   A convergence strategy that monitors log-joint probability during Gibbs sweeps and halts when improvement plateaus. Implemented in `gibbs_sweep_early_stopping()` with configurable patience and minimum improvement threshold.
+
 **Dependence Matrix (Z-matrix)**
 :   An N x N matrix (where N = number of columns) showing the posterior probability that each pair of columns belongs to the same view. Values near 1.0 indicate strong statistical dependence; values near 0.0 indicate independence. Computed via `dependence_matrix()`.
 
 **Dirichlet Process (DP)**
 :   A distribution over probability distributions, used as a nonparametric prior that allows the number of clusters to grow with the data. The CRP is the sequential representation of a DP. CrossCat uses a two-level DP: outer (columns into views) and inner (rows into clusters per view).
+
+**InitResult**
+:   Frozen dataclass returned by `initialize()`. Wraps the state(s) and optional subsample metadata. Access the CrossCat state via `result.state` and subsample indices via `result.subsample_idx`.
 
 **Gibbs Sampling**
 :   A Markov Chain Monte Carlo (MCMC) method that samples each variable in turn from its conditional distribution given the current values of all other variables. In CrossCat, Gibbs sampling is used to update row assignments, column assignments, hyperparameters, and CRP concentration parameters.
@@ -34,6 +40,12 @@ Key terms used throughout the jax-crosscat documentation.
 **Log-Joint**
 :   The log probability of the data and all latent variables (cluster assignments, hyperparameters) under the model. Used as a convergence diagnostic — when log-joint plateaus across multiple chains, the sampler has likely converged. Computed via `log_joint()`.
 
+**Memory Estimation**
+:   Pre-inference calculation of GPU memory required for a packed state with given dimensions. Use `estimate_packed_memory()` to plan `max_clusters` and `max_views` before packing.
+
+**Mini-Batch Gibbs**
+:   A variant of Gibbs sampling where each sweep updates only a random subset of rows (the "mini-batch"), reducing per-sweep cost from O(N) to O(B). Implemented in `minibatch_gibbs_sweep()` and `packed_transition_row_assignments_minibatch()`.
+
 **Marginal Likelihood**
 :   The probability of the observed data in a cluster after integrating out all component parameters. Used to score how well a cluster explains its assigned data points. Each component model provides `log_marginal_likelihood()`.
 
@@ -45,6 +57,9 @@ Key terms used throughout the jax-crosscat documentation.
 
 **Posterior Predictive**
 :   The distribution over new data points, integrating over all posterior uncertainty in cluster assignments and parameters. Used by all query functions (sampling, probability, CDF, anomaly scoring). "Fully Bayesian" means predictions account for parameter uncertainty, not just point estimates.
+
+**Subsample Annealing**
+:   A scaling strategy that initializes the model on a small subsample of rows, runs Gibbs sweeps to discover structure, then progressively inserts more rows and refines. Implemented in `subsample_anneal()`. Combines the benefits of fast initialization with full-data inference.
 
 **Sufficient Statistics**
 :   Compact summaries of the data in each cluster that are sufficient to compute likelihoods. For example, the Normal-Gamma model tracks `(count, sum, sum_of_squares)` per cluster. Sufficient statistics enable efficient incremental updates when rows are added or removed from clusters.

@@ -23,7 +23,8 @@ from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
 # Train the model
 key = jax.random.key(42)
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)

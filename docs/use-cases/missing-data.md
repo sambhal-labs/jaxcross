@@ -23,7 +23,8 @@ from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 
 # Data with missing values (NaN)
 # CrossCat handles NaN transparently during inference
-state = initialize(jax.random.key(42), data, col_types)
+result = initialize(jax.random.key(42), data, col_types)
+state = result.state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)

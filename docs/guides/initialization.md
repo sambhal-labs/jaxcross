@@ -16,7 +16,8 @@ from crosscat import initialize
 from crosscat.types import ColumnType
 
 key = jax.random.key(42)
-state = initialize(key, data, col_types)
+result = initialize(key, data, col_types)
+state = result.state
 
 print(f"Views: {state.n_views}")
 print(f"Column assignments: {state.column_assignments}")
@@ -30,7 +31,8 @@ for v in range(state.n_views):
 Different random initializations can lead to different local optima. Running multiple chains and selecting the best gives more robust results:
 
 ```python
-states = initialize(key, data, col_types, n_chains=4)
+result = initialize(key, data, col_types, n_chains=4)
+states = result.state
 # Returns a list of 4 independent CrossCatState objects
 ```
 
@@ -44,10 +46,12 @@ states = initialize(key, data, col_types, n_chains=4)
 
 ```python
 # Conservative start
-state = initialize(key, data, col_types, initialization="together")
+result = initialize(key, data, col_types, initialization="together")
+state = result.state
 
 # Exploratory start
-state = initialize(key, data, col_types, initialization="apart")
+result = initialize(key, data, col_types, initialization="apart")
+state = result.state
 ```
 
 ## CRP Concentration Parameters
@@ -60,9 +64,10 @@ The `column_crp_alpha` and `row_crp_alpha` parameters control how many groups th
 
 ```python
 # Encourage more views and more clusters
-state = initialize(key, data, col_types,
-                   column_crp_alpha=2.0,
-                   row_crp_alpha=2.0)
+result = initialize(key, data, col_types,
+                    column_crp_alpha=2.0,
+                    row_crp_alpha=2.0)
+state = result.state
 ```
 
 !!! tip
@@ -83,12 +88,38 @@ Hyperparameters are initialized automatically from the data:
 !!! info "Ordinal columns are non-conjugate"
     The OrderedLogistic model uses grid integration (31-point grid over latent location), which is slower than conjugate models. This is expected and correct.
 
+## Subsampled Initialization
+
+For large datasets (10K+ rows), initialize on a subsample for faster startup:
+
+```python
+result = initialize(key, data, col_types, subsample_rows=5000)
+state = result.state
+sub_idx = result.subsample_idx  # shape (5000,)
+
+# Pack and run inference on the subsample
+sub_data = data[sub_idx]
+packed = pack_state(state)
+packed = packed_gibbs_sweep(key, packed, sub_data, n_sweeps=50)
+
+# Then insert remaining rows
+from crosscat.packed.kernels import packed_insert_rows
+remaining_mask = jnp.ones(data.shape[0], dtype=bool).at[sub_idx].set(False)
+remaining = data[remaining_mask]
+packed, full_data = packed_insert_rows(key, packed, sub_data, remaining)
+```
+
+!!! tip
+    For a fully automated version of this pattern, see [`subsample_anneal`](../api/scaling.md#subsample_anneal) in the scaling module.
+
 ## Tips
 
 - **Always use multi-chain** for any serious analysis (4+ chains)
 - The initial state is random — run at least 50 sweeps before querying
 - Use `log_joint(state, data)` to compare chains after inference
+- For large datasets, use `subsample_rows` to speed up initialization
 
 ## API Reference
 
 - [`initialize`](../api/model.md#initialize)
+- [`InitResult`](../api/types.md#initresult)
