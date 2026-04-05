@@ -105,8 +105,7 @@ from crosscat.packed_inference import (
 from crosscat.scaling import (
     gibbs_sweep_early_stopping,
     minibatch_gibbs_sweep,
-    multi_device_gibbs_sweep,
-    shard_data_across_devices,
+    parallel_gibbs_sweep,
     subsample_anneal,
 )
 from crosscat.serialization import (
@@ -193,8 +192,7 @@ __all__ = [
     # Scaling
     "gibbs_sweep_early_stopping",
     "minibatch_gibbs_sweep",
-    "multi_device_gibbs_sweep",
-    "shard_data_across_devices",
+    "parallel_gibbs_sweep",
     "subsample_anneal",
     # Synthetic
     "add_missing_data",

@@ -962,15 +962,18 @@ def packed_transition_row_assignments_parallel(
 ) -> PackedCrossCatState:
     """Batch-parallel Gibbs sweep: scores ALL rows simultaneously via vmap.
 
-    Instead of sequential lax.scan (one row at a time with suffstat updates),
-    this kernel scores all N rows against the SAME current sufficient statistics
-    in parallel using vmap, then samples new assignments for all rows at once.
-    Suffstats are recomputed from scratch afterward.
+    Each row is scored against shared sufficient statistics with its OWN
+    contribution removed (per-row leave-one-out). This is correct collapsed
+    Gibbs — the only approximation is that rows don't see each other's
+    reassignment within the same sweep (synchronous Gibbs).
+
+    New cluster creation is blocked in this kernel because parallel rows
+    cannot coordinate distinct free slots. Run the sequential kernel
+    periodically (e.g., every 5th sweep) to allow cluster birth/death.
 
     Tradeoffs vs sequential kernel:
-    - Much faster on GPU (full parallelism, no sequential dependency)
-    - Slightly different convergence (rows don't see each other's updates
-      within a sweep — similar to "synchronous Gibbs")
+    - Much faster on GPU (full parallelism via vmap)
+    - Cannot create new clusters (only reassigns among existing ones)
     - Best for large N where GPU parallelism dominates
 
     Args:
@@ -996,24 +999,43 @@ def packed_transition_row_assignments_parallel(
         dom_type = _compute_dominant_type(col_indices, packed.col_type_ids, n_columns)
 
         assigns = ra_all[v_idx]
+        n_cl = nc_all[v_idx]
 
-        # Current cluster counts
-        counts = jnp.bincount(assigns, length=max_c).astype(jnp.int32)
+        # Current cluster counts and suffstats (shared baseline)
+        counts = jnp.bincount(assigns, length=max_c).astype(jnp.float32)
 
-        # Score ALL rows against current suffstats in parallel
-        def score_one_row(row_data):
-            return _score_row_all_clusters(
-                row_data,
-                col_indices,
-                n_columns,
-                packed.col_type_ids,
-                counts,
+        # Score each row with its own contribution removed (leave-one-out)
+        def score_one_row(row_data, old_cluster):
+            # Remove this row from counts (CRP prior correction)
+            adj_counts = counts.at[old_cluster].add(-1.0)
+
+            # Remove this row from suffstats
+            ss_c, ss_sx, ss_sxsq, ss_cat, ss_sin, ss_cos = _remove_row_from_suffstats(
                 packed.ss_counts[v_idx],
                 packed.ss_sum_x[v_idx],
                 packed.ss_sum_x_sq[v_idx],
                 packed.ss_cat_counts[v_idx],
                 packed.ss_sum_sin[v_idx],
                 packed.ss_sum_cos[v_idx],
+                old_cluster,
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                packed.max_categories,
+            )
+
+            log_scores = _score_row_all_clusters(
+                row_data,
+                col_indices,
+                n_columns,
+                packed.col_type_ids,
+                adj_counts,
+                ss_c,
+                ss_sx,
+                ss_sxsq,
+                ss_cat,
+                ss_sin,
+                ss_cos,
                 packed.hyper_mu,
                 packed.hyper_r,
                 packed.hyper_s,
@@ -1029,28 +1051,25 @@ def packed_transition_row_assignments_parallel(
                 max_c,
                 dominant_type=dom_type,
             )
+            return log_scores
 
-        all_log_probs = jax.vmap(score_one_row)(data)  # (n_rows, max_c + 1)
+        all_log_probs = jax.vmap(score_one_row)(data, assigns)  # (n_rows, max_c + 1)
 
-        # Block new cluster if budget exhausted
-        n_cl = nc_all[v_idx]
-        budget_exhausted = n_cl >= (max_c - 1)
-        all_log_probs = all_log_probs.at[:, max_c].set(
-            jnp.where(budget_exhausted, -jnp.inf, all_log_probs[:, max_c])
-        )
+        # Block new cluster creation — cannot coordinate slots in parallel
+        all_log_probs = all_log_probs.at[:, max_c].set(-jnp.inf)
+
+        # Mask entries beyond current clusters
+        valid_mask = jnp.arange(max_c + 1) < n_cl
+        all_log_probs = jnp.where(valid_mask[None, :], all_log_probs, -jnp.inf)
 
         # Normalize and sample all rows in parallel
         all_log_probs = all_log_probs - jnp.max(all_log_probs, axis=1, keepdims=True)
         row_keys = jax.random.split(view_keys[v_idx], n_rows)
         chosen = jax.vmap(jax.random.categorical)(row_keys, all_log_probs)  # (n_rows,)
 
-        # Handle new cluster assignments
-        is_new = chosen == max_c
-        # Find free slots via counts
-        free_slot = jnp.argmin(counts)
-        new_assigns = jnp.where(is_new, free_slot, chosen).astype(jnp.int32)
+        new_assigns = chosen.astype(jnp.int32)
 
-        # Compact cluster IDs
+        # Compact cluster IDs (may reduce n_clusters if clusters emptied)
         compacted, compacted_n_cl = _compact_clusters(new_assigns, n_rows, max_c)
 
         new_ra = jnp.where(is_active, compacted, ra_all[v_idx])

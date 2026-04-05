@@ -6,7 +6,7 @@ Tests:
   3. Parallel row scoring vs sequential comparison
   4. Early stopping convergence
 
-Designed for Kaggle 2xT4 (32GB VRAM). Requires >= 16GB GPU memory.
+Designed for Kaggle T4 (16GB VRAM). Requires >= 16GB GPU memory.
 
 Usage:
     uv run python benchmarks/scaling_1m_benchmark.py
@@ -128,7 +128,8 @@ def benchmark_minibatch_throughput(key, n_rows=1_000_000, n_cols=20, n_sweeps=5)
 
     # Initialize on subsample
     result = initialize(k2, data, col_types, subsample_rows=5000)
-    state, sub_idx = result
+    state = result.state
+    sub_idx = result.subsample_idx
     packed = pack_state(state, max_clusters=max_k)
     sub_data = data[sub_idx]
     packed = packed_gibbs_sweep(jax.random.fold_in(k2, 1), packed, sub_data, n_sweeps=3)
