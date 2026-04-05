@@ -99,6 +99,11 @@ from crosscat.packed_inference import (
     packed_row_typicality,
     packed_sample_and_insert,
 )
+from crosscat.scaling import (
+    gibbs_sweep_early_stopping,
+    minibatch_gibbs_sweep,
+    subsample_anneal,
+)
 from crosscat.serialization import (
     load_latest_checkpoint,
     load_packed_state,
@@ -178,6 +183,10 @@ __all__ = [
     "save_npz",
     "write_csv",
     "write_parquet",
+    # Scaling
+    "gibbs_sweep_early_stopping",
+    "minibatch_gibbs_sweep",
+    "subsample_anneal",
     # Synthetic
     "add_missing_data",
     "generate_crosscat_data",

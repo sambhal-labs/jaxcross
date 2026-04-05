@@ -738,6 +738,218 @@ def packed_transition_row_assignments(
 
 
 # ---------------------------------------------------------------------------
+# Mini-batch row assignment kernel
+# ---------------------------------------------------------------------------
+
+
+@functools.partial(jax.jit, static_argnames=("batch_size",))
+def packed_transition_row_assignments_minibatch(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    *,
+    batch_size: int = 10_000,
+) -> PackedCrossCatState:
+    """Mini-batch Gibbs sweep over a random subset of row assignments.
+
+    Instead of updating all N rows per sweep, randomly samples ``batch_size``
+    rows and only updates their cluster assignments. This reduces per-sweep
+    cost from O(N*K*C) to O(B*K*C) where B << N, enabling practical
+    inference on million-row datasets.
+
+    Suffstats are recomputed from scratch after the sweep since only a
+    subset of rows were updated.
+
+    Args:
+        rng_key: PRNG key.
+        packed: Current packed state.
+        data: (n_rows, n_cols) data matrix.
+        batch_size: Number of rows to update per sweep (static for JIT).
+            If >= n_rows, falls back to full sweep.
+
+    Returns:
+        Updated PackedCrossCatState with new row assignments and suffstats.
+    """
+    n_rows = packed.n_rows
+    max_c = packed.max_clusters
+    max_views = packed.max_views
+    max_cats = packed.max_categories
+
+    if batch_size >= n_rows:
+        return packed_transition_row_assignments(rng_key, packed, data)
+
+    k1, k2 = jax.random.split(rng_key)
+
+    # Sample batch_size row indices without replacement
+    row_indices = jax.random.choice(k1, n_rows, shape=(batch_size,), replace=False)
+    row_indices = jnp.sort(row_indices)
+
+    # Pre-split keys for all views
+    view_keys = jax.random.split(k2, max_views)
+
+    def scan_one_view(carry, v_idx):
+        """Process one view: inner scan over sampled rows only."""
+        ra_all, nc_all = carry
+        view_key = view_keys[v_idx]
+        row_keys = jax.random.split(view_key, batch_size)
+
+        is_active = packed.view_mask[v_idx]
+        col_indices = packed.view_column_indices[v_idx]
+        n_columns = packed.view_n_columns[v_idx]
+        alpha = packed.view_row_crp_alpha[v_idx]
+        dom_type = _compute_dominant_type(col_indices, packed.col_type_ids, n_columns)
+
+        # Working suffstats for this view
+        w_ss_c = packed.ss_counts[v_idx]
+        w_ss_sx = packed.ss_sum_x[v_idx]
+        w_ss_sxsq = packed.ss_sum_x_sq[v_idx]
+        w_ss_cat = packed.ss_cat_counts[v_idx]
+        w_ss_sin = packed.ss_sum_sin[v_idx]
+        w_ss_cos = packed.ss_sum_cos[v_idx]
+
+        assigns = ra_all[v_idx]
+        n_cl = nc_all[v_idx]
+
+        def scan_one_row(row_carry, batch_idx):
+            """Process one sampled row within a view."""
+            (r_assigns, r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos, r_n_cl) = (
+                row_carry
+            )
+            row_idx = row_indices[batch_idx]
+            rk = row_keys[batch_idx]
+            row_data = data[row_idx]
+            old_cluster = r_assigns[row_idx]
+
+            # Remove row from old cluster's suffstats
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = _remove_row_from_suffstats(
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                old_cluster,
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                max_cats,
+            )
+
+            # Cluster counts excluding this row
+            temp_assigns = r_assigns.at[row_idx].set(max_c)
+            counts = jnp.bincount(temp_assigns, length=max_c).astype(jnp.int32)
+
+            # Score all clusters
+            log_probs = _score_row_all_clusters(
+                row_data,
+                col_indices,
+                n_columns,
+                packed.col_type_ids,
+                counts,
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                packed.hyper_mu,
+                packed.hyper_r,
+                packed.hyper_s,
+                packed.hyper_nu,
+                packed.hyper_dirichlet_alpha,
+                packed.hyper_alpha,
+                packed.hyper_beta,
+                packed.hyper_kappa,
+                packed.hyper_vm_a,
+                packed.hyper_vm_mu,
+                packed.hyper_cutpoints,
+                alpha,
+                max_c,
+                dominant_type=dom_type,
+            )
+
+            # Block new cluster if budget exhausted
+            budget_exhausted = r_n_cl >= (max_c - 1)
+            log_probs = log_probs.at[max_c].set(
+                jnp.where(budget_exhausted, -jnp.inf, log_probs[max_c])
+            )
+
+            log_probs = log_probs - jnp.max(log_probs)
+            chosen = jax.random.categorical(rk, log_probs)
+
+            # Handle new cluster
+            free_slot = jnp.argmin(counts)
+            is_new = chosen == max_c
+            actual_cluster = jnp.where(is_new, free_slot, chosen).astype(jnp.int32)
+            r_n_cl = jnp.where(is_new, r_n_cl + 1, r_n_cl)
+
+            r_assigns = r_assigns.at[row_idx].set(actual_cluster)
+
+            # Add row to chosen cluster's suffstats
+            r_ss_c, r_ss_sx, r_ss_sxsq, r_ss_cat, r_ss_sin, r_ss_cos = _add_row_to_suffstats(
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                actual_cluster,
+                row_data,
+                col_indices,
+                packed.col_type_ids,
+                max_cats,
+            )
+
+            new_carry = (
+                r_assigns,
+                r_ss_c,
+                r_ss_sx,
+                r_ss_sxsq,
+                r_ss_cat,
+                r_ss_sin,
+                r_ss_cos,
+                r_n_cl,
+            )
+            return new_carry, None
+
+        row_init = (assigns, w_ss_c, w_ss_sx, w_ss_sxsq, w_ss_cat, w_ss_sin, w_ss_cos, n_cl)
+        (final_assigns, _, _, _, _, _, _, final_n_cl), _ = jax.lax.scan(
+            scan_one_row, row_init, jnp.arange(batch_size)
+        )
+
+        # Compact cluster IDs
+        compacted_assigns, compacted_n_cl = _compact_clusters(final_assigns, n_rows, max_c)
+
+        new_ra = jnp.where(is_active, compacted_assigns, ra_all[v_idx])
+        new_nc = jnp.where(is_active, compacted_n_cl, nc_all[v_idx])
+
+        ra_all = ra_all.at[v_idx].set(new_ra)
+        nc_all = nc_all.at[v_idx].set(new_nc)
+
+        return (ra_all, nc_all), None
+
+    init_carry = (jnp.array(packed.view_row_assignments), jnp.array(packed.view_n_clusters))
+    (new_row_assigns, new_n_clusters), _ = jax.lax.scan(
+        scan_one_view, init_carry, jnp.arange(max_views)
+    )
+
+    updated = PackedCrossCatState(
+        **{
+            name: (
+                new_row_assigns
+                if name == "view_row_assignments"
+                else new_n_clusters
+                if name == "view_n_clusters"
+                else getattr(packed, name)
+            )
+            for name in _ARRAY_FIELDS
+        },
+        **{name: getattr(packed, name) for name in _STATIC_FIELDS},
+    )
+    return recompute_all_suffstats(updated, data)
+
+
+# ---------------------------------------------------------------------------
 # Column hypers kernel (JIT-compatible via vmap)
 # ---------------------------------------------------------------------------
 
