@@ -23,11 +23,11 @@ import jax.numpy as jnp
 from crosscat.model import initialize
 from crosscat.packed.kernels import (
     packed_gibbs_sweep,
+    packed_insert_rows,
     packed_transition_row_assignments_minibatch,
     packed_transition_row_assignments_parallel,
 )
 from crosscat.packed.state import pack_state, suggest_max_clusters
-from crosscat.packed.suffstats import recompute_all_suffstats
 from crosscat.scaling import (
     minibatch_gibbs_sweep,
     subsample_anneal,
@@ -126,7 +126,7 @@ def benchmark_minibatch_throughput(key, n_rows=1_000_000, n_cols=20, n_sweeps=5)
     data, col_types = _make_data(k1, n_rows, n_cols)
     max_k = suggest_max_clusters(n_rows)
 
-    # Initialize on subsample
+    # Initialize on subsample, sweep, then insert remaining rows
     result = initialize(k2, data, col_types, subsample_rows=5000)
     state = result.state
     sub_idx = result.subsample_idx
@@ -134,24 +134,17 @@ def benchmark_minibatch_throughput(key, n_rows=1_000_000, n_cols=20, n_sweeps=5)
     sub_data = data[sub_idx]
     packed = packed_gibbs_sweep(jax.random.fold_in(k2, 1), packed, sub_data, n_sweeps=3)
 
-    # Extend to full dataset via recomputing suffstats with full assignments
-    # (simplified: just extend assignments with zeros and recompute)
-    full_ra = jnp.zeros((packed.max_views, n_rows), dtype=jnp.int32)
-    full_ra = full_ra.at[:, : sub_data.shape[0]].set(packed.view_row_assignments)
-
-    from crosscat.packed.state import _ARRAY_FIELDS, _STATIC_FIELDS, PackedCrossCatState
-
-    full_packed = PackedCrossCatState(
-        **{
-            name: (full_ra if name == "view_row_assignments" else getattr(packed, name))
-            for name in _ARRAY_FIELDS
-        },
-        **{
-            name: (n_rows if name == "n_rows" else getattr(packed, name))
-            for name in _STATIC_FIELDS
-        },
-    )
-    full_packed = recompute_all_suffstats(full_packed, data)
+    # Insert remaining rows in batches via packed_insert_rows
+    included = jnp.zeros(n_rows, dtype=bool).at[sub_idx].set(True)
+    remaining_idx = jnp.where(~included, size=n_rows - sub_data.shape[0])[0]
+    remaining = data[remaining_idx]
+    batch_size = 50_000
+    current_data = sub_data
+    for b in range(0, remaining.shape[0], batch_size):
+        batch = remaining[b : b + batch_size]
+        kb = jax.random.fold_in(k2, b + 100)
+        packed, current_data = packed_insert_rows(kb, packed, current_data, batch)
+    full_packed = packed
 
     # Time mini-batch sweeps
     t0 = time.perf_counter()

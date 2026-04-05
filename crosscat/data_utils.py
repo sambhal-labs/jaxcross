@@ -486,11 +486,7 @@ def read_parquet(
         ) from None
 
     table = pq.read_table(filepath, columns=columns)
-    col_names = table.column_names
-    # Convert to pandas then numpy for reliable NaN handling
-    df = table.to_pandas()
-    data_np = df.to_numpy(dtype=np.float32, na_value=float("nan"))
-    return jnp.array(data_np), col_names
+    return _arrow_table_to_jax(table)
 
 
 def write_parquet(
