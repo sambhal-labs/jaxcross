@@ -192,7 +192,7 @@ Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction 
 | **Query API** | Predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy |
 | **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
 | **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
-| **Data Handling** | Transparent NaN (missing data), CSV I/O with auto type detection, no preprocessing needed for mixed types |
+| **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY I/O, auto type detection, chunked reading, memory-mapped loading |
 | **Production** | Serialization (`.jxc` format), checkpointing, state validation, deterministic RNG for reproducibility |
 | **Scaling** | Subsample initialization, mini-batch Gibbs, parallel row scoring, early stopping, subsample annealing for 10K+ row datasets |
 | **Constraints** | Column dependency enforcement (must-link / cannot-link), row clustering constraints via rejection sampling |
