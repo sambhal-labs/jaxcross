@@ -456,3 +456,149 @@ class TestEarlyStopping:
         assert len(history) > 0
         lj = float(packed_log_joint(result, data))
         assert np.isfinite(lj)
+
+
+# ---------------------------------------------------------------------------
+# 8. Additional must-have tests
+# ---------------------------------------------------------------------------
+
+
+class TestMinibatchAssignmentInvariants:
+    """Validate structural invariants after minibatch kernel, not just log-joint."""
+
+    def test_assignments_in_range(self, simple_packed):
+        """All row assignments must be in [0, max_clusters)."""
+        packed, data, _ = simple_packed
+        key = jax.random.key(600)
+        updated = packed_transition_row_assignments_minibatch(key, packed, data, batch_size=15)
+        ra = updated.view_row_assignments
+        n_rows = updated.n_rows
+        max_k = updated.max_clusters
+        for v in range(int(updated.n_views)):
+            assigns = ra[v, :n_rows]
+            assert jnp.all(assigns >= 0), f"View {v}: negative assignment"
+            assert jnp.all(assigns < max_k), f"View {v}: assignment >= max_clusters"
+
+    def test_validate_state_after_minibatch(self, simple_packed):
+        """validate_state should pass on minibatch output."""
+        from crosscat.packed import unpack_state
+        from crosscat.validate import validate_state
+
+        packed, data, col_types = simple_packed
+        key = jax.random.key(601)
+        updated = packed_transition_row_assignments_minibatch(key, packed, data, batch_size=15)
+        state = unpack_state(updated, col_types, data=data)
+        errors = validate_state(state, data)
+        assert not errors, f"Validation errors: {errors}"
+
+
+class TestEarlyStoppingEdgeCases:
+    def test_nan_log_joint_stops_with_warning(self):
+        """If log-joint is NaN, early stopping should break with a warning."""
+        from unittest.mock import patch
+
+        from crosscat.scaling import gibbs_sweep_early_stopping
+
+        key = jax.random.key(700)
+        data = jax.random.normal(key, (20, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        state = initialize(jax.random.key(701), data, col_types).state
+        packed = pack_state(state)
+
+        # Patch packed_log_joint to return NaN after first call
+        real_plj = packed_log_joint
+        call_count = [0]
+
+        def fake_log_joint(p, d):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return real_plj(p, d)
+            return jnp.array(float("nan"))
+
+        with (
+            patch("crosscat.scaling.packed_log_joint", side_effect=fake_log_joint),
+            warnings.catch_warnings(record=True) as w,
+        ):
+            warnings.simplefilter("always")
+            _, history = gibbs_sweep_early_stopping(
+                jax.random.key(702),
+                packed,
+                data,
+                max_sweeps=50,
+                check_interval=5,
+            )
+            # Should have stopped after 2 checks (first OK, second NaN)
+            assert len(history) == 2
+            assert np.isnan(history[-1])
+            assert any("NaN" in str(x.message) or "nan" in str(x.message) for x in w)
+
+
+class TestReadCsvEdgeCases:
+    def test_empty_csv_raises(self):
+        """Empty CSV file raises ValueError."""
+        from crosscat.data_utils import read_csv_chunked
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "empty.csv"
+            path.write_text("")
+            with pytest.raises(ValueError, match="empty"):
+                read_csv_chunked(path)
+
+    def test_empty_csv_read_csv_raises(self):
+        """Empty CSV file raises ValueError in read_csv too."""
+        from crosscat.data_utils import read_csv
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "empty.csv"
+            path.write_text("")
+            with pytest.raises(ValueError, match="empty"):
+                read_csv(path)
+
+    def test_has_header_false(self):
+        """read_csv_chunked with has_header=False generates column names."""
+        from crosscat.data_utils import read_csv_chunked
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "noheader.csv"
+            path.write_text("1.0,2.0\n3.0,4.0\n")
+            data, names = read_csv_chunked(path, has_header=False)
+            assert names == ["col_0", "col_1"]
+            assert data.shape == (2, 2)
+            assert float(data[0, 0]) == pytest.approx(1.0)
+
+    def test_read_csv_warns_on_unparseable(self):
+        """read_csv (not chunked) now also warns on unparseable values."""
+        from crosscat.data_utils import read_csv
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "bad.csv"
+            path.write_text("a,b\n1.0,hello\nworld,3.0\n")
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                data, _ = read_csv(path)
+                assert any("Could not parse" in str(x.message) for x in w)
+                assert np.isnan(float(data[0, 1]))
+
+
+class TestNpzMmapWithNpy:
+    """Tests for the corrected save_npz/load_npz_mmap using .npy format."""
+
+    def test_saves_as_npy(self):
+        """save_npz creates a .npy file (not .npz)."""
+        from crosscat.data_utils import save_npz
+
+        data = jnp.array([[1.0, 2.0]])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_npz(Path(tmpdir) / "test.npz", data)
+            # Should create .npy regardless of input extension
+            assert (Path(tmpdir) / "test.npy").exists()
+
+    def test_true_memmap(self):
+        """load_npz_mmap returns a true numpy memmap on .npy files."""
+        from crosscat.data_utils import load_npz_mmap, save_npz
+
+        data = jnp.ones((100, 10))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_npz(Path(tmpdir) / "test", data)
+            loaded, _ = load_npz_mmap(Path(tmpdir) / "test")
+            assert isinstance(loaded, np.memmap), f"Expected np.memmap, got {type(loaded)}"

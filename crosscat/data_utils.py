@@ -45,10 +45,15 @@ def read_csv(
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
 
+    import warnings
+
     filepath = Path(filepath)
     with open(filepath, newline="") as f:
         reader = csv.reader(f)
         rows = list(reader)
+
+    if not rows:
+        raise ValueError(f"CSV file is empty: {filepath}")
 
     if has_header:
         col_names = rows[0]
@@ -57,23 +62,26 @@ def read_csv(
         data_rows = rows
         col_names = [f"col_{i}" for i in range(len(data_rows[0]))]
 
-    # Convert to float array, replacing nan_values with NaN
-    n_cols = len(col_names)
-    values = []
-    for row in data_rows:
-        row_vals = []
-        for val in row:
-            if val.strip() in nan_values:
-                row_vals.append(float("nan"))
-            else:
-                try:
-                    row_vals.append(float(val))
-                except ValueError:
-                    row_vals.append(float("nan"))
-        row_vals.extend([float("nan")] * (n_cols - len(row_vals)))
-        values.append(row_vals[:n_cols])
+    if not data_rows:
+        return jnp.zeros((0, len(col_names))), col_names
 
-    return jnp.array(values), col_names
+    n_cols = len(col_names)
+    parsed, bad_examples, n_mismatched = _parse_rows(data_rows, n_cols, nan_values)
+
+    if bad_examples:
+        warnings.warn(
+            f"Could not parse {len(bad_examples)}+ values to float "
+            f"(converted to NaN). Examples: {bad_examples[:5]}",
+            stacklevel=2,
+        )
+    if n_mismatched > 0:
+        warnings.warn(
+            f"{n_mismatched} rows had mismatched column count "
+            f"(expected {n_cols}). Short rows are NaN-padded, long rows truncated.",
+            stacklevel=2,
+        )
+
+    return jnp.array(parsed), col_names
 
 
 def write_csv(
@@ -271,11 +279,16 @@ def read_csv_chunked(
     with open(filepath, newline="") as f:
         reader = csv.reader(f)
 
-        if has_header:
-            col_names = next(reader)
-        else:
-            first_row = next(reader)
-            col_names = [f"col_{i}" for i in range(len(first_row))]
+        try:
+            if has_header:
+                col_names = next(reader)
+            else:
+                first_row = next(reader)
+                col_names = [f"col_{i}" for i in range(len(first_row))]
+        except StopIteration:
+            raise ValueError(f"CSV file is empty: {filepath}") from None
+
+        if not has_header:
             # Process first row since we already consumed it
             arr, bad, mis = _parse_rows([first_row], len(col_names), nan_values)
             chunks.append(arr)
@@ -290,14 +303,14 @@ def read_csv_chunked(
             if len(batch) >= chunk_size:
                 arr, bad, mis = _parse_rows(batch, n_cols, nan_values)
                 chunks.append(arr)
-                all_bad_examples.extend(bad[: 5 - len(all_bad_examples)])
+                all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
                 total_mismatched += mis
                 batch = []
 
         if batch:
             arr, bad, mis = _parse_rows(batch, n_cols, nan_values)
             chunks.append(arr)
-            all_bad_examples.extend(bad[: 5 - len(all_bad_examples)])
+            all_bad_examples.extend(bad[: max(0, 5 - len(all_bad_examples))])
             total_mismatched += mis
 
     if not chunks:
@@ -355,20 +368,25 @@ def save_npz(
     data: Array,
     column_names: list[str] | None = None,
 ) -> None:
-    """Save data array to compressed NPZ for fast reloading.
+    """Save data array to uncompressed ``.npy`` for fast memory-mapped reloading.
+
+    Despite the name (kept for backwards compatibility), this saves an
+    uncompressed ``.npy`` file — not a compressed ``.npz`` — so that
+    ``load_npz_mmap`` can truly memory-map the result.
 
     Column names are stored in a separate JSON sidecar file to avoid
     pickle serialization.
 
     Args:
-        filepath: Output .npz path.
+        filepath: Output path. The ``.npy`` suffix is used regardless of
+            what extension is provided.
         data: Data array, shape (n_rows, n_cols).
         column_names: Optional column names (saved as JSON sidecar).
     """
     import json
 
-    filepath = Path(filepath)
-    np.savez_compressed(filepath, data=np.asarray(data, dtype=np.float32))
+    filepath = Path(filepath).with_suffix(".npy")
+    np.save(filepath, np.asarray(data, dtype=np.float32))
     if column_names is not None:
         meta_path = filepath.with_suffix(".json")
         with open(meta_path, "w") as f:
@@ -380,17 +398,17 @@ def load_npz_mmap(
     *,
     mmap_mode: str = "r",
 ) -> tuple[np.ndarray, list[str] | None]:
-    """Load data from NPZ with memory-mapping for large files.
+    """Load data from ``.npy`` file with memory-mapping for large files.
 
     Returns a **NumPy memmap**, not a JAX array.  The OS pages data in on
     demand, so peak RAM stays low for multi-GB files.  Convert slices to
     JAX when needed::
 
-        data_np, names = load_npz_mmap("big.npz")
+        data_np, names = load_npz_mmap("data.npy")
         batch = jnp.array(data_np[1000:2000])   # only this slice hits RAM/GPU
 
     Args:
-        filepath: Path to .npz file (created by ``save_npz``).
+        filepath: Path to ``.npy`` file (created by ``save_npz``).
         mmap_mode: NumPy mmap mode ('r' for read-only, 'r+' for read-write).
 
     Returns:
@@ -402,9 +420,8 @@ def load_npz_mmap(
     import json
     import warnings
 
-    filepath = Path(filepath)
-    npz = np.load(filepath, mmap_mode=mmap_mode)
-    data_np = npz["data"]
+    filepath = Path(filepath).with_suffix(".npy")
+    data_np = np.load(filepath, mmap_mode=mmap_mode)
     col_names = None
     meta_path = filepath.with_suffix(".json")
     if meta_path.exists():

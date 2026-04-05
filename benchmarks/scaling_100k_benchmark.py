@@ -3,7 +3,6 @@
 Tests:
   1. Subsample init (5K) + batch insert (95K) + Gibbs sweeps
   2. Data connector roundtrip (save_npz / load_npz_mmap)
-  3. Memory estimation at 100K scale
 
 Designed for Kaggle T4 (16GB VRAM). Not runnable on small GPUs.
 
@@ -18,6 +17,7 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from crosscat.data_utils import load_npz_mmap, save_npz
 from crosscat.model import initialize
@@ -66,7 +66,8 @@ def benchmark_subsample_workflow(key, n_rows=100_000, n_cols=20, subsample_size=
     # Step 1: Subsample init
     t0 = time.perf_counter()
     result = initialize(k2, data, col_types, subsample_rows=subsample_size)
-    state, sub_idx = result
+    state = result.state
+    sub_idx = result.subsample_idx
     sub_data = data[sub_idx]
     packed = pack_state(state, max_clusters=max_k)
     init_time = time.perf_counter() - t0
@@ -129,30 +130,30 @@ def benchmark_data_connectors(key, n_rows=100_000, n_cols=20):
 
     tmp_dir = Path("/tmp/jaxcross_bench")
     tmp_dir.mkdir(exist_ok=True)
-    npz_path = tmp_dir / "test_100k.npz"
+    npy_path = tmp_dir / "test_100k.npy"
 
     # Save
     t0 = time.perf_counter()
-    save_npz(npz_path, data, column_names=col_names)
+    save_npz(npy_path, data, column_names=col_names)
     save_time = time.perf_counter() - t0
-    file_size_mb = npz_path.stat().st_size / (1024 * 1024)
+    file_size_mb = npy_path.stat().st_size / (1024 * 1024)
     print(f"  save_npz: {save_time:.2f}s ({file_size_mb:.1f} MB)")
 
     # Load with mmap
     t0 = time.perf_counter()
-    loaded_data, loaded_names = load_npz_mmap(npz_path)
+    loaded_data, loaded_names = load_npz_mmap(npy_path)
     load_time = time.perf_counter() - t0
     print(f"  load_npz_mmap: {load_time:.2f}s")
 
-    # Verify
+    # Verify (use np.allclose to avoid defeating mmap with JAX conversion)
     assert loaded_data.shape == data.shape, f"Shape mismatch: {loaded_data.shape} vs {data.shape}"
-    assert jnp.allclose(loaded_data, data, equal_nan=True), "Data mismatch after roundtrip"
+    assert np.allclose(loaded_data, np.asarray(data), equal_nan=True), "Data mismatch"
     assert loaded_names == col_names, "Column names mismatch"
     print("  roundtrip verified OK")
 
     # Cleanup
-    npz_path.unlink(missing_ok=True)
-    npz_path.with_suffix(".json").unlink(missing_ok=True)
+    npy_path.unlink(missing_ok=True)
+    npy_path.with_suffix(".json").unlink(missing_ok=True)
 
     return {"save_time": save_time, "load_time": load_time, "file_size_mb": file_size_mb}
 
