@@ -27,14 +27,14 @@ from crosscat.types import ColumnType
 
 logger = logging.getLogger(__name__)
 
-_FLOAT32_WARNING_ISSUED = False
-
 
 def _warn_float32_coercion(data: np.ndarray) -> None:
-    """Emit a one-time warning when float64 data is coerced to float32."""
-    global _FLOAT32_WARNING_ISSUED
-    if _FLOAT32_WARNING_ISSUED:
-        return
+    """Emit a warning when float64 data is coerced to float32.
+
+    Uses Python's default warning filter which automatically deduplicates
+    identical warnings per call site (``"default"`` filter shows each
+    location once).
+    """
     if hasattr(data, "dtype") and data.dtype == np.float64:
         warnings.warn(
             "Input data has dtype float64 and will be stored as float32. "
@@ -42,7 +42,6 @@ def _warn_float32_coercion(data: np.ndarray) -> None:
             UserWarning,
             stacklevel=3,
         )
-        _FLOAT32_WARNING_ISSUED = True
 
 
 def read_csv(
