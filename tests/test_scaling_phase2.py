@@ -3,7 +3,7 @@
 Covers:
 - packed_transition_row_assignments_minibatch validity
 - Bincount _score_column_in_view regression (via column assignment)
-- save_npz / load_npz_mmap roundtrip
+- save_npy / load_npy_mmap roundtrip
 - read_csv_chunked parity + warning behavior
 - subsample_anneal small-scale e2e
 - minibatch_gibbs_sweep multi-sweep validity
@@ -160,70 +160,70 @@ class TestBincountColumnScoring:
 
 
 # ---------------------------------------------------------------------------
-# 3. save_npz / load_npz_mmap roundtrip
+# 3. save_npy / load_npy_mmap roundtrip
 # ---------------------------------------------------------------------------
 
 
-class TestNpzRoundtrip:
+class TestNpyRoundtrip:
     def test_basic_roundtrip(self):
-        """save_npz -> load_npz_mmap preserves data and column names."""
-        from crosscat.data_utils import load_npz_mmap, save_npz
+        """save_npy -> load_npy_mmap preserves data and column names."""
+        from crosscat.data_utils import load_npy_mmap, save_npy
 
         data = jnp.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
         col_names = ["a", "b"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test.npy"
-            save_npz(path, data, col_names)
-            loaded, loaded_names = load_npz_mmap(path)
+            save_npy(path, data, col_names)
+            loaded, loaded_names = load_npy_mmap(path)
             assert isinstance(loaded, np.ndarray), "Should return numpy array, not JAX"
             np.testing.assert_allclose(loaded, np.array(data), atol=1e-6)
             assert loaded_names == col_names
 
     def test_nan_preservation(self):
         """NaN values survive the roundtrip."""
-        from crosscat.data_utils import load_npz_mmap, save_npz
+        from crosscat.data_utils import load_npy_mmap, save_npy
 
         data = jnp.array([[1.0, float("nan")], [float("nan"), 4.0]])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "nan.npy"
-            save_npz(path, data)
-            loaded, _ = load_npz_mmap(path)
+            save_npy(path, data)
+            loaded, _ = load_npy_mmap(path)
             assert np.isnan(loaded[0, 1])
             assert np.isnan(loaded[1, 0])
             assert loaded[0, 0] == pytest.approx(1.0)
             assert loaded[1, 1] == pytest.approx(4.0)
 
     def test_missing_sidecar_warns(self):
-        """load_npz_mmap warns when JSON sidecar is missing."""
-        from crosscat.data_utils import load_npz_mmap, save_npz
+        """load_npy_mmap warns when JSON sidecar is missing."""
+        from crosscat.data_utils import load_npy_mmap, save_npy
 
         data = jnp.array([[1.0, 2.0]])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "nosidecar.npy"
-            save_npz(path, data, column_names=["a", "b"])
+            save_npy(path, data, column_names=["a", "b"])
             # Delete the sidecar that was created
             sidecar = path.with_suffix(".json")
             assert sidecar.exists(), "Sidecar should have been created"
             sidecar.unlink()
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
-                loaded, names = load_npz_mmap(path)
+                loaded, names = load_npy_mmap(path)
                 assert names is None
                 assert any("sidecar" in str(x.message).lower() for x in w)
 
     def test_returns_numpy_memmap(self):
-        """load_npz_mmap returns a numpy array (memmap), not a JAX array."""
-        from crosscat.data_utils import load_npz_mmap, save_npz
+        """load_npy_mmap returns a numpy array (memmap), not a JAX array."""
+        from crosscat.data_utils import load_npy_mmap, save_npy
 
         data = jnp.ones((10, 3))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "memmap.npy"
-            save_npz(path, data)
-            loaded, _ = load_npz_mmap(path)
+            save_npy(path, data)
+            loaded, _ = load_npy_mmap(path)
             assert isinstance(loaded, np.ndarray)
             assert not hasattr(loaded, "devices")  # JAX arrays have .devices()
 
@@ -580,25 +580,27 @@ class TestReadCsvEdgeCases:
                 assert np.isnan(float(data[0, 1]))
 
 
-class TestNpzMmapWithNpy:
-    """Tests for the corrected save_npz/load_npz_mmap using .npy format."""
+class TestNpyMmap:
+    """Tests for the corrected save_npy/load_npy_mmap using .npy format."""
 
     def test_saves_as_npy(self):
-        """save_npz creates a .npy file (not .npz)."""
-        from crosscat.data_utils import save_npz
+        """save_npy creates a .npy file (not .npz)."""
+        from crosscat.data_utils import save_npy
 
         data = jnp.array([[1.0, 2.0]])
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_npz(Path(tmpdir) / "test.npz", data)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                save_npy(Path(tmpdir) / "test.npz", data)
             # Should create .npy regardless of input extension
             assert (Path(tmpdir) / "test.npy").exists()
 
     def test_true_memmap(self):
-        """load_npz_mmap returns a true numpy memmap on .npy files."""
-        from crosscat.data_utils import load_npz_mmap, save_npz
+        """load_npy_mmap returns a true numpy memmap on .npy files."""
+        from crosscat.data_utils import load_npy_mmap, save_npy
 
         data = jnp.ones((100, 10))
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_npz(Path(tmpdir) / "test", data)
-            loaded, _ = load_npz_mmap(Path(tmpdir) / "test")
+            save_npy(Path(tmpdir) / "test", data)
+            loaded, _ = load_npy_mmap(Path(tmpdir) / "test")
             assert isinstance(loaded, np.memmap), f"Expected np.memmap, got {type(loaded)}"

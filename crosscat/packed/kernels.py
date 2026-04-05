@@ -775,6 +775,10 @@ def packed_transition_row_assignments_minibatch(
     max_views = packed.max_views
     max_cats = packed.max_categories
 
+    # This comparison is evaluated at JIT trace time: batch_size is static,
+    # and n_rows is concrete during tracing. The branch is frozen for the
+    # lifetime of this compiled function — safe because n_rows is fixed
+    # for a given packed state shape (JIT recompiles on shape change).
     if batch_size >= n_rows:
         return packed_transition_row_assignments(rng_key, packed, data)
 
@@ -1004,10 +1008,25 @@ def packed_transition_row_assignments_parallel(
         # Current cluster counts and suffstats (shared baseline)
         counts = jnp.bincount(assigns, length=max_c).astype(jnp.float32)
 
-        # Score each row with its own contribution removed (leave-one-out)
+        # Score each row with its own contribution removed (leave-one-out).
+        # In synchronous Gibbs, all rows remove themselves from the SAME
+        # shared baseline simultaneously. This means if two rows share a
+        # cluster with count=2, both see count=1 after their own removal
+        # (not count=0 as sequential Gibbs would produce for the second).
+        # This is a well-known approximation that targets a slightly
+        # different distribution (product of conditionals vs the joint)
+        # but converges to the same posterior in practice. It can slow
+        # mixing vs sequential Gibbs for highly overlapping clusters.
         def score_one_row(row_data, old_cluster):
             # Remove this row from counts (CRP prior correction).
-            # Clamp to 0 to prevent NaN from log(-1) on inactive view padding.
+            # The jnp.maximum clamp to 0 is load-bearing for two reasons:
+            # (1) inactive view padding rows compute garbage counts that
+            #     get masked by is_active later, but log(-1) produces NaN
+            #     that poisons the computation before the mask applies;
+            # (2) under synchronous Gibbs, multiple rows in the same
+            #     cluster each subtract 1 from the shared baseline, which
+            #     is individually correct but means the clamp is needed
+            #     as a safety net against pathological edge cases.
             adj_counts = jnp.maximum(counts.at[old_cluster].add(-1.0), 0.0)
 
             # Remove this row from suffstats

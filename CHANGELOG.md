@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase 2: Memory optimization** (#84)
   - `read_csv_chunked()` — streaming CSV reader for large files with bounded
     memory, warnings on unparseable values and mismatched row lengths
-  - `save_npz()` / `load_npz_mmap()` — uncompressed `.npy` save with true
-    NumPy memory-mapped loading for multi-GB datasets
+  - `save_npy()` / `load_npy_mmap()` — uncompressed `.npy` save with true
+    NumPy memory-mapped loading for multi-GB datasets (formerly `save_npz`
+    / `load_npz_mmap`, which are now deprecated aliases)
   - `read_parquet()` / `write_parquet()` — Apache Parquet integration via
     pyarrow (optional dependency)
   - Memory-efficient column scoring in `_score_column_in_view`: replaced
@@ -41,8 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `read_csv()` refactored to use shared `_parse_rows()` with warnings on
   unparseable values and mismatched row lengths (parity with `read_csv_chunked`)
 - `_parse_rows()` tracks exact unparseable count (not capped at 5)
-- `save_npz` / `load_npz_mmap` warn when input file extension differs from
+- `save_npy` / `load_npy_mmap` warn when input file extension differs from
   `.npy` (suffix is silently rewritten for true mmap support)
+- `save_npz` / `load_npz_mmap` are now deprecated aliases that emit
+  `DeprecationWarning` and delegate to the new names
 
 ## [0.10.1] - 2026-03-30 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.10.0...v0.10.1)
 
