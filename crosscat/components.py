@@ -346,6 +346,9 @@ class DirichletCategorical:
         k = counts.shape[0]
 
         probs = (counts + alpha) / (n + k * alpha)
+        # Clamp OOB indices for JAX tracing safety: padded values (e.g. +inf, NaN)
+        # flow through "unused" jnp.where branches in the packed path. Matches
+        # packed/components.py which already clips via fixed-size arrays.
         x_safe = jnp.clip(x.astype(jnp.int32), 0, k - 1)
         return jnp.log(probs[x_safe])
 
@@ -477,6 +480,7 @@ class OrderedLogistic:
         counts = suffstats.category_counts.astype(jnp.float32)
         avg_probs = OrderedLogistic._averaged_probs(counts, hypers)
         n_levels = avg_probs.shape[0]
+        # Clamp OOB indices for JAX tracing safety (see DirichletCategorical note)
         x_safe = jnp.clip(x.astype(jnp.int32), 0, n_levels - 1)
         return jnp.log(jnp.maximum(avg_probs[x_safe], LOG_EPS))
 

@@ -189,6 +189,10 @@ def estimate_packed_memory(
 ) -> dict[str, int]:
     """Estimate GPU memory usage for a packed state in bytes.
 
+    Covers all ``PackedCrossCatState`` array fields plus the data matrix.
+    This is a close estimate; actual usage may be slightly higher due to
+    JIT intermediates and JAX runtime overhead.
+
     Args:
         n_rows: Number of rows in the dataset.
         n_cols: Number of columns.
@@ -210,15 +214,33 @@ def estimate_packed_memory(
     i32 = 4  # bytes per int32
 
     breakdown = {
-        "row_assignments": mv * n_rows * i32,
-        "suffstats_counts": mv * mk * mcpv * i32,
-        "suffstats_sum_x": mv * mk * mcpv * f32,
-        "suffstats_sum_x_sq": mv * mk * mcpv * f32,
-        "suffstats_cat_counts": mv * mk * mcpv * mc * i32,
-        "suffstats_sin_cos": 2 * mv * mk * mcpv * f32,
-        "hyperparameters": n_cols * 6 * f32,  # mu, s, r, nu, alpha, kappa
+        # Per-column arrays (n_cols): assignments, types, hyperparameters
         "column_assignments": n_cols * i32,
+        "col_type_ids": n_cols * i32,
+        "hypers_per_column": n_cols
+        * 10
+        * f32,  # mu,r,s,nu,alpha,beta,kappa,vm_a,vm_mu + cutpoints
+        "hyper_cutpoints": n_cols * (mc - 1) * f32,
+        "hyper_n_cutpoints": n_cols * i32,
+        # Per-view arrays (max_views)
         "view_column_indices": mv * mcpv * i32,
+        "view_n_columns": mv * i32,
+        "view_n_clusters": mv * i32,
+        "view_row_crp_alpha": mv * f32,
+        "view_mask": mv * i32,
+        # Per-view-row arrays (max_views * n_rows)
+        "view_row_assignments": mv * n_rows * i32,
+        # Sufficient statistics (max_views * max_clusters * max_cols_per_view)
+        "ss_counts": mv * mk * mcpv * i32,
+        "ss_sum_x": mv * mk * mcpv * f32,
+        "ss_sum_x_sq": mv * mk * mcpv * f32,
+        "ss_cat_counts": mv * mk * mcpv * mc * i32,
+        "ss_sum_sin": mv * mk * mcpv * f32,
+        "ss_sum_cos": mv * mk * mcpv * f32,
+        # Scalars / small arrays
+        "column_crp_alpha": f32,
+        "n_views": i32,
+        # Data matrix (not part of state but needed for inference)
         "data_matrix": n_rows * n_cols * f32,
     }
     breakdown["total"] = sum(breakdown.values())

@@ -68,8 +68,12 @@ class TBLogger:
         for key, value in metrics.items():
             if isinstance(value, (int, float)):
                 self._writer.add_scalar(key, value, step)
-            elif isinstance(value, (list, np.ndarray)):
-                arr = np.asarray(value, dtype=np.float64)
+            else:
+                # Convert JAX arrays, lists, and numpy arrays uniformly
+                try:
+                    arr = np.asarray(value, dtype=np.float64)
+                except (TypeError, ValueError):
+                    continue
                 if arr.ndim == 0:
                     self._writer.add_scalar(key, float(arr), step)
                 elif arr.ndim == 1:
