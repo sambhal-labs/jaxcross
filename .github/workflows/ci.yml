@@ -33,6 +33,26 @@ jobs:
         run: uv run mypy crosscat/ --ignore-missing-imports
         continue-on-error: true
 
-      # All tests (fast + slow) require JAX JIT compilation which is
-      # too slow for CPU runners. Run tests on Kaggle P100 GPU via
-      # notebooks/run_tests.ipynb instead.
+      # GPU-heavy tests (packed kernels, full sweeps) require a GPU runner.
+      # Run the full suite on Kaggle P100 via notebooks/run_tests.ipynb.
+      # CPU-safe tests run below in the test-cpu job.
+
+  test-cpu:
+    runs-on: ubuntu-latest
+    env:
+      JAX_PLATFORM_NAME: cpu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run CPU-safe tests
+        run: uv run pytest -m cpu --timeout=120 -x -v

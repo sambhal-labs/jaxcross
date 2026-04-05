@@ -178,6 +178,75 @@ def suggest_max_clusters(n_rows: int) -> int:
     return min(32, max(4, int(math.sqrt(n_rows))))
 
 
+def estimate_packed_memory(
+    n_rows: int,
+    n_cols: int,
+    *,
+    max_clusters: int = 32,
+    max_views: int = 16,
+    max_categories: int = 16,
+    max_cols_per_view: int | None = None,
+) -> dict[str, int]:
+    """Estimate GPU memory usage for a packed state in bytes.
+
+    Covers all ``PackedCrossCatState`` array fields plus the data matrix.
+    This is a close estimate; actual usage may be slightly higher due to
+    JIT intermediates and JAX runtime overhead.
+
+    Args:
+        n_rows: Number of rows in the dataset.
+        n_cols: Number of columns.
+        max_clusters: Maximum clusters per view.
+        max_views: Maximum number of views.
+        max_categories: Maximum categories for categorical/ordinal columns.
+        max_cols_per_view: Max columns per view (defaults to n_cols).
+
+    Returns:
+        Dict with per-component byte estimates and ``"total"`` sum.
+    """
+    if max_cols_per_view is None:
+        max_cols_per_view = n_cols
+    mcpv = max_cols_per_view
+    mk = max_clusters
+    mv = max_views
+    mc = max_categories
+    f32 = 4  # bytes per float32
+    i32 = 4  # bytes per int32
+
+    breakdown = {
+        # Per-column arrays (n_cols): assignments, types, hyperparameters
+        "column_assignments": n_cols * i32,
+        "col_type_ids": n_cols * i32,
+        "hypers_per_column": n_cols
+        * 10
+        * f32,  # mu,r,s,nu,alpha,beta,kappa,vm_a,vm_mu + cutpoints
+        "hyper_cutpoints": n_cols * (mc - 1) * f32,
+        "hyper_n_cutpoints": n_cols * i32,
+        # Per-view arrays (max_views)
+        "view_column_indices": mv * mcpv * i32,
+        "view_n_columns": mv * i32,
+        "view_n_clusters": mv * i32,
+        "view_row_crp_alpha": mv * f32,
+        "view_mask": mv * i32,
+        # Per-view-row arrays (max_views * n_rows)
+        "view_row_assignments": mv * n_rows * i32,
+        # Sufficient statistics (max_views * max_clusters * max_cols_per_view)
+        "ss_counts": mv * mk * mcpv * i32,
+        "ss_sum_x": mv * mk * mcpv * f32,
+        "ss_sum_x_sq": mv * mk * mcpv * f32,
+        "ss_cat_counts": mv * mk * mcpv * mc * i32,
+        "ss_sum_sin": mv * mk * mcpv * f32,
+        "ss_sum_cos": mv * mk * mcpv * f32,
+        # Scalars / small arrays
+        "column_crp_alpha": f32,
+        "n_views": i32,
+        # Data matrix (not part of state but needed for inference)
+        "data_matrix": n_rows * n_cols * f32,
+    }
+    breakdown["total"] = sum(breakdown.values())
+    return breakdown
+
+
 # ---------------------------------------------------------------------------
 # Pack / unpack conversion
 # ---------------------------------------------------------------------------

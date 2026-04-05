@@ -15,6 +15,7 @@ import pytest
 from crosscat.model import _compute_suffstats_for_view, initialize, log_joint
 from crosscat.packed import (
     compute_suffstats_vectorized,
+    estimate_packed_memory,
     pack_state,
     unpack_state,
 )
@@ -208,3 +209,25 @@ def test_pack_state_no_data_skips_category_validation():
     # (suffstat-level validation may still catch via category_counts length)
     packed = pack_state(state, max_categories=16)
     assert packed.max_categories == 16
+
+
+def test_estimate_packed_memory_returns_valid_breakdown():
+    """estimate_packed_memory returns positive total and all expected keys."""
+    result = estimate_packed_memory(1000, 20, max_clusters=32, max_views=16)
+    assert result["total"] > 0
+    assert result["total"] == sum(v for k, v in result.items() if k != "total")
+    # All values must be non-negative integers
+    for key, val in result.items():
+        assert isinstance(val, int), f"{key} is not int: {type(val)}"
+        assert val >= 0, f"{key} is negative: {val}"
+    # Sanity: 1000 rows x 20 cols should be at least 1 MB
+    assert result["total"] > 1_000_000
+
+
+def test_estimate_packed_memory_scales_with_rows():
+    """Doubling rows should increase memory (row_assignments, data_matrix grow)."""
+    small = estimate_packed_memory(100, 10)
+    large = estimate_packed_memory(200, 10)
+    assert large["total"] > small["total"]
+    assert large["view_row_assignments"] == 2 * small["view_row_assignments"]
+    assert large["data_matrix"] == 2 * small["data_matrix"]

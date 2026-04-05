@@ -275,6 +275,11 @@ class DirichletCategorical:
 
         NaN values are filtered before accumulation.
 
+        Note:
+            Unlike NormalGamma/BetaBernoulli/VonMises, this method requires
+            ``n_categories`` because the category count vector size cannot be
+            inferred from data alone (unobserved categories need slots).
+
         Args:
             data: 1D array of integer category indices (may contain NaN).
             n_categories: Number of possible categories.
@@ -341,7 +346,11 @@ class DirichletCategorical:
         k = counts.shape[0]
 
         probs = (counts + alpha) / (n + k * alpha)
-        return jnp.log(probs[x.astype(jnp.int32)])
+        # Clamp OOB indices for JAX tracing safety: padded values (e.g. +inf, NaN)
+        # flow through "unused" jnp.where branches in the packed path. Matches
+        # packed/components.py which already clips via fixed-size arrays.
+        x_safe = jnp.clip(x.astype(jnp.int32), 0, k - 1)
+        return jnp.log(probs[x_safe])
 
     @staticmethod
     def sample_posterior_predictive(
@@ -394,7 +403,12 @@ class OrderedLogistic:
 
     @staticmethod
     def sufficient_statistics(data: Array, n_levels: int) -> SufficientStats:
-        """Compute sufficient statistics from ordinal data. NaN-aware."""
+        """Compute sufficient statistics from ordinal data. NaN-aware.
+
+        Note:
+            Requires ``n_levels`` because the level count vector size cannot
+            be inferred from data alone (unobserved levels need slots).
+        """
         clean = _filter_nan(data)
         return SufficientStats(
             column_type=ColumnType.ORDINAL,
@@ -408,7 +422,7 @@ class OrderedLogistic:
         extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
         cum = jax.nn.sigmoid(extended - mu)
         probs = cum[1:] - cum[:-1]
-        return jnp.maximum(probs, 1e-30)
+        return jnp.maximum(probs, LOG_EPS)
 
     @staticmethod
     def _mu_grid_and_weights(counts, hypers):
@@ -416,7 +430,7 @@ class OrderedLogistic:
         cutpoints = hypers.cutpoints
         mu0 = float(hypers.mu) if hypers.mu is not None else 0.0
         s0 = float(hypers.s) if hypers.s is not None else 4.0
-        s0 = max(s0, 1e-30)
+        s0 = max(s0, LOG_EPS)
 
         half_range = 4.0 * jnp.sqrt(s0)
         mu_grid = jnp.linspace(mu0 - half_range, mu0 + half_range, OrderedLogistic._N_GRID)
@@ -465,7 +479,10 @@ class OrderedLogistic:
         """Posterior predictive log p(x=k | data, cutpoints)."""
         counts = suffstats.category_counts.astype(jnp.float32)
         avg_probs = OrderedLogistic._averaged_probs(counts, hypers)
-        return jnp.log(jnp.maximum(avg_probs[x.astype(jnp.int32)], 1e-30))
+        n_levels = avg_probs.shape[0]
+        # Clamp OOB indices for JAX tracing safety (see DirichletCategorical note)
+        x_safe = jnp.clip(x.astype(jnp.int32), 0, n_levels - 1)
+        return jnp.log(jnp.maximum(avg_probs[x_safe], LOG_EPS))
 
     @staticmethod
     def sample_posterior_predictive(
@@ -474,7 +491,9 @@ class OrderedLogistic:
         """Draw samples from posterior predictive over ordinal levels."""
         counts = suffstats.category_counts.astype(jnp.float32)
         avg_probs = OrderedLogistic._averaged_probs(counts, hypers)
-        return jax.random.categorical(rng_key, jnp.log(jnp.maximum(avg_probs, 1e-30)), shape=(n,))
+        return jax.random.categorical(
+            rng_key, jnp.log(jnp.maximum(avg_probs, LOG_EPS)), shape=(n,)
+        )
 
 
 # ---------------------------------------------------------------------------
