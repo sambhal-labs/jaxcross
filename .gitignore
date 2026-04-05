@@ -47,6 +47,15 @@ Thumbs.db
 # Tool logs
 *.log
 
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
 # Benchmark results
 results/
 site/
