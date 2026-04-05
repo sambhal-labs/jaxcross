@@ -14,8 +14,13 @@ from crosscat.data_utils import (
     gen_column_metadata,
     guess_column_type,
     guess_column_types,
+    load_npz_mmap,
     read_csv,
+    read_csv_chunked,
+    read_parquet,
+    save_npz,
     write_csv,
+    write_parquet,
 )
 from crosscat.diagnostics import (
     adjusted_rand_index,
@@ -166,8 +171,13 @@ __all__ = [
     "gen_column_metadata",
     "guess_column_type",
     "guess_column_types",
+    "load_npz_mmap",
     "read_csv",
+    "read_csv_chunked",
+    "read_parquet",
+    "save_npz",
     "write_csv",
+    "write_parquet",
     # Synthetic
     "add_missing_data",
     "generate_crosscat_data",
