@@ -72,7 +72,8 @@ def subsample_anneal(
     # Stage 0: Initialize on subsample
     k_init, k_sweep, k_rest = jax.random.split(rng_key, 3)
     result = initialize(k_init, data, column_types, subsample_rows=initial_size)
-    state, sub_idx = result
+    state = result.state
+    sub_idx = result.subsample_idx
     current_data = data[sub_idx]
     packed = pack_state(state, max_clusters=max_clusters, max_views=max_views)
 
