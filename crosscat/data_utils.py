@@ -8,13 +8,14 @@ Maps to original CrossCat data_utils.py:
 
 Scaling additions:
 - read_csv_chunked: streaming CSV reader for large files
-- load_npz_mmap: memory-mapped NPZ loading
+- load_npy_mmap: memory-mapped NPY loading
 - read_parquet: Apache Parquet/Arrow integration
 """
 
 from __future__ import annotations
 
 import csv
+import warnings
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -44,8 +45,6 @@ def read_csv(
     """
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
-
-    import warnings
 
     filepath = Path(filepath)
     with open(filepath, newline="") as f:
@@ -269,8 +268,6 @@ def read_csv_chunked(
     if nan_values is None:
         nan_values = {"", "NA", "nan", "NaN", "NULL", "None", "null", "N/A", "."}
 
-    import warnings
-
     filepath = Path(filepath)
     chunks: list[np.ndarray] = []
     all_bad_examples: list[str] = []
@@ -388,7 +385,6 @@ def save_npy(
         column_names: Optional column names (saved as JSON sidecar).
     """
     import json
-    import warnings
 
     filepath = Path(filepath)
     if filepath.suffix and filepath.suffix != ".npy":
@@ -415,8 +411,6 @@ def save_npz(
     This function saves ``.npy`` files despite its name. The ``save_npy``
     alias is preferred for clarity.
     """
-    import warnings
-
     warnings.warn(
         "save_npz is deprecated — use save_npy instead (saves .npy files, not .npz).",
         DeprecationWarning,
@@ -450,7 +444,6 @@ def load_npy_mmap(
         If the JSON sidecar with column names is missing.
     """
     import json
-    import warnings
 
     filepath = Path(filepath)
     if filepath.suffix and filepath.suffix != ".npy":
@@ -485,8 +478,6 @@ def load_npz_mmap(
     This function loads ``.npy`` files despite its name. The ``load_npy_mmap``
     alias is preferred for clarity.
     """
-    import warnings
-
     warnings.warn(
         "load_npz_mmap is deprecated — use load_npy_mmap instead (loads .npy files).",
         DeprecationWarning,
@@ -645,7 +636,7 @@ def load_arrow(
     When ``memory_map=True`` (default), pyarrow memory-maps the file.
     However, the data is still fully materialized into a JAX array,
     so peak RAM includes Arrow + NumPy + JAX copies.  For truly
-    lazy loading, use ``load_npz_mmap`` which returns a NumPy memmap.
+    lazy loading, use ``load_npy_mmap`` which returns a NumPy memmap.
 
     Args:
         filepath: Path to .arrow/.feather file (created by ``save_arrow``).
