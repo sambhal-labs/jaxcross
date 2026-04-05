@@ -1323,22 +1323,34 @@ def _score_column_in_view(
     clean = jnp.where(valid, data_col, 0.0)
     valid_f = valid.astype(jnp.float32)
 
-    # Membership matrix: (n_rows, max_clusters)
-    membership = (row_assignments[:, None] == jnp.arange(max_clusters)[None, :]).astype(
-        jnp.float32
+    # Use bincount for O(N) memory instead of O(N*K) membership matrix.
+    # Mask invalid rows to cluster 0 with zero weight so they don't contribute.
+    safe_assigns = jnp.where(valid, row_assignments, 0)
+
+    counts = jnp.bincount(safe_assigns, weights=valid_f, length=max_clusters).astype(jnp.int32)
+    sum_x = jnp.bincount(safe_assigns, weights=clean * valid_f, length=max_clusters)
+    sum_x_sq = jnp.bincount(safe_assigns, weights=clean**2 * valid_f, length=max_clusters)
+    sum_sin = jnp.bincount(
+        safe_assigns,
+        weights=jnp.where(valid, jnp.sin(data_col), 0.0),
+        length=max_clusters,
+    )
+    sum_cos = jnp.bincount(
+        safe_assigns,
+        weights=jnp.where(valid, jnp.cos(data_col), 0.0),
+        length=max_clusters,
     )
 
-    # Per-cluster sufficient statistics for this single column
-    counts = (membership.T @ valid_f).astype(jnp.int32)  # (max_clusters,)
-    sum_x = membership.T @ (clean * valid_f)  # (max_clusters,)
-    sum_x_sq = membership.T @ (clean**2 * valid_f)  # (max_clusters,)
-    sum_sin = membership.T @ jnp.where(valid, jnp.sin(data_col), 0.0)
-    sum_cos = membership.T @ jnp.where(valid, jnp.cos(data_col), 0.0)
-
-    # Category counts: (max_clusters, max_categories)
+    # Category counts: vmap bincount over each category value
     int_data = jnp.where(valid, clean.astype(jnp.int32), 0)
-    one_hot = jax.nn.one_hot(int_data, max_categories)  # (n_rows, max_cats)
-    cat_counts = membership.T @ (one_hot * valid_f[:, None])  # (max_clusters, max_cats)
+
+    def count_one_cat(c):
+        cat_mask = ((int_data == c) & valid).astype(jnp.float32)
+        return jnp.bincount(safe_assigns, weights=cat_mask, length=max_clusters)
+
+    cat_counts = jax.vmap(count_one_cat)(
+        jnp.arange(max_categories)
+    ).T  # (max_clusters, max_categories)
 
     # vmap unified_log_marginal over clusters
     def score_one_cluster(cnt, sx, sxsq, cc, ssin, scos):
