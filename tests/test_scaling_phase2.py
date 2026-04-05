@@ -589,7 +589,9 @@ class TestNpyMmap:
 
         data = jnp.array([[1.0, 2.0]])
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_npy(Path(tmpdir) / "test.npz", data)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                save_npy(Path(tmpdir) / "test.npz", data)
             # Should create .npy regardless of input extension
             assert (Path(tmpdir) / "test.npy").exists()
 
