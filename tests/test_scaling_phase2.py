@@ -173,7 +173,7 @@ class TestNpzRoundtrip:
         col_names = ["a", "b"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "test.npz"
+            path = Path(tmpdir) / "test.npy"
             save_npz(path, data, col_names)
             loaded, loaded_names = load_npz_mmap(path)
             assert isinstance(loaded, np.ndarray), "Should return numpy array, not JAX"
@@ -187,7 +187,7 @@ class TestNpzRoundtrip:
         data = jnp.array([[1.0, float("nan")], [float("nan"), 4.0]])
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "nan.npz"
+            path = Path(tmpdir) / "nan.npy"
             save_npz(path, data)
             loaded, _ = load_npz_mmap(path)
             assert np.isnan(loaded[0, 1])
@@ -202,12 +202,12 @@ class TestNpzRoundtrip:
         data = jnp.array([[1.0, 2.0]])
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "nosidecar.npz"
-            save_npz(path, data)  # no column names -> no sidecar
-            # Manually remove sidecar if it exists
+            path = Path(tmpdir) / "nosidecar.npy"
+            save_npz(path, data, column_names=["a", "b"])
+            # Delete the sidecar that was created
             sidecar = path.with_suffix(".json")
-            if sidecar.exists():
-                sidecar.unlink()
+            assert sidecar.exists(), "Sidecar should have been created"
+            sidecar.unlink()
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
                 loaded, names = load_npz_mmap(path)
@@ -221,7 +221,7 @@ class TestNpzRoundtrip:
         data = jnp.ones((10, 3))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "memmap.npz"
+            path = Path(tmpdir) / "memmap.npy"
             save_npz(path, data)
             loaded, _ = load_npz_mmap(path)
             assert isinstance(loaded, np.ndarray)
