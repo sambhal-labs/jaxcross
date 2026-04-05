@@ -54,6 +54,9 @@ benchmark = [
     "pandas>=2.0",
     "seaborn>=0.13",
 ]
+tensorboard = [
+    "tensorboardX>=2.6",
+]
 docs = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
@@ -94,4 +97,5 @@ testpaths = ["tests"]
 timeout = 300
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "cpu: marks tests that can run on CPU without GPU (used in CI)",
 ]
