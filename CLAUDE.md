@@ -68,12 +68,11 @@ The package is `crosscat/` with these core modules:
   - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths. Sub-kernels have `@jax.jit` for independent compilation.
   - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `compile_kernels()`, `clear_cache()`)
 
-- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support:
-  - **Single-state (11):** `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
-  - **Multi-state (4, accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
+- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support (29 public functions):
+  - **Single-state packed_ (12):** `packed_classify_column`, `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
+  - **Multi-state packed_ (4, accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
   - **Batch (8):** `batch_anomaly_score`, `batch_impute_column`, `batch_row_typicality`, `batch_credible_interval`, `batch_predictive_cdf`, `batch_row_similarity`, `batch_classify_column`, `batch_score_columns_binary`
   - **Multi-chain wrappers (5):** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`
-  - **Classification (2):** `packed_classify_column`, `batch_classify_column`
 
 - **constraints.py** — Enforces column/row dependency constraints via packed Gibbs rejection sampling.
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation).
@@ -81,7 +80,7 @@ The package is `crosscat/` with these core modules:
 - **synthetic.py** — Synthetic data generation from known CrossCat generative model, missing data injection.
 - **data_utils.py** — CSV I/O, column type detection, discretization.
 - **scaling.py** — Large-dataset workflows: `subsample_anneal()`, `minibatch_gibbs_sweep()`, `parallel_gibbs_sweep()`, `gibbs_sweep_early_stopping()`. Combines subsample initialization, batch insertion, and mini-batch Gibbs sweeps for 10K+ row datasets.
-- **tb_logger.py** — TensorBoard logging via `tensorboardX`. `TBLogger` context manager logs per-sweep diagnostics (scalars, histograms) from `collect_diagnostics()`. Requires optional `tensorboardX` dependency.
+- **tb_logger.py** — TensorBoard logging via `tensorboardX`. `TBLogger` context manager logs per-sweep diagnostics (scalars, histograms). Designed to consume the dict returned by `diagnostics.collect_diagnostics()`. Requires optional `tensorboardX` dependency.
 - **validate.py** — State consistency checking.
 - **../contrib/fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific, not part of core).
 
