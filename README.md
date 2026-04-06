@@ -252,7 +252,7 @@ crosscat/                            # Core library
 ├── tb_logger.py                     #   TensorBoard logging for inference monitoring
 └── validate.py                      #   State consistency checking
 
-tests/                               # 276 fast tests + 69 slow tests (345 total)
+tests/                               # 279 fast tests + 69 slow tests (348 total)
 notebooks/                           # Interactive tutorials and test runners
 benchmarks/                          # MNIST, WDI, synthetic, JIT benchmarks
 dashboard/                           # Streamlit interactive analysis UI

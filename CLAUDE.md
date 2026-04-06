@@ -124,7 +124,7 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 - **CI (GitHub Actions)** runs lint + format + type check only (~1 min). No pytest in CI.
 - **Kaggle setup**: Use `pip install -e . --no-deps` to preserve Kaggle's pre-installed JAX+CUDA stack. Do NOT use `uv sync --extra gpu` on Kaggle (causes ptxas version mismatch).
 - **Test markers**: `@pytest.mark.slow` for GPU-heavy tests (30+ Gibbs sweeps). `@pytest.mark.xfail` for 3 known flaky tests (stochastic recovery).
-- **Test suite**: 276 fast tests (including 34 Hypothesis property tests), 69 slow tests (345 total).
+- **Test suite**: 279 fast tests (including 34 Hypothesis property tests), 69 slow tests (348 total).
 - **Property tests**: `tests/test_property.py` uses Hypothesis to verify mathematical invariants (suffstat roundtrips for all 5 types, component scoring, type dispatch parity, NaN safety) across random inputs.
 
 ## Benchmarks
