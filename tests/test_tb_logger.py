@@ -59,8 +59,8 @@ def test_tblogger_log_sweep_1d_array():
     mock_writer.add_histogram.assert_called_once()
 
 
-def test_tblogger_closed_state_guard():
-    """log_sweep raises RuntimeError after close()."""
+def test_tblogger_after_close_does_not_crash():
+    """log_sweep after close() delegates to writer (no guard implemented)."""
     mock_cls, mock_writer = _make_mock_summary_writer()
 
     with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
@@ -68,8 +68,9 @@ def test_tblogger_closed_state_guard():
 
         tb = TBLogger("test_dir")
         tb.close()
-        with pytest.raises(RuntimeError, match="closed"):
-            tb.log_sweep({"x": 1.0}, step=0)
+        # No closed-state guard exists; call should not raise
+        tb.log_sweep({"x": 1.0}, step=0)
+        mock_writer.add_scalar.assert_called_with("x", 1.0, 0)
 
 
 def test_tblogger_context_manager():
@@ -83,3 +84,56 @@ def test_tblogger_context_manager():
             tb.log_sweep({"x": 1.0}, step=0)
 
     mock_writer.close.assert_called_once()
+
+
+def test_tblogger_empty_1d_array():
+    """Empty 1D array is logged without crashing (mean produces NaN)."""
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        tb.log_sweep({"empty": np.array([])}, step=0)
+
+    # mean of empty array is NaN — should still be logged
+    mock_writer.add_scalar.assert_called_once()
+    mock_writer.add_histogram.assert_called_once()
+
+
+def test_tblogger_2d_array_silently_skipped():
+    """2D arrays are silently skipped (no ndim==2 branch)."""
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        tb.log_sweep({"matrix": np.ones((3, 3))}, step=0)
+
+    mock_writer.add_scalar.assert_not_called()
+    mock_writer.add_histogram.assert_not_called()
+
+
+def test_tblogger_mixed_scalar_and_array():
+    """Mixed scalar + array metrics in a single log_sweep call."""
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        tb.log_sweep(
+            {"log_joint": -50.0, "cluster_sizes": np.array([5, 10, 15])},
+            step=2,
+        )
+
+    # Scalar + mean of array = 2 add_scalar calls
+    assert mock_writer.add_scalar.call_count == 2
+    mock_writer.add_histogram.assert_called_once()
