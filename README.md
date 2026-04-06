@@ -108,32 +108,36 @@ An employee dataset might cluster by `(salary, experience)` into seniority tiers
 ## Quick Start
 
 ```bash
-pip install jax-crosscat               # CPU
-pip install "jax-crosscat[gpu]"        # GPU (NVIDIA CUDA)
+git clone https://github.com/sambhal-labs/jaxcross.git && cd jaxcross
+uv sync --extra dev                    # CPU
+uv sync --extra dev --extra gpu        # GPU (NVIDIA CUDA)
 ```
 
 ```python
 import jax
-from crosscat import initialize, predictive_sample, dependence_matrix
+import jax.numpy as jnp
+from crosscat import initialize, dependence_matrix
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
 from crosscat.types import ColumnType
 
 # Load and configure
-data, col_types = your_data, [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL, ...]
+data = jnp.array(your_data, dtype=jnp.float32)
+col_types = [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL, ...]
 
 # Initialize → Pack → Infer → Unpack → Query
 key = jax.random.key(42)
 result = initialize(key, data, col_types)
-state = result.state
+state = result.state                    # InitResult wraps the state
 packed = pack_state(state)
 packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=100)
 state = unpack_state(packed, col_types, data=data)
 
 # Discover column relationships
-z_matrix = dependence_matrix([state])  # which columns are related?
+z_matrix = dependence_matrix([state])   # which columns are related?
 
-# Predict missing values
-samples = predictive_sample(jax.random.key(2), state, data, query_cols=[0])
+# Impute missing values with confidence
+from crosscat import impute_and_confidence
+value, confidence = impute_and_confidence(jax.random.key(2), state, data, query_col=3, row_id=0)
 ```
 
 > **Want the full walkthrough?** Open the **[Interactive Tutorial](notebooks/intro_tutorial.ipynb)** in Colab — covers synthetic data, inference, and 7 query types end-to-end.
@@ -160,17 +164,22 @@ After inference, ask questions about your data:
 from crosscat import (
     predictive_probability,     # P(col=value | context)
     predictive_sample,          # Draw from posterior predictive
+    predictive_cdf,             # P(X <= value | context)
     impute_and_confidence,      # Fill missing values with confidence
     mutual_information,         # Information shared between columns
     dependence_matrix,          # Full pairwise column dependency matrix
     predictive_anomalousness,   # Detect unusual rows
     row_similarity,             # How similar are two rows?
+    row_typicality,             # Structural anomaly score
+    column_typicality,          # Column-level anomaly
     credible_interval,          # Bayesian credible intervals
     conditional_entropy,        # Remaining uncertainty in a column
+    joint_predictive_probability, # Joint P(multiple cols | context)
+    sample_and_insert,          # Impute missing + insert row
 )
 ```
 
-All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
+All 15 unpacked queries have packed equivalents with GPU acceleration, plus 8 batch functions and 5 multi-chain wrappers for production use. All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
 
 ## Performance
 
@@ -189,11 +198,11 @@ Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction 
 | **Column Types** | Continuous (Normal-Gamma), Categorical (Dirichlet-Categorical), Binary (Beta-Bernoulli), Ordinal (Ordered Logistic), Cyclic (Von Mises) |
 | **Inference** | Collapsed Gibbs sampling, multi-chain with best-chain selection, constraint enforcement, convergence diagnostics |
 | **GPU Acceleration** | JIT-compiled packed state, vectorized kernels via `vmap`/`lax.scan`, XLA persistent compilation cache, 12x speedup |
-| **Query API** | Predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy |
+| **Query API** | 15 unpacked + 22 packed + 8 batch + 5 multi-chain query functions: predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy, classification |
 | **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
 | **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
-| **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY I/O, auto type detection, chunked reading, memory-mapped loading |
-| **Production** | Serialization (`.jxc` format), checkpointing, state validation, deterministic RNG for reproducibility |
+| **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY/NPZ I/O, auto type detection, discretization, chunked reading, memory-mapped loading |
+| **Production** | Serialization (`.jxc` format), checkpointing, state validation, TensorBoard logging, deterministic RNG for reproducibility |
 | **Scaling** | Subsample initialization, mini-batch Gibbs, parallel row scoring, early stopping, subsample annealing for 10K+ row datasets |
 | **Constraints** | Column dependency enforcement (must-link / cannot-link), row clustering constraints via rejection sampling |
 
@@ -226,14 +235,14 @@ crosscat/                            # Core library
 ├── components.py                    #   5 Bayesian component models (conjugate + grid)
 ├── model.py                         #   Initialization, scoring, row insertion
 ├── gibbs.py                         #   Collapsed Gibbs MCMC kernels (unpacked)
-├── inference.py                     #   15 posterior predictive queries (unpacked)
+├── inference.py                     #   15 posterior predictive queries (unpacked path)
 ├── packed/                          #   JIT-compiled packed state sub-package
 │   ├── state.py                     #     Pack/unpack, batching, multi-chain
 │   ├── components.py                #     Unified type-dispatched scoring
 │   ├── kernels.py                   #     Vectorized Gibbs kernels (vmap + lax.scan)
 │   ├── suffstats.py                 #     Batched sufficient statistics
 │   └── aot_cache.py                 #     XLA persistent compilation cache
-├── packed_inference.py              #   15 packed queries + 5 multi-chain wrappers
+├── packed_inference.py              #   22 packed + 8 batch + 5 multi-chain query functions
 ├── constraints.py                   #   Column/row dependency enforcement
 ├── diagnostics.py                   #   ARI, log-joint, held-out likelihood
 ├── serialization.py                 #   Save/load in .jxc format
@@ -243,7 +252,7 @@ crosscat/                            # Core library
 ├── tb_logger.py                     #   TensorBoard logging for inference monitoring
 └── validate.py                      #   State consistency checking
 
-tests/                               # 185+ fast tests + 31 slow tests
+tests/                               # 276 fast tests + 69 slow tests (345 total)
 notebooks/                           # Interactive tutorials and test runners
 benchmarks/                          # MNIST, WDI, synthetic, JIT benchmarks
 dashboard/                           # Streamlit interactive analysis UI
@@ -261,7 +270,7 @@ paper/                               # Research paper materials
 | **[Getting Started](https://sambhal-labs.github.io/jaxcross/getting-started/installation/)** | Installation, quickstart, core concepts |
 | **[Feature Guides](https://sambhal-labs.github.io/jaxcross/guides/)** | Deep dives into every capability |
 | **[Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/)** | Dedicated guides for each query type |
-| **[API Reference](https://sambhal-labs.github.io/jaxcross/api/types/)** | Complete function documentation (88+ functions) |
+| **[API Reference](https://sambhal-labs.github.io/jaxcross/api/types/)** | Complete function documentation (130+ exported symbols) |
 | **[Architecture](https://sambhal-labs.github.io/jaxcross/architecture/overview/)** | Internal design, JAX patterns, performance |
 | **[Benchmarks](benchmarks/)** | MNIST, synthetic recovery, JIT timing |
 | **[Full Docs Site](https://sambhal-labs.github.io/jaxcross/)** | Searchable hosted documentation |
@@ -271,17 +280,14 @@ paper/                               # Research paper materials
 | Example | Colab | Description |
 |---------|-------|-------------|
 | **[MNIST Benchmark](benchmarks/mnist_paper_colab.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/mnist_paper_colab.ipynb) | Reproduce Section 3.2 of the JMLR paper — pixel dependence, inpainting, classification |
-| **[WDI Macroeconomics](benchmarks/wdi_macroeconomic_benchmark.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb) | Real-world GDP, trade, and population data — structure discovery in economics |
+| **[WDI Macroeconomics](benchmarks/wdi_macroeconomic_benchmark.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb) | Real-world GDP, trade, and population data — structure discovery in economics (gold-standard workflow reference) |
 | **[Intro Tutorial](notebooks/intro_tutorial.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb) | End-to-end walkthrough: synthetic data, inference, 7 query types |
 
-## From Source
+## Development
 
 ```bash
-git clone https://github.com/sambhal-labs/jaxcross.git && cd jaxcross
-uv sync --extra dev                    # CPU
-uv sync --extra dev --extra gpu        # GPU (NVIDIA CUDA)
-
-uv run pytest                          # Run tests
+uv run pytest                          # Run tests (recommend GPU/Colab)
+uv run pytest -m "not slow"            # Fast tests only
 uv run ruff check . && uv run ruff format .  # Lint & format
 ```
 
