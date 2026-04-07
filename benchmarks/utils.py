@@ -103,7 +103,7 @@ def auto_config(
 
     # Estimate single-chain memory
     mem = estimate_packed_memory(n_rows, n_cols, max_clusters=max_clusters, max_views=max_views)
-    chain_gb = mem["total_bytes"] / (1024**3)
+    chain_gb = mem["total"] / (1024**3)
 
     # Leave 30% VRAM headroom for JIT intermediates
     usable_gb = vram_gb * 0.7
