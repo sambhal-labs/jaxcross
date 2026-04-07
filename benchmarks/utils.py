@@ -3,21 +3,253 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import jax
+import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")  # headless backend — must be before pyplot import
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
+from crosscat import estimate_packed_memory, suggest_max_clusters  # noqa: E402
+from crosscat.types import ColumnType  # noqa: E402
 
-def create_results_dir(benchmark_name: str, base_dir: str = "results") -> Path:
+# ---------------------------------------------------------------------------
+# Platform detection
+# ---------------------------------------------------------------------------
+
+
+def detect_platform() -> dict:
+    """Detect runtime platform, GPU count, and VRAM.
+
+    Returns:
+        Dict with keys: platform, backend, n_gpus, gpu_names, vram_gb.
+    """
+    if "COLAB_RELEASE_TAG" in os.environ:
+        platform = "colab"
+    elif Path("/kaggle/working").exists():
+        platform = "kaggle"
+    else:
+        platform = "local"
+
+    backend = str(jax.default_backend())
+    try:
+        gpu_devices = jax.devices("gpu")
+        n_gpus = len(gpu_devices)
+        gpu_names = [d.device_kind for d in gpu_devices]
+    except RuntimeError:
+        n_gpus = 0
+        gpu_names = []
+
+    vram_gb = _query_vram_gb()
+
+    return {
+        "platform": platform,
+        "backend": backend,
+        "n_gpus": n_gpus,
+        "gpu_names": gpu_names,
+        "vram_gb": vram_gb,
+    }
+
+
+def _query_vram_gb() -> float:
+    """Query total GPU VRAM in GB via nvidia-smi. Returns 0.0 on failure."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            # Sum all GPUs; nvidia-smi reports in MiB
+            total_mib = sum(float(line.strip()) for line in result.stdout.strip().split("\n"))
+            return round(total_mib / 1024, 1)
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError):
+        pass
+    return 0.0
+
+
+# ---------------------------------------------------------------------------
+# Auto-configuration
+# ---------------------------------------------------------------------------
+
+
+def auto_config(
+    n_rows: int,
+    n_cols: int,
+    *,
+    vram_gb: float | None = None,
+) -> dict:
+    """Recommend benchmark parameters based on data size and available VRAM.
+
+    Returns:
+        Dict with n_chains, n_sweeps, max_clusters, max_views,
+        diag_interval, ckpt_interval.
+    """
+    if vram_gb is None:
+        vram_gb = _query_vram_gb()
+    if vram_gb <= 0:
+        vram_gb = 4.0  # conservative CPU fallback
+
+    max_clusters = suggest_max_clusters(n_rows)
+    max_views = min(16, max(4, n_cols // 4))
+
+    # Estimate single-chain memory
+    mem = estimate_packed_memory(n_rows, n_cols, max_clusters=max_clusters, max_views=max_views)
+    chain_gb = mem["total_bytes"] / (1024**3)
+
+    # Leave 30% VRAM headroom for JIT intermediates
+    usable_gb = vram_gb * 0.7
+    max_chains = max(1, int(usable_gb / chain_gb)) if chain_gb > 0 else 4
+
+    # Tier-based defaults
+    if vram_gb >= 40:  # A100
+        n_chains = min(max_chains, 8)
+        n_sweeps = 500
+    elif vram_gb >= 12:  # T4 / P100
+        n_chains = min(max_chains, 4)
+        n_sweeps = 200
+    else:  # Small local GPU
+        n_chains = min(max_chains, 2)
+        n_sweeps = 100
+
+    # Scale down sweeps for very large datasets
+    if n_rows >= 100_000:
+        n_sweeps = min(n_sweeps, 50)
+    elif n_rows >= 10_000:
+        n_sweeps = min(n_sweeps, 100)
+
+    diag_interval = max(1, n_sweeps // 10)
+    ckpt_interval = max(1, n_sweeps // 5)
+
+    return {
+        "n_chains": n_chains,
+        "n_sweeps": n_sweeps,
+        "max_clusters": max_clusters,
+        "max_views": max_views,
+        "diag_interval": diag_interval,
+        "ckpt_interval": ckpt_interval,
+        "estimated_chain_gb": round(chain_gb, 3),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Notebook setup
+# ---------------------------------------------------------------------------
+
+_KNOWN_REPO = "https://github.com/sambhal-labs/jaxcross.git"
+
+
+def setup_notebook(branch: str = "main") -> None:
+    """Install jaxcross in a notebook environment (Colab/Kaggle).
+
+    Skips if crosscat is already importable. Preserves pre-installed
+    JAX+CUDA stack by installing with --no-deps.
+    """
+    try:
+        import crosscat  # noqa: F401
+
+        print(f"crosscat {crosscat.__version__} already installed — skipping setup")
+        return
+    except ImportError:
+        pass
+
+    platform = "colab" if "COLAB_RELEASE_TAG" in os.environ else "kaggle"
+    workdir = "/content/jaxcross" if platform == "colab" else "/kaggle/working/jaxcross"
+
+    if not Path(workdir).exists():
+        subprocess.run(["git", "clone", _KNOWN_REPO, workdir], check=True)
+
+    subprocess.run(
+        ["git", "fetch", "origin"],
+        cwd=workdir,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "checkout", branch],
+        cwd=workdir,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "pull", "origin", branch],
+        cwd=workdir,
+        check=True,
+    )
+    subprocess.run(
+        ["pip", "install", "-e", workdir, "--no-deps", "-q"],
+        check=True,
+    )
+
+    print(f"Installed jaxcross from {workdir} (branch: {branch})")
+
+
+# ---------------------------------------------------------------------------
+# Shared benchmark data generation
+# ---------------------------------------------------------------------------
+
+_DEFAULT_TYPE_CYCLE = [
+    ColumnType.CONTINUOUS,
+    ColumnType.BINARY,
+    ColumnType.CATEGORICAL,
+    ColumnType.CONTINUOUS,
+    ColumnType.BINARY,
+]
+
+
+def make_benchmark_data(
+    key: jax.Array,
+    n_rows: int,
+    n_cols: int,
+    col_types: list[ColumnType] | None = None,
+) -> tuple[jax.Array, list[ColumnType]]:
+    """Generate random mixed-type data for benchmarking.
+
+    Args:
+        key: JAX PRNG key.
+        n_rows: Number of rows.
+        n_cols: Number of columns.
+        col_types: Column types. If None, cycles through
+            CONTINUOUS, BINARY, CATEGORICAL.
+
+    Returns:
+        (data, col_types) tuple.
+    """
+    if col_types is None:
+        col_types = [_DEFAULT_TYPE_CYCLE[i % len(_DEFAULT_TYPE_CYCLE)] for i in range(n_cols)]
+
+    parts = []
+    for j in range(n_cols):
+        ct = col_types[j]
+        kj = jax.random.fold_in(key, j)
+        if ct == ColumnType.CONTINUOUS:
+            col = jax.random.normal(kj, shape=(n_rows,)) * 3.0
+        elif ct == ColumnType.BINARY:
+            col = jax.random.bernoulli(kj, 0.5, shape=(n_rows,)).astype(jnp.float32)
+        elif ct == ColumnType.CATEGORICAL:
+            col = jax.random.randint(kj, shape=(n_rows,), minval=0, maxval=5).astype(jnp.float32)
+        else:
+            col = jax.random.normal(kj, shape=(n_rows,))
+        parts.append(col)
+
+    return jnp.stack(parts, axis=1), col_types
+
+
+# ---------------------------------------------------------------------------
+# Results persistence
+# ---------------------------------------------------------------------------
+
+
+def create_results_dir(benchmark_name: str, base_dir: str = "benchmarks/results") -> Path:
     """Create timestamped results directory.
 
-    Returns path like results/synthetic/2026-03-20_143022/
+    Returns path like benchmarks/results/synthetic/2026-03-20_143022/
     """
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     results_dir = Path(base_dir) / benchmark_name / timestamp
@@ -48,6 +280,11 @@ def _json_serializable(obj: Any) -> Any:
     if isinstance(obj, Path):
         return str(obj)
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+# ---------------------------------------------------------------------------
+# Visualization
+# ---------------------------------------------------------------------------
 
 
 def plot_convergence(
