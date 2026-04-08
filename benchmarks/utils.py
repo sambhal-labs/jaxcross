@@ -232,8 +232,10 @@ def make_benchmark_data(
             col = jax.random.normal(kj, shape=(n_rows,)) * 3.0
         elif ct == ColumnType.BINARY:
             col = jax.random.bernoulli(kj, 0.5, shape=(n_rows,)).astype(jnp.float32)
-        elif ct == ColumnType.CATEGORICAL:
+        elif ct == ColumnType.CATEGORICAL or ct == ColumnType.ORDINAL:
             col = jax.random.randint(kj, shape=(n_rows,), minval=0, maxval=5).astype(jnp.float32)
+        elif ct == ColumnType.CYCLIC:
+            col = jax.random.uniform(kj, shape=(n_rows,), minval=0.0, maxval=2.0 * jnp.pi)
         else:
             col = jax.random.normal(kj, shape=(n_rows,))
         parts.append(col)
