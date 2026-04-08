@@ -72,6 +72,7 @@ from crosscat.packed import (
     packed_transition_row_assignments_minibatch,
     packed_transition_row_assignments_parallel,
     select_best_chain,
+    suggest_max_clusters,
     unbatch_packed_states,
     unpack_state,
 )
@@ -230,6 +231,7 @@ __all__ = [
     "packed_transition_row_assignments_minibatch",
     "packed_transition_row_assignments_parallel",
     "select_best_chain",
+    "suggest_max_clusters",
     "unbatch_packed_states",
     "unpack_state",
     # Multi-chain inference
