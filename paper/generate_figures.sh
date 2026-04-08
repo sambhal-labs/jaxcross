@@ -45,7 +45,7 @@ fi
 WDI_DIR="${RESULTS_DIR}/wdi"
 if [ -d "${WDI_DIR}" ]; then
     echo "WDI results: ${WDI_DIR}"
-    for f in convergence z_matrix; do
+    for f in convergence z_matrix imputation_accuracy mutual_information typicality_distribution country_similarity; do
         cp -v "${WDI_DIR}/${f}.png" "${FIGURES_DIR}/wdi_${f}.png" 2>/dev/null || echo "  [MISSING] ${f}.png"
     done
 else
@@ -54,7 +54,11 @@ else
 fi
 
 # --- Scalability benchmark ---
-SCALE_DIR="${RESULTS_DIR}/scalability"
+SCALE_DIR=$(ls -td "${RESULTS_DIR}/scalability/"*/ 2>/dev/null | head -1)
+if [ -z "${SCALE_DIR}" ]; then
+    # Fall back to flat directory (legacy layout)
+    SCALE_DIR="${RESULTS_DIR}/scalability"
+fi
 if [ -d "${SCALE_DIR}" ]; then
     echo "Scalability results: ${SCALE_DIR}"
     cp -v "${SCALE_DIR}/scalability.png" "${FIGURES_DIR}/scalability.png" 2>/dev/null || echo "  [MISSING] scalability.png"

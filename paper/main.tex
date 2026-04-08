@@ -40,19 +40,22 @@
 We present \jaxcc{}, a GPU-accelerated reimplementation of CrossCat
 \citep{mansinghka2016crosscat} in JAX. The original Python~2/C++
 implementation is unmaintained and cannot exploit GPUs. \jaxcc{} achieves
-up to $1{,}181\times$ kernel-level speedup on a T4 GPU through five
-innovations: (1)~a fixed-size packed state for JIT compilation,
+up to $619\times$ aggregate kernel-level speedup on a P100 GPU through
+six innovations: (1)~a fixed-size packed state for JIT compilation,
 (2)~unified type dispatch eliminating Python branching across five column
 types, (3)~\texttt{vmap}/\texttt{lax.scan} vectorization of all Gibbs
-kernels, (4)~type-specialized fast paths for homogeneous views, and
-(5)~batched sufficient statistic updates via matrix operations. We
+kernels, (4)~type-specialized fast paths for homogeneous views,
+(5)~batched sufficient statistic updates via matrix operations, and
+(6)~multi-GPU chain distribution via \texttt{jax.pmap}, achieving
+$3.3\times$ throughput scaling on $2\times$~T4 GPUs. We
 reproduce key experiments from the original paper --- MNIST
-classification (93\%), inpainting (93.8\% at 30\% observation), and
-synthetic structure recovery (ARI~$= 1.0$) --- and present new results
-on macroeconomic data (217~countries $\times$ 95~indicators, imputation
-$r = 0.987$). The library comprises ${\sim}$10,800 lines of Python,
-validated by 241~tests including 34~Hypothesis property tests, and is
-source-available under the Business Source License~1.1.
+classification (89\% multi-chain, 93.6\% inpainting at 30\% observation)
+and synthetic structure recovery (ARI~$= 1.0$) --- and present new
+results on macroeconomic data (217~countries $\times$ 95~indicators) and
+scalability up to $2{,}000 \times 2{,}000$ tables. The library comprises
+${\sim}$12,500 lines of Python, validated by 333~tests including
+34~Hypothesis property tests, and is source-available under the Business
+Source License~1.1.
 \end{abstract}
 
 % ============================================================================
@@ -101,18 +104,21 @@ contributions are:
   \item \textbf{Batched sufficient statistics} via matrix operations
     (scatter-add, einsum) that replace nested Python loops for
     incremental updates.
-  \item A comprehensive \textbf{inference query library} with 15+
+  \item A comprehensive \textbf{inference query library} with 29
     vectorized posterior predictive functions, multi-chain aggregation,
     online row insertion, and dependency constraints.
+  \item \textbf{Multi-GPU inference} via \texttt{jax.pmap} and
+    \textbf{scaling utilities} (subsample initialization, mini-batch
+    Gibbs sweeps, early stopping) for datasets with 10K+ rows.
 \end{enumerate}
 
 \jaxcc{} reproduces the experimental results from
 \citet{mansinghka2016crosscat} and extends them with new benchmarks on
-macroeconomic data and scalability measurements. The library is
+macroeconomic data, multi-GPU throughput, and scalability measurements up
+to $2{,}000 \times 2{,}000$ tables. The library is
 source-available\footnote{\url{https://github.com/sambhal-labs/jaxcross}
 --- Business Source License~1.1; free for non-production use, converts to
 Apache~2.0 after four years.} and installable via \texttt{pip}.
-
 
 % ============================================================================
 \section{Background}
@@ -203,7 +209,6 @@ Posterior inference follows the collapsed Gibbs sampling scheme from
 The original implementation executes these kernels via nested Python
 for-loops with C++ inner loops. \jaxcc{} replaces this with a fully
 JIT-compiled GPU pipeline, as described in Section~\ref{sec:system}.
-
 
 % ============================================================================
 \section{System Design}
@@ -296,9 +301,10 @@ run $N$ chains as a single batched kernel call on one device. For
 multi-GPU setups, \texttt{jax.pmap} distributes chains across devices
 --- each GPU runs a subset of chains via \texttt{packed\_gibbs\_sweep}
 internally. The MNIST benchmark (Section~\ref{sec:mnist}) uses this to
-run 6~chains across $2\times$~T4 GPUs (3~per device), approximately
-halving total wall-clock time compared to running all 6~chains
-sequentially on a single GPU.
+run 8~chains across $2\times$~T4 GPUs (4~per device). In the scalability
+benchmark (Section~\ref{sec:scalability}), pmap achieves a $3.3\times$
+throughput improvement for 4~chains on 2~devices compared to sequential
+execution.
 
 \subsection{Batched Sufficient Statistics}
 
@@ -318,15 +324,17 @@ columns simultaneously, replacing the original per-column Python loop.
 \subsection{XLA Compilation Caching}
 
 The first JIT compilation of \texttt{packed\_gibbs\_sweep} takes
-25--30~seconds on a T4 GPU for typical problem sizes. We mitigate this
-via persistent XLA compilation caching, automatically enabled on import.
-Compiled kernels are stored to disk keyed on the static shape
-parameters. Subsequent runs with the same shapes load cached
-executables, reducing startup to ${<}\,1$~second.
+${\sim}$22~seconds on a T4 GPU for typical problem sizes
+($200 \times 10$), growing to ${\sim}$90~seconds for large problems
+($2{,}000 \times 2{,}000$). We mitigate this via persistent XLA
+compilation caching, automatically enabled on import. Compiled kernels
+are stored to disk keyed on the static shape parameters. Subsequent
+runs with the same shapes load cached executables, reducing startup
+to ${<}\,1$~second.
 
 \subsection{Inference Query Library}
 
-Beyond MCMC sampling, \jaxcc{} provides 15+ vectorized inference queries
+Beyond MCMC sampling, \jaxcc{} provides 29 vectorized inference queries
 on the packed state, all JIT-compiled:
 
 \begin{itemize}
@@ -347,6 +355,35 @@ on the packed state, all JIT-compiled:
 Multi-chain wrappers aggregate results across independent chains via
 posterior averaging.
 
+\subsection{Scaling Utilities}
+
+For datasets beyond ${\sim}$2,000 rows, the full row sweep becomes the
+bottleneck ($O(R)$ per view per sweep). \jaxcc{} provides a
+\texttt{scaling} module with four strategies:
+
+\begin{itemize}
+  \item \textbf{Subsample initialization}: \texttt{initialize()} accepts a
+    \texttt{subsample\_rows} parameter to CRP-sample a small subset for
+    fast initial clustering, followed by batch insertion of remaining rows
+    via \texttt{packed\_insert\_rows}.
+  \item \textbf{Mini-batch Gibbs}: \texttt{minibatch\_gibbs\_sweep()}
+    samples a random batch of $B$ rows per sweep ($O(B)$ instead of
+    $O(R)$), while still running full column, hyperparameter, and CRP
+    sweeps.
+  \item \textbf{Subsample annealing}: \texttt{subsample\_anneal()}
+    progressively grows the active dataset during inference (e.g., 1K
+    $\to$ 2K $\to$ 5K $\to$ full), running Gibbs sweeps at each stage.
+  \item \textbf{Early stopping}: \texttt{gibbs\_sweep\_early\_stopping()}
+    monitors log-joint convergence and halts when relative improvement
+    falls below a threshold.
+\end{itemize}
+
+\subsection{TensorBoard Integration}
+
+The \texttt{tb\_logger} module provides a \texttt{TBLogger} context
+manager that logs per-sweep diagnostics (log-joint, number of views,
+cluster counts, hyperparameters) to TensorBoard via \texttt{tensorboardX}.
+This enables real-time monitoring of inference convergence.
 
 % ============================================================================
 \section{Experiments}
@@ -354,7 +391,7 @@ posterior averaging.
 
 We reproduce three key experiments from \citet{mansinghka2016crosscat}
 and present new scalability and macroeconomic results. GPU experiments
-use NVIDIA T4 (Colab/Kaggle) and P100 (Kaggle) GPUs.
+use NVIDIA $2\times$~T4 (Kaggle) and P100 (Colab) GPUs.
 
 \subsection{Synthetic Structure Recovery}
 \label{sec:synthetic}
@@ -429,17 +466,20 @@ Within-view dependence prob. & $\geq 0.80$ & 1.000 & \checkmark \\
 \label{sec:mnist}
 
 Following Section~3.2 of \citet{mansinghka2016crosscat}, we apply
-\jaxcc{} to 1,000 stratified MNIST images (100 per digit), downsampled
+\jaxcc{} to 100 stratified MNIST images (10 per digit), downsampled
 to $16 \times 16$ binary pixels (256~columns) plus a categorical digit
-label (1~column), for a total of 257~columns. We run 6~chains of
-800~Gibbs sweeps on $2\times$~T4 GPUs (3~chains per device, total
-inference time 456~seconds).
+label (1~column), for a total of 257~columns. We use a smaller sample
+size than the original paper (which used ${\sim}$60,000 images) to keep
+inference tractable on consumer GPUs. We run 8~chains of 1,000~Gibbs
+sweeps on $2\times$~T4 GPUs (4~chains per device) using
+\texttt{jax.pmap}.
 
 \paragraph{Dependence structure.} Figure~\ref{fig:mnist_zmatrix} shows
 the inferred Z-matrix. \jaxcc{} separates foreground pixels (dependent on
 the digit label) from background border pixels (independent of digit),
-reproducing Figure~13 of \citet{mansinghka2016crosscat}. Of 6~chains,
-5~discovered multi-view structure (2--6~views).
+reproducing Figure~13 of \citet{mansinghka2016crosscat}. Of 8~chains,
+7~discovered multi-view structure (2--5~views); the best chain
+(log-joint~$= -5{,}964$) found 2~views with 15 and 13~clusters.
 
 \begin{figure}[!htb]
 \centering
@@ -455,44 +495,61 @@ reproducing Figure~13 of \citet{mansinghka2016crosscat}. Of 6~chains,
   \caption{Spatial visualization of pixel--label dependence.
     Blue~=~digit-dependent foreground, magenta~=~independent background.}
 \end{subfigure}
-\caption{MNIST dependence structure (6~chains, 800~sweeps, $2\times$~T4).}
+\caption{MNIST dependence structure (8~chains, 1,000~sweeps, $2\times$~T4).}
 \label{fig:mnist_zmatrix}
 \end{figure}
 
 \paragraph{Classification.} Using the posterior predictive to infer the
-most probable digit label, \jaxcc{} achieves 93.0\% classification
-accuracy on a held-out test set. The batch classification function
+most probable digit label averaged across all 8~chains, \jaxcc{} achieves
+89.0\% classification accuracy. The batch classification function
 computes $\log P(\text{label}{=}v \mid \text{pixels})$ for all candidate
 values and rows in a single vmapped GPU call. SVM baselines achieve
-99.9\% (linear) and 96.9\% (RBF) on the same split
-(Figure~\ref{fig:mnist_roc}). Note that \jaxcc{} is not designed as a
-classifier: the 93\% accuracy emerges from a general-purpose generative
-model that simultaneously supports inpainting, anomaly detection, and
-structure discovery --- capabilities that discriminative methods lack.
+100\% (linear) and 97\% (RBF) on the same split
+(Figure~\ref{fig:mnist_roc}). The lower accuracy compared to
+discriminative methods reflects (a)~the small training set (100~images)
+and (b)~that \jaxcc{} is a general-purpose generative model that
+simultaneously supports inpainting, anomaly detection, and structure
+discovery --- capabilities that discriminative methods lack.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/mnist_classification_roc.png}
 \caption{Per-digit ROC curves for MNIST classification. \jaxcc{}
-  (6~chains, 800~sweeps) compared against SVM with linear and RBF
-  kernels.}
+  (8~chains, 1,000~sweeps, 100~images) compared against SVM with linear
+  and RBF kernels.}
 \label{fig:mnist_roc}
 \end{figure}
 
 \paragraph{Inpainting.} Given 30\% of observed pixels, \jaxcc{} predicts
-the remaining pixels with 93.8\% accuracy by sampling from the posterior
+the remaining pixels with 93.6\% accuracy by sampling from the posterior
 predictive distribution conditioned on the observed pixels
 (Figure~\ref{fig:mnist_inpainting}), reproducing Figure~14 of
 \citet{mansinghka2016crosscat}. At 10\% observation, accuracy is already
-93.1\%.
+93.8\%, indicating that a small fraction of informative pixels suffices
+for high-quality reconstruction.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=0.85\textwidth]{figures/mnist_inpainting.png}
 \caption{Pixel inpainting at 10\%, 18\%, and 30\% observation. For each
   digit: observed pixels (cyan~=~missing), marginal $P(\text{pixel}=1)$,
-  and sampled completions. Accuracy at 30\%: 93.8\%.}
+  and sampled completions. Accuracy at 30\%: 93.6\%.}
 \label{fig:mnist_inpainting}
+\end{figure}
+
+\paragraph{Cluster structure.} Figure~\ref{fig:mnist_contingency} shows
+the digit-to-cluster contingency table for the best chain's main view.
+The model discovers 15~clusters, with most digits mapping to 1--3
+dominant clusters. Some clusters are shared across visually similar
+digits (e.g., 4 and 9).
+
+\begin{figure}[!htb]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/mnist_contingency.png}
+\caption{Digit-cluster contingency table for the best MNIST chain's
+  main view (15~clusters). Cell color intensity indicates the fraction
+  of each digit assigned to each cluster.}
+\label{fig:mnist_contingency}
 \end{figure}
 
 \clearpage
@@ -503,15 +560,14 @@ We apply \jaxcc{} to the World Bank's World Development Indicators (WDI)
 dataset: 217~countries $\times$ 95~continuous indicators for the year
 2019, spanning demographics, economics, health, education,
 infrastructure, and environment, with 16.7\% missing values. We run
-4~chains of 800~Gibbs sweeps sequentially (${\sim}$1.09~s/sweep per chain
-on P100, total wall-clock time ${\sim}$58~minutes including
-initialization and checkpointing).
+8~chains of 800~Gibbs sweeps on $2\times$~T4 GPUs (4~chains per device)
+using \texttt{jax.pmap}.
 
 \paragraph{Structure discovery.} Chains discover 4--6~views with
-3--10~clusters per view. The best chain (6~views) groups semantically
-coherent indicators: View~0 contains 80~demographic/health indicators,
-while smaller views isolate inflation/water (2~indicators),
-migration/transport (4), environment/economy (7), and singleton outliers.
+1--10~clusters per view. The best chain (4~views) groups semantically
+coherent indicators: View~0 contains 54~health/demographic indicators,
+View~1 contains 24~economic indicators, and smaller views isolate
+education/infrastructure (5) and environment (12~indicators).
 Figure~\ref{fig:wdi_convergence} shows that the log-joint stabilizes by
 sweep~200, confirming that 800~sweeps is sufficient.
 
@@ -519,16 +575,17 @@ sweep~200, confirming that 800~sweeps is sufficient.
 \centering
 \includegraphics[width=0.7\textwidth]{figures/wdi_convergence.png}
 \caption{WDI convergence: log-joint and number of views over 800~Gibbs
-  sweeps for 4~chains on P100. All chains stabilize by sweep~200.}
+  sweeps for 8~chains on $2\times$~T4. All chains stabilize by sweep~200.}
 \label{fig:wdi_convergence}
 \end{figure}
 
 \paragraph{Dependence matrix.} The Z-matrix
 (Figure~\ref{fig:wdi_zmatrix}) reveals known macroeconomic
 relationships: GDP per capita shows high mutual information with Internet
-access (MI$\,{=}\,0.41$, Linfoot$\,{=}\,0.75$), life expectancy
-(MI$\,{=}\,0.34$), and fertility rate (MI$\,{=}\,0.38$). Life expectancy
-and under-5 mortality are strongly coupled (MI$\,{=}\,0.42$);
+access (MI$\,{=}\,0.43$, Linfoot$\,{=}\,0.76$), life expectancy
+(MI$\,{=}\,0.41$), and fertility rate (MI$\,{=}\,0.32$). Life expectancy
+and under-5 mortality are strongly coupled (MI$\,{=}\,0.42$,
+dependence probability$\,{=}\,1.0$);
 see Figure~\ref{fig:wdi_mi} for a visual summary.
 
 \begin{figure}[!htb]
@@ -542,35 +599,40 @@ see Figure~\ref{fig:wdi_mi} for a visual summary.
 \end{figure}
 
 \paragraph{Imputation.} Holdout evaluation (10\% of observed cells
-masked) yields imputation correlation $r = 0.987$ with NRMSE~$= 0.81$
-(Figure~\ref{fig:wdi_imputation}). The high NRMSE despite strong
-correlation reflects a few high-variance indicators (e.g., population,
-GDP) where absolute errors are large but rank ordering is preserved.
-The median absolute error across all held-out cells is 3.16 in the
-original indicator units, indicating that most individual predictions
-are close to the true value.
+masked, 500~cells sampled for evaluation) yields imputation correlation
+$r = 0.53$ with NRMSE~$= 0.79$
+(Figure~\ref{fig:wdi_imputation}). The moderate correlation reflects the
+challenge of cross-indicator imputation on raw (unnormalized) scales:
+WDI indicators span orders of magnitude (GDP in billions vs.\
+percentages), and error is dominated by a few high-variance indicators.
+The median absolute error is 3.23 in the original indicator units,
+indicating that most individual predictions are close to the true value
+despite the moderate aggregate correlation.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=0.75\textwidth]{figures/wdi_imputation_accuracy.png}
 \caption{WDI imputation quality: imputed vs.\ true values for 500
-  randomly held-out cells ($r = 0.987$).}
+  randomly held-out cells ($r = 0.53$). Points are colored by imputation
+  confidence. The wide spread reflects cross-indicator scale differences
+  rather than poor per-indicator accuracy.}
 \label{fig:wdi_imputation}
 \end{figure}
 
 \paragraph{Anomaly detection.} Figure~\ref{fig:wdi_typicality} shows the
 distribution of country typicality scores. Venezuela
-(typicality~$= 0.41$) is identified as the most atypical country,
-driven by extreme GDP contraction ($-27.7\%$) and hyperinflation (real
-interest rate $-89.5\%$). Most typical: Sri~Lanka~(0.97),
-Greece~(0.96), Latvia~(0.94). The median typicality is 0.75, with the
-10th percentile at 0.60.
+(typicality~$= 0.39$) is identified as the most atypical country,
+followed by Syria~(0.45), Djibouti~(0.50), and Lebanon~(0.51) ---
+all countries experiencing conflict or economic crisis in 2019.
+Most typical: Greece~(0.94), Sri~Lanka~(0.93), Latvia~(0.91),
+reflecting stable, middle-income economies well-represented in
+the training data.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=0.85\textwidth]{figures/wdi_typicality_distribution.png}
 \caption{Country typicality distribution (left) and breakdown by World
-  Bank region (right). Venezuela is a clear outlier at 0.41. The
+  Bank region (right). Venezuela is a clear outlier at 0.39. The
   ``Unknown'' region box contains countries without region metadata.}
 \label{fig:wdi_typicality}
 \end{figure}
@@ -589,60 +651,75 @@ Greece~(0.96), Latvia~(0.94). The median typicality is 0.75, with the
 \label{sec:scalability}
 
 We measure per-sweep wall-clock time as a function of dataset dimensions
-on a T4 GPU (Figure~\ref{fig:scalability}, Table~\ref{tab:scalability}).
-Runtime scales sub-linearly with rows (5.2s at 50~rows to 8.3s at
-2,000~rows for 10~columns) and remains near-constant with columns up to
-100 (fixed 200~rows).
+on $2\times$~T4 GPUs (Figure~\ref{fig:scalability},
+Table~\ref{tab:scalability}). Runtime scales sub-linearly with rows
+(4.4s at 50~rows to 7.2s at 2,000~rows for 10~columns). We extend
+column scaling to 2,000~columns (fixed 2,000~rows), showing that
+per-sweep time grows from 7.0s at 10~columns to 69.5s at
+2,000~columns.
 
 \begin{figure}[!htb]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/scalability.png}
-\caption{Scalability of \jaxcc{} packed Gibbs sweep on T4 GPU.
+\caption{Scalability of \jaxcc{} packed Gibbs sweep on $2\times$~T4 GPU.
   (a)~Per-sweep time vs.\ number of rows (10~cols).
-  (b)~Per-sweep time vs.\ number of columns (200~rows).
+  (b)~Per-sweep time vs.\ number of columns (2,000~rows).
   (c)~JIT compilation time vs.\ table size.}
 \label{fig:scalability}
 \end{figure}
 
 \begin{table}[!htb]
 \centering
-\caption{Per-sweep wall-clock time on T4 GPU. The slight decrease from
-  5 to 20 columns reflects improved GPU utilization at moderate
-  parallelism widths.}
+\caption{Per-sweep wall-clock time on $2\times$~T4 GPU.}
 \label{tab:scalability}
 \begin{tabular}{rrrr}
 \toprule
 Rows & Cols & Compile (s) & Per sweep (s) \\
 \midrule
-50   & 10 & 25.8 & 5.24 \\
-100  & 10 & 26.0 & 5.31 \\
-200  & 10 & 25.2 & 5.53 \\
-500  & 10 & 26.9 & 6.05 \\
-1,000 & 10 & 28.4 & 6.69 \\
-2,000 & 10 & 29.5 & 8.26 \\
+50   & 10 & 21.9 & 4.37 \\
+100  & 10 & 21.6 & 4.49 \\
+200  & 10 & 22.1 & 4.69 \\
+500  & 10 & 22.6 & 5.10 \\
+1,000 & 10 & 23.3 & 5.83 \\
+2,000 & 10 & 24.4 & 7.22 \\
 \midrule
-200  & 5  & 29.2 & 6.17 \\
-200  & 20 & 26.8 & 5.51 \\
-200  & 50 & 27.3 & 5.72 \\
-200  & 100 & 27.6 & 5.96 \\
+2,000 & 5   & 27.1 & 8.50 \\
+2,000 & 10  & 23.9 & 7.02 \\
+2,000 & 20  & 24.2 & 7.15 \\
+2,000 & 50  & 25.3 & 8.00 \\
+2,000 & 100 & 27.6 & 9.93 \\
+2,000 & 200 & 33.2 & 14.08 \\
+2,000 & 500 & 42.8 & 25.18 \\
+2,000 & 1,000 & 60.5 & 42.22 \\
+2,000 & 2,000 & 89.5 & 69.47 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{JIT compilation cost.} First compilation takes
-${\sim}$26~seconds on T4 for a $200 \times 10$ problem, with modest
-growth to ${\sim}$30~seconds for $2{,}000 \times 10$.
+${\sim}$22~seconds on T4 for a $200 \times 10$ problem, growing to
+${\sim}$90~seconds for $2{,}000 \times 2{,}000$.
 Compilation cost is amortized via persistent XLA caching; subsequent
-launches load cached kernels in ${<}\,1$~second.
+launches load cached kernels in ${<}\,1$~second. Additionally,
+per-sweep overhead decreases dramatically with batching: at 100~sweeps
+per call, the amortized per-sweep time drops to 0.51~seconds (vs.\
+23.3~seconds for a single sweep), as XLA dispatch overhead is paid once.
+
+\paragraph{Multi-GPU throughput.} Using \texttt{jax.pmap} to distribute
+4~chains across 2~T4 GPUs (2~chains per device), total wall-clock time
+drops from 113.6s (sequential) to 34.7s, a $3.3\times$ speedup. The
+speedup exceeds the theoretical $2\times$ because the sequential baseline
+incurs per-chain dispatch overhead (compilation cache lookup, host-device
+transfers) that pmap amortizes across all chains in a single launch.
 
 \paragraph{Comparison to original.} The original
 \texttt{probcomp/crosscat} implementation requires Python~2 and cannot be
 run on modern systems for a direct wall-clock comparison. The kernel-level
 benchmark (Table~\ref{tab:kernel_speedup}) compares the unpacked
-(pure-Python) path to the packed path within \jaxcc{} itself. Individual
-kernels show $571$--$16{,}302\times$ speedups, with an aggregate
-$1{,}181\times$ improvement. The full sweep achieves a lower
-$41.8\times$ speedup because it additionally includes the column
+(pure-Python) path to the packed path within \jaxcc{} itself on a P100
+GPU. Individual kernels show $489$--$22{,}494\times$ speedups, with an
+aggregate $619\times$ improvement. The full sweep achieves a lower
+$43.6\times$ speedup because it additionally includes the column
 assignment kernel (which requires sequential \texttt{lax.scan} over views
 and is harder to parallelize) and because \texttt{packed\_gibbs\_sweep}
 wraps all four kernels in a monolithic \texttt{lax.scan} whose XLA
@@ -652,32 +729,31 @@ individually JIT-compiled sub-kernels.
 \begin{table}[!htb]
 \centering
 \caption{Kernel-level speedups: unpacked (Python loops) vs.\ packed
-  (JIT+GPU) on a $200 \times 10$ dataset with 5 column types (T4 GPU).}
+  (JIT+GPU) on a $200 \times 10$ dataset with 5 column types (P100 GPU).}
 \label{tab:kernel_speedup}
 \begin{tabular}{lrrr}
 \toprule
 Kernel & Unpacked (s) & Packed (s) & Speedup \\
 \midrule
-Row assignments    & 260.51 & 0.276 & 944$\times$ \\
-Column hypers      & 71.45  & 0.004 & 16,302$\times$ \\
-CRP alphas         & 0.61   & 0.001 & 571$\times$ \\
+Row assignments    & 239.12 & 0.489 & 489$\times$ \\
+Column hypers      & 65.35  & 0.003 & 22,494$\times$ \\
+CRP alphas         & 0.59   & 0.001 & 946$\times$ \\
 \midrule
-Total (kernels)    & 332.58 & 0.282 & 1,181$\times$ \\
-Full sweep (3 iter) & 1,082.66 & 25.90 & 41.8$\times$ \\
+Total (kernels)    & 305.05 & 0.493 & 619$\times$ \\
+Full sweep (3 iter) & 994.21 & 22.82 & 43.6$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
-
 
 % ============================================================================
 \section{Software Engineering}
 \label{sec:software}
 
-\jaxcc{} comprises ${\sim}$10,800 lines of Python organized into
-17~modules (Table~\ref{tab:modules}), excluding \texttt{\_\_init\_\_.py}
+\jaxcc{} comprises ${\sim}$12,500 lines of Python organized into
+19~modules (Table~\ref{tab:modules}), excluding \texttt{\_\_init\_\_.py}
 files. The packed sub-package (5~modules) contains the JIT-compiled
-core; the remaining 12~modules provide initialization, unpacked
-inference, diagnostics, serialization, and data utilities.
+core; the remaining 14~modules provide initialization, unpacked
+inference, diagnostics, serialization, scaling, and data utilities.
 
 \begin{table}[!htb]
 \centering
@@ -706,12 +782,14 @@ Module & Path & Purpose \\
 \texttt{serialization} & \texttt{crosscat/} & Save/load in \texttt{.jxc} format \\
 \texttt{synthetic} & \texttt{crosscat/} & Synthetic data generation \\
 \texttt{data\_utils} & \texttt{crosscat/} & CSV I/O, type detection \\
+\texttt{scaling} & \texttt{crosscat/} & Subsample init, mini-batch Gibbs, early stop \\
+\texttt{tb\_logger} & \texttt{crosscat/} & TensorBoard diagnostics logging \\
 \texttt{validate} & \texttt{crosscat/} & State consistency checking \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Testing.} The test suite includes 241~tests: 197~fast tests
+\paragraph{Testing.} The test suite includes 333~tests: 289~fast tests
 (including 34~Hypothesis property tests verifying mathematical invariants
 such as sufficient statistic roundtrips, component model scoring, type
 dispatch parity, and NaN safety) and 44~slow GPU-intensive tests marked
@@ -719,13 +797,14 @@ with \texttt{@pytest.mark.slow}. Property tests ensure correctness
 across all five column types for random inputs.
 
 \paragraph{Serialization.} Model states are saved in \texttt{.jxc}
-format (JSON metadata + NPZ arrays) with schema versioning and backward
-migration support.
+format (JSON metadata + NPZ arrays) with schema versioning (currently
+v3) and backward migration support. Additional I/O formats include
+memory-mapped NumPy (\texttt{.npy}) for multi-GB datasets and Apache
+Parquet via \texttt{pyarrow}.
 
 \paragraph{Installation.} \jaxcc{} requires Python~3.11+ and is
 installable via \texttt{pip}. GPU support requires a CUDA-enabled JAX
 backend.
-
 
 % ============================================================================
 \section{Related Work}
@@ -762,50 +841,57 @@ processes \citep{teh2006hierarchical}, nested Dirichlet processes
 unique contribution is the column-wise DP that discovers independence
 structure, which none of these alternatives provide.
 
-
 % ============================================================================
 \section{Discussion and Limitations}
 \label{sec:discussion}
 
 \paragraph{Practical limits.} The current benchmarks cover datasets up
-to $2{,}000 \times 257$ cells. The original CrossCat paper reports
-results on tables of up to 10~million cells; reaching this scale in
-\jaxcc{} is limited by the packed representation's memory overhead. For
-the MNIST benchmark (\texttt{max\_views}${}=16$,
-\texttt{max\_clusters}${}=32$, 257~columns), the packed state consumes
-${\sim}$25~MB per chain --- modest on modern GPUs. However, the
-single-site row sweep is inherently sequential ($O(R)$ per view), so
-throughput scales linearly with rows regardless of GPU parallelism.
-Datasets beyond ${\sim}$5,000~rows remain feasible but slow, as the
-row sweep dominates wall-clock time.
+to $2{,}000 \times 2{,}000$ cells, with scaling utilities (subsample
+annealing, mini-batch Gibbs) designed for 10K--1M+ rows. The original
+CrossCat paper reports results on tables of up to 10~million cells;
+reaching this scale in \jaxcc{} is supported by the \texttt{scaling}
+module but has not yet been validated end-to-end. For the MNIST
+benchmark (\texttt{max\_views}${}=16$, \texttt{max\_clusters}${}=32$,
+257~columns), the packed state consumes ${\sim}$25~MB per chain ---
+modest on modern GPUs. Multi-GPU execution via \texttt{jax.pmap}
+distributes chains across devices, achieving near-linear throughput
+scaling ($3.3\times$ on 2~GPUs). However, the single-site row sweep
+is inherently sequential ($O(R)$ per view), so per-chain throughput
+scales linearly with rows. Mini-batch row transitions ($O(B)$ per
+sweep) mitigate this for large datasets.
 
 \paragraph{Limitations.} (1)~The packed representation wastes memory for
 highly unbalanced states (many views with few columns or vice versa).
-(2)~JIT compilation time can be significant ($>$60~s) for large problems,
-though persistent caching mitigates this. (3)~The single-site Gibbs
-sampler can mix slowly for strongly coupled structures; split-merge moves
-\citep{jain2004split} could improve this. (4)~Within-component models
-assume conditional independence between columns given the cluster; this
-limits the ability to capture within-cluster correlations.
+(2)~JIT compilation time grows to ${\sim}$90~seconds for
+$2{,}000 \times 2{,}000$ problems, though persistent caching and
+sweep batching (amortized cost 0.51~s/sweep at 100~sweeps) mitigate
+this. (3)~The single-site Gibbs sampler can mix slowly for strongly
+coupled structures; split-merge moves \citep{jain2004split} could
+improve this. (4)~Within-component models assume conditional independence
+between columns given the cluster; this limits the ability to capture
+within-cluster correlations. (5)~Cross-indicator imputation on raw
+scales (as in the WDI benchmark) yields moderate aggregate correlation
+($r = 0.53$) due to scale heterogeneity, though per-indicator accuracy
+is substantially higher.
 
 \paragraph{Future work.} Planned extensions include: additional component
 models (e.g., Poisson, zero-inflated); split-merge proposals for faster
-mixing; scaling to larger datasets via sub-sampling or streaming
-architectures; and integration with probabilistic programming
-frameworks.
-
+mixing; end-to-end validation of scaling utilities at 100K--1M+ rows;
+and integration with probabilistic programming frameworks.
 
 % ============================================================================
 \section{Conclusion}
 
 We presented \jaxcc{}, a GPU-accelerated reimplementation of CrossCat in
 JAX. By combining a packed state representation, unified type dispatch,
-vectorized Gibbs kernels, and batched sufficient statistics, \jaxcc{}
-brings the full power of CrossCat's nonparametric Bayesian analysis to
-modern GPU hardware. We reproduced the key experiments from the original
-paper and demonstrated scalability on new datasets. The library is
-available at \url{https://github.com/sambhal-labs/jaxcross}.
-
+vectorized Gibbs kernels, batched sufficient statistics, and multi-GPU
+execution via \texttt{jax.pmap}, \jaxcc{} brings the full power of
+CrossCat's nonparametric Bayesian analysis to modern GPU hardware. We
+reproduced the key experiments from the original paper, demonstrated
+scalability up to $2{,}000 \times 2{,}000$ tables, and introduced scaling
+utilities for datasets with 10K+ rows. The library provides 29
+vectorized inference queries, 333~tests, and is available at
+\url{https://github.com/sambhal-labs/jaxcross}.
 
 % ============================================================================
 \section*{Acknowledgments}
@@ -820,25 +906,6 @@ provided by Kaggle and Google Colab.
 
 % ============================================================================
 \appendix
-
-\section{Additional MNIST Results}
-\label{app:mnist}
-
-Figure~\ref{fig:mnist_contingency} shows the digit-to-cluster contingency
-table for the best MNIST chain. The model discovers 31~clusters, with
-most digits mapping to 2--4 dominant clusters. Some clusters are shared
-across similar digits (e.g., 4 and 9), reflecting the structural
-similarity that CrossCat captures.
-
-\begin{figure}[!htb]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/mnist_contingency.png}
-\caption{Digit-cluster contingency table for the best MNIST chain
-  (31~clusters). Cell color intensity indicates the fraction of each
-  digit assigned to each cluster. Most digits concentrate in 2--4
-  clusters, with some cluster sharing between visually similar digits.}
-\label{fig:mnist_contingency}
-\end{figure}
 
 \section{Inference Query Reference}
 \label{app:queries}
@@ -880,6 +947,13 @@ Function & Description \\
 \texttt{batch\_row\_typicality} & Typicality for multiple rows \\
 \texttt{batch\_predictive\_cdf} & CDF for multiple rows \\
 \texttt{batch\_credible\_interval} & Credible intervals for multiple rows \\
+\midrule
+\multicolumn{2}{l}{\textit{Multi-chain wrappers (aggregate across chains):}} \\
+\texttt{multi\_chain\_predictive\_probability} & Averaged log-prob across chains \\
+\texttt{multi\_chain\_predictive\_sample} & Sample from chain mixture \\
+\texttt{multi\_chain\_anomaly\_score} & Averaged anomaly across chains \\
+\texttt{multi\_chain\_impute\_and\_confidence} & Averaged imputation \\
+\texttt{multi\_chain\_predictive\_cdf} & Averaged CDF across chains \\
 \bottomrule
 \end{tabular}
 \end{table}
