@@ -76,7 +76,7 @@ The package is `crosscat/` with these core modules:
 
 - **constraints.py** — Enforces column/row dependency constraints via packed Gibbs rejection sampling.
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation, Gelman-Rubin R-hat, Effective Sample Size).
-- **serialization.py** — Save/load states and checkpoints in `.jxc` format (JSON metadata + NPZ arrays).
+- **serialization.py** — Save/load states and checkpoints in `.jxc` format (JSON metadata + NPZ arrays). Uses atomic writes (temp file + rename) with a `.valid` marker to prevent corruption on crash.
 - **synthetic.py** — Synthetic data generation from known CrossCat generative model, missing data injection.
 - **data_utils.py** — Data I/O (Arrow IPC preferred, CSV, Parquet, NPY), column type detection, discretization. Use `save_data()`/`load_data()` for Arrow-first workflows with column type metadata.
 - **scaling.py** — Large-dataset workflows: `subsample_anneal()`, `minibatch_gibbs_sweep()`, `parallel_gibbs_sweep()`, `gibbs_sweep_early_stopping()`. Combines subsample initialization, batch insertion, and mini-batch Gibbs sweeps for 10K+ row datasets.
@@ -122,11 +122,11 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 ## Testing
 
-- **Do NOT run pytest locally** — tests require JAX JIT compilation which is slow even on GPU. Run on Kaggle via `notebooks/run_tests.ipynb` (2xT4 with pmap preferred over single P100).
+- **Run tests on local GPU** (GTX 1650 or similar) via `uv run pytest -m "not slow"`. Kaggle (2xT4 with pmap) is an alternative for multi-GPU benchmarks.
 - **CI (GitHub Actions)** runs lint + format + type check + CPU-safe tests (`pytest -m cpu --timeout=120`). No GPU tests in CI.
 - **Kaggle setup**: Use `pip install -e . --no-deps` to preserve Kaggle's pre-installed JAX+CUDA stack. Do NOT use `uv sync --extra gpu` on Kaggle (causes ptxas version mismatch).
 - **Test markers**: `@pytest.mark.slow` for GPU-heavy tests (30+ Gibbs sweeps). `@pytest.mark.xfail` for 3 known flaky tests (stochastic recovery).
-- **Test suite**: 279 fast tests (including 34 Hypothesis property tests), 69 slow tests (348 total).
+- **Test suite**: 339 fast tests (including 34 Hypothesis property tests), 70 slow tests (409 total).
 - **Property tests**: `tests/test_property.py` uses Hypothesis to verify mathematical invariants (suffstat roundtrips for all 5 types, component scoring, type dispatch parity, NaN safety) across random inputs.
 
 ## Benchmarks
@@ -223,158 +223,141 @@ Read: docs/architecture/performance.md
 
 ## Gold-Standard Workflow
 
-Read the WDI benchmark notebook (`benchmarks/wdi_macroeconomic_benchmark.ipynb`) for the latest, fastest patterns. Every new feature or use-case should follow this structure:
+Read the WDI benchmark notebook (`benchmarks/wdi_macroeconomic_benchmark.ipynb`) for the pmap multi-GPU pattern.
+
+### Quick Start
 
 ```python
 import jax
 import jax.numpy as jnp
-import numpy as np
-from crosscat import initialize, log_joint
-from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat import initialize
+from crosscat.packed import (
+    pack_state, multi_chain_packed_gibbs_sweep,
+    unbatch_packed_states, select_best_chain,
+)
 from crosscat.types import ColumnType
 
-# 1. Data loading
+# Data
 data = jnp.array(raw_data, dtype=jnp.float32)
 col_types = [ColumnType.CONTINUOUS, ColumnType.CATEGORICAL, ...]
 
-# 2. Multi-chain initialization
+# Multi-chain init → packed sweep → best chain
 key = jax.random.key(42)
 result = initialize(key, data, col_types, n_chains=4)
-packed_states = [pack_state(s, max_views=16, max_clusters=32) for s in result.state]
+chains = [pack_state(s, max_views=16, max_clusters=32) for s in result.state]
+batched, scores = multi_chain_packed_gibbs_sweep(key, chains, data, n_sweeps=200)
+best = select_best_chain(batched, scores)
 
-# 3. Packed Gibbs inference (GPU)
-final_packed = []
-for i, packed in enumerate(packed_states):
-    k = jax.random.fold_in(key, i + 100)
-    packed = packed_gibbs_sweep(k, packed, data, n_sweeps=200)
-    final_packed.append(packed)
-
-# 4. Select best chain
-final_states = [unpack_state(p, col_types, data=data) for p in final_packed]
-scores = [float(log_joint(s, data)) for s in final_states]
-best_idx = int(np.argmax(scores))
-
-# 5. Inference queries
+# Queries (stay packed — no unpack needed)
 from crosscat import packed_dependence_matrix, batch_anomaly_score
-z_matrix = packed_dependence_matrix(final_packed)
-anomaly_scores = batch_anomaly_score(final_packed[best_idx], data, jnp.arange(data.shape[0]))
+z_matrix = packed_dependence_matrix(unbatch_packed_states(batched, n_chains=4))
+anomalies = batch_anomaly_score(best, data, jnp.arange(data.shape[0]))
 ```
+
+### Production Pipeline
+
+```python
+import jax
+import jax.numpy as jnp
+
+from crosscat import initialize
+from crosscat.packed import (
+    pack_state, multi_chain_packed_gibbs_sweep,
+    unbatch_packed_states, select_best_chain,
+)
+from crosscat.data_utils import load_data
+from crosscat.diagnostics import gelman_rubin_rhat, effective_sample_size
+from crosscat.serialization import save_checkpoint, load_latest_checkpoint
+from crosscat.types import ColumnType
+
+# ── 1. Data I/O (Arrow preferred) ──────────────────────────────
+data, col_names, col_types = load_data("dataset.arrow")
+# Or: col_types = guess_column_types(data)
+
+# ── 2. Initialize chains ───────────────────────────────────────
+N_CHAINS, N_SWEEPS, DIAG_EVERY, CKPT_EVERY = 4, 400, 50, 100
+key = jax.random.key(42)
+result = initialize(key, data, col_types, n_chains=N_CHAINS)
+chains = [pack_state(s, max_views=16, max_clusters=32) for s in result.state]
+
+# ── 3. Inference loop with convergence monitoring ──────────────
+log_joint_traces = [[] for _ in range(N_CHAINS)]
+
+for sweep in range(0, N_SWEEPS, DIAG_EVERY):
+    key, subkey = jax.random.split(key)
+    batched, scores = multi_chain_packed_gibbs_sweep(
+        subkey, chains, data, n_sweeps=DIAG_EVERY
+    )
+    chains = unbatch_packed_states(batched, N_CHAINS)
+
+    # Track per-chain log_joint
+    for i, s in enumerate(scores):
+        log_joint_traces[i].append(float(s))
+
+    # Convergence check (Rhat on log_joint across chains)
+    if len(log_joint_traces[0]) >= 4:
+        traces = jnp.array(log_joint_traces)
+        rhat = float(gelman_rubin_rhat(traces))
+        ess = float(effective_sample_size(traces))
+        print(f"Sweep {sweep + DIAG_EVERY}: Rhat={rhat:.3f} ESS={ess:.1f} "
+              f"log_joints={[float(s) for s in scores]}")
+
+    # Checkpoint
+    if (sweep + DIAG_EVERY) % CKPT_EVERY == 0:
+        best = select_best_chain(batched, scores)
+        save_checkpoint(best, "./checkpoints", sweep + DIAG_EVERY,
+                       column_types=col_types)
+
+# ── 4. Select best chain & run queries ─────────────────────────
+best = select_best_chain(batched, scores)
+all_chains = unbatch_packed_states(batched, N_CHAINS)
+
+from crosscat import (
+    packed_dependence_matrix, batch_anomaly_score,
+    batch_impute_column, multi_chain_predictive_probability,
+)
+
+# Structure queries (accept list — average over posterior samples)
+z_matrix = packed_dependence_matrix(all_chains)
+
+# Row-vectorized queries (accept single packed — batch over rows)
+anomalies = batch_anomaly_score(best, data, jnp.arange(data.shape[0]))
+imputations, confidences = batch_impute_column(
+    jax.random.key(99), best, data, query_col=0,
+    row_ids=jnp.arange(data.shape[0]),
+)
+
+# Multi-chain averaged queries (accept list — Bayesian model averaging)
+log_p = multi_chain_predictive_probability(
+    all_chains, data, query_cols=[0], query_vals=jnp.array([0.5]),
+)
+```
+
+**For datasets > 10K rows**, use `subsample_anneal()` for initialization followed by
+`gibbs_sweep_early_stopping()` for convergence. See `docs/guides/scaling.md`.
+
+**For multi-GPU**, replace `multi_chain_packed_gibbs_sweep` with explicit `jax.pmap()`.
+See `benchmarks/wdi_macroeconomic_benchmark.ipynb` for the pmap pattern.
 
 ## API Quick Reference
 
-### Anomaly Detection
-```python
-from crosscat import (
-    predictive_anomalousness,    # Single row, unpacked
-    batch_anomaly_score,         # All rows, packed (PREFERRED)
-    row_typicality,              # Structural anomaly (unpacked, multi-state)
-    batch_row_typicality,        # Structural anomaly, batch (packed)
-    multi_chain_anomaly_score,   # Multi-chain ensemble
-    column_typicality,           # Column-level anomaly (unpacked)
-    packed_column_typicality,    # Column-level, packed
-)
-```
+The full list of exported symbols is in `crosscat/__init__.py`. Three tiers of inference functions:
 
-### Imputation & Missing Data
-```python
-from crosscat import (
-    impute_and_confidence,           # Single cell (unpacked)
-    batch_impute_column,             # Batch imputation (packed, PREFERRED)
-    packed_impute_and_confidence,    # Single cell (packed)
-    sample_and_insert,               # Impute + insert row (unpacked)
-    packed_sample_and_insert,        # Impute + insert row (packed)
-    batch_sample_and_insert,         # Multiple partial rows (packed)
-    multi_chain_impute_and_confidence,  # Multi-chain
-    multi_chain_sample_and_insert,   # Per-chain impute + insert
-)
-```
+| Prefix | Accepts | Batches over | Example |
+|--------|---------|-------------|---------|
+| `packed_*` | single packed state | nothing (one query) | `packed_anomaly_score(key, packed, data, query_row=5)` |
+| `batch_*` | single packed state | **rows/queries** (vmap) | `batch_anomaly_score(packed, data, row_ids)` |
+| `multi_chain_*` | `list[PackedCrossCatState]` | **chains** (BMA) | `multi_chain_anomaly_score(key, chains, data, query_row=5)` |
 
-### Predictive Inference
-```python
-from crosscat import (
-    predictive_probability,          # P(query | conditions) (unpacked)
-    predictive_sample,               # Draw samples (unpacked)
-    predictive_cdf,                  # P(X <= val) (unpacked)
-    packed_predictive_probability,   # (packed)
-    packed_predictive_sample,        # (packed)
-    packed_predictive_cdf,           # (packed)
-    batch_predictive_probability,    # Per-row log prob (packed)
-    batch_predictive_sample,         # Per-row samples (packed)
-    multi_chain_predictive_probability,  # Multi-chain
-    multi_chain_predictive_sample,       # Multi-chain
-)
-```
+Some functions accept lists for posterior averaging (e.g., `packed_dependence_matrix(list)`, `packed_mutual_information(list)`).
 
-### Classification
-```python
-from crosscat import (
-    packed_classify_column,          # Argmax predictive (packed)
-    batch_classify_column,           # Batch classification (packed)
-    batch_score_columns_binary,      # Binary column probabilities (packed)
-    multi_chain_classify_column,     # Ensemble classification (multi-chain)
-)
-```
-
-### Dependency Discovery
-```python
-from crosscat import (
-    dependence_probability,          # Pairwise P(col_i ~ col_j) (unpacked)
-    dependence_matrix,               # Full Z-matrix (unpacked, multi-state)
-    packed_dependence_probability,   # Pairwise (packed, accepts list)
-    packed_dependence_matrix,        # Full Z-matrix (packed, accepts list, PREFERRED)
-    batch_dependence_probability,    # Multiple column pairs (packed)
-    mutual_information,              # MI + Linfoot correlation (multi-state)
-    packed_mutual_information,       # MI (packed, accepts list)
-    conditional_entropy,             # H(target | given) (unpacked)
-    packed_conditional_entropy,      # H(target | given) (packed, accepts list)
-    batch_conditional_entropy,       # Multiple targets (packed)
-    batch_column_typicality,         # Multiple columns (packed)
-    packed_joint_predictive_probability,  # Joint P(q1,q2,...) (packed)
-    batch_joint_predictive_probability,  # Multiple query combos (packed)
-    multi_chain_joint_predictive_probability,  # Multi-chain averaged
-)
-```
-
-### Credible Intervals
-```python
-from crosscat import (
-    credible_interval,               # Percentile CI (unpacked)
-    packed_credible_interval,        # (packed)
-    batch_credible_interval,         # Multiple rows (packed)
-    multi_chain_credible_interval,   # Pooled across chains
-)
-```
-
-### Serialization & Checkpointing
-```python
-from crosscat import (
-    save_state, load_state,                  # Single state .jxc
-    save_packed_state, load_packed_state,     # Packed state .jxc
-    save_checkpoint, load_latest_checkpoint,  # Checkpoint directory
-    save_data, load_data,                    # Arrow IPC with metadata (PREFERRED)
-)
-```
-
-### Diagnostics
-```python
-from crosscat import (
-    log_joint,                       # Model score (for convergence)
-    collect_diagnostics,             # Per-sweep metrics dict
-    adjusted_rand_index,             # ARI between partitions
-    gelman_rubin_rhat,               # R-hat convergence (multi-chain)
-    effective_sample_size,           # ESS (multi-chain)
-    random_holdout_mask,             # Cell-level holdout mask
-    packed_evaluate_imputation,      # Holdout imputation metrics (packed, PREFERRED)
-    evaluate_imputation,             # (unpacked)
-)
-```
-
-### Scaling (10K+ rows)
-```python
-from crosscat import (
-    subsample_anneal,                # Subsample → grow → full inference
-    minibatch_gibbs_sweep,           # Mini-batch row transitions
-    parallel_gibbs_sweep,            # Parallel row scoring
-    gibbs_sweep_early_stopping,      # Stop when log_joint plateaus
-)
-```
+Key categories:
+- **Anomaly**: `batch_anomaly_score` (preferred), `multi_chain_anomaly_score`, `batch_row_typicality`
+- **Imputation**: `batch_impute_column` (preferred), `batch_sample_and_insert`, `multi_chain_impute_and_confidence`
+- **Predictive**: `batch_predictive_probability`, `batch_predictive_sample`, `multi_chain_predictive_*`
+- **Classification**: `batch_classify_column`, `batch_score_columns_binary`, `multi_chain_classify_column`
+- **Dependency**: `packed_dependence_matrix` (preferred), `packed_mutual_information`, `batch_conditional_entropy`
+- **Credible Intervals**: `batch_credible_interval`, `multi_chain_credible_interval`
+- **Serialization**: `save_packed_state`/`load_packed_state` (.jxc), `save_data`/`load_data` (Arrow IPC, preferred)
+- **Diagnostics**: `gelman_rubin_rhat`, `effective_sample_size`, `packed_evaluate_imputation`
+- **Scaling**: `subsample_anneal`, `minibatch_gibbs_sweep`, `parallel_gibbs_sweep`, `gibbs_sweep_early_stopping`
