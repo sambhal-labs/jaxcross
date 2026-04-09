@@ -2076,6 +2076,10 @@ def multi_chain_sample_and_insert(
     the best chain's completed row as canonical data for subsequent
     queries (e.g., via ``select_best_chain``).
 
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+        Returns N copies of the data matrix (one per chain), which
+        may be significant on memory-constrained hardware.
+
     Args:
         rng_key: JAX PRNG key.
         packed_states: List of PackedCrossCatState (MCMC posterior samples).
@@ -2085,9 +2089,6 @@ def multi_chain_sample_and_insert(
     Returns:
         Tuple of (updated_states, updated_datas, completed_rows) — one
         per chain.
-
-    .. note:: Returns N copies of the data matrix (one per chain), which
-        may be significant on memory-constrained hardware.
     """
     updated_states = []
     updated_datas = []
