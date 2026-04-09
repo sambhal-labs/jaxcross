@@ -28,6 +28,10 @@ from jax import Array
 # against log(0) and division-by-zero in posterior computations.
 LOG_EPS: float = 1e-30
 
+# Pseudo-infinity for logistic sigmoid boundaries (ordinal cutpoints).
+# Must be large enough to saturate sigmoid but small enough to avoid overflow.
+LOGISTIC_INF: float = 1e10
+
 # Grid points for ordinal logistic μ integration. Override to trade accuracy
 # for speed. Note: this is captured at import time, so changes require
 # restarting the Python process to take effect.

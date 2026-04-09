@@ -126,6 +126,7 @@ from crosscat.serialization import (
 from crosscat.synthetic import add_missing_data, generate_crosscat_data
 from crosscat.types import (
     LOG_EPS,
+    LOGISTIC_INF,
     ColumnHypers,
     ColumnType,
     CrossCatState,
@@ -137,6 +138,7 @@ from crosscat.validate import ValidationError, assert_valid_state, validate_stat
 
 __all__ = [
     # Types
+    "LOGISTIC_INF",
     "LOG_EPS",
     "ColumnHypers",
     "ColumnType",
