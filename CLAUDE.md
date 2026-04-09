@@ -68,17 +68,17 @@ The package is `crosscat/` with these core modules:
   - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths. Sub-kernels have `@jax.jit` for independent compilation.
   - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `compile_kernels()`, `clear_cache()`)
 
-- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support (29 public functions):
+- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support (37 public functions):
   - **Single-state packed_ (12):** `packed_classify_column`, `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
   - **Multi-state packed_ (4, accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
-  - **Batch (8):** `batch_anomaly_score`, `batch_impute_column`, `batch_row_typicality`, `batch_credible_interval`, `batch_predictive_cdf`, `batch_row_similarity`, `batch_classify_column`, `batch_score_columns_binary`
-  - **Multi-chain wrappers (5):** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`
+  - **Batch (13):** `batch_anomaly_score`, `batch_impute_column`, `batch_row_typicality`, `batch_credible_interval`, `batch_predictive_cdf`, `batch_row_similarity`, `batch_classify_column`, `batch_score_columns_binary`, `batch_predictive_probability`, `batch_predictive_sample`, `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`
+  - **Multi-chain wrappers (8):** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`, `multi_chain_classify_column`, `multi_chain_credible_interval`, `multi_chain_joint_predictive_probability`
 
 - **constraints.py** — Enforces column/row dependency constraints via packed Gibbs rejection sampling.
-- **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation).
+- **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation, Gelman-Rubin R-hat, Effective Sample Size).
 - **serialization.py** — Save/load states and checkpoints in `.jxc` format (JSON metadata + NPZ arrays).
 - **synthetic.py** — Synthetic data generation from known CrossCat generative model, missing data injection.
-- **data_utils.py** — CSV I/O, column type detection, discretization.
+- **data_utils.py** — Data I/O (Arrow IPC preferred, CSV, Parquet, NPY), column type detection, discretization. Use `save_data()`/`load_data()` for Arrow-first workflows with column type metadata.
 - **scaling.py** — Large-dataset workflows: `subsample_anneal()`, `minibatch_gibbs_sweep()`, `parallel_gibbs_sweep()`, `gibbs_sweep_early_stopping()`. Combines subsample initialization, batch insertion, and mini-batch Gibbs sweeps for 10K+ row datasets.
 - **tb_logger.py** — TensorBoard logging via `tensorboardX`. `TBLogger` context manager logs per-sweep diagnostics (scalars, histograms). Designed to consume the dict returned by `diagnostics.collect_diagnostics()`. Requires optional `tensorboardX` dependency.
 - **validate.py** — State consistency checking.
@@ -287,20 +287,6 @@ from crosscat import (
 )
 ```
 
-### Dependency Discovery
-```python
-from crosscat import (
-    dependence_probability,          # Pairwise P(col_i ~ col_j) (unpacked)
-    dependence_matrix,               # Full Z-matrix (unpacked, multi-state)
-    packed_dependence_probability,   # Pairwise (packed)
-    packed_dependence_matrix,        # Full Z-matrix (packed, PREFERRED)
-    mutual_information,              # MI + Linfoot correlation (multi-state)
-    packed_mutual_information,       # MI (packed)
-    conditional_entropy,             # H(target | given) (unpacked)
-    packed_conditional_entropy,      # H(target | given) (packed)
-)
-```
-
 ### Predictive Inference
 ```python
 from crosscat import (
@@ -310,6 +296,8 @@ from crosscat import (
     packed_predictive_probability,   # (packed)
     packed_predictive_sample,        # (packed)
     packed_predictive_cdf,           # (packed)
+    batch_predictive_probability,    # Per-row log prob (packed)
+    batch_predictive_sample,         # Per-row samples (packed)
     multi_chain_predictive_probability,  # Multi-chain
     multi_chain_predictive_sample,       # Multi-chain
 )
@@ -321,6 +309,34 @@ from crosscat import (
     packed_classify_column,          # Argmax predictive (packed)
     batch_classify_column,           # Batch classification (packed)
     batch_score_columns_binary,      # Binary column probabilities (packed)
+    multi_chain_classify_column,     # Ensemble classification (multi-chain)
+)
+```
+
+### Dependency Discovery
+```python
+from crosscat import (
+    dependence_probability,          # Pairwise P(col_i ~ col_j) (unpacked)
+    dependence_matrix,               # Full Z-matrix (unpacked, multi-state)
+    packed_dependence_probability,   # Pairwise (packed, accepts list)
+    packed_dependence_matrix,        # Full Z-matrix (packed, accepts list, PREFERRED)
+    batch_dependence_probability,    # Multiple column pairs (packed)
+    mutual_information,              # MI + Linfoot correlation (multi-state)
+    packed_mutual_information,       # MI (packed, accepts list)
+    conditional_entropy,             # H(target | given) (unpacked)
+    packed_conditional_entropy,      # H(target | given) (packed, accepts list)
+    batch_conditional_entropy,       # Multiple targets (packed)
+    batch_column_typicality,         # Multiple columns (packed)
+)
+```
+
+### Credible Intervals
+```python
+from crosscat import (
+    credible_interval,               # Percentile CI (unpacked)
+    packed_credible_interval,        # (packed)
+    batch_credible_interval,         # Multiple rows (packed)
+    multi_chain_credible_interval,   # Pooled across chains
 )
 ```
 
@@ -330,6 +346,7 @@ from crosscat import (
     save_state, load_state,                  # Single state .jxc
     save_packed_state, load_packed_state,     # Packed state .jxc
     save_checkpoint, load_latest_checkpoint,  # Checkpoint directory
+    save_data, load_data,                    # Arrow IPC with metadata (PREFERRED)
 )
 ```
 
@@ -339,6 +356,8 @@ from crosscat import (
     log_joint,                       # Model score (for convergence)
     collect_diagnostics,             # Per-sweep metrics dict
     adjusted_rand_index,             # ARI between partitions
+    gelman_rubin_rhat,               # R-hat convergence (multi-chain)
+    effective_sample_size,           # ESS (multi-chain)
     random_holdout_mask,             # Cell-level holdout mask
     packed_evaluate_imputation,      # Holdout imputation metrics (packed, PREFERRED)
     evaluate_imputation,             # (unpacked)
