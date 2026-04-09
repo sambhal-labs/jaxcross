@@ -1993,3 +1993,100 @@ def batch_dependence_probability(
     return jnp.array(
         [packed_dependence_probability(packed_states, ci, cj) for ci, cj in col_pairs]
     )
+
+
+# ---------------------------------------------------------------------------
+# Remaining batch + multi-chain functions (Phase D/C completion)
+# ---------------------------------------------------------------------------
+
+
+def batch_joint_predictive_probability(
+    packed: PackedCrossCatState,
+    data: Array,
+    query_cols: list[int],
+    query_vals_list: list[Array],
+) -> Array:
+    """Compute joint predictive probability for multiple query-value combos.
+
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        query_cols: Column indices to query (shared across all combos).
+        query_vals_list: List of (n_query_cols,) arrays, one per combo.
+
+    Returns:
+        (n_combos,) array of log joint probabilities.
+    """
+    return jnp.array(
+        [
+            packed_joint_predictive_probability(packed, data, query_cols, qv)
+            for qv in query_vals_list
+        ]
+    )
+
+
+def batch_sample_and_insert(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    partial_rows: list[Array],
+) -> tuple[PackedCrossCatState, Array, list[Array]]:
+    """Sample and insert multiple partial rows sequentially.
+
+    Each partial row is imputed from the current posterior and inserted,
+    so later rows condition on earlier insertions.
+
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        partial_rows: List of 1D arrays with NaN for missing entries.
+
+    Returns:
+        Tuple of (updated_packed, updated_data, completed_rows).
+    """
+    completed_rows = []
+    for i, row in enumerate(partial_rows):
+        k = jax.random.fold_in(rng_key, i)
+        packed, data, completed = packed_sample_and_insert(k, packed, data, row)
+        completed_rows.append(completed)
+    return packed, data, completed_rows
+
+
+def multi_chain_sample_and_insert(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    partial_row: Array,
+) -> tuple[list[PackedCrossCatState], list[Array], list[Array]]:
+    """Sample and insert a partial row independently per chain.
+
+    Each chain uses its own posterior to impute missing values, then
+    inserts its own completed row.  The caller should typically pick
+    the best chain's completed row as canonical data for subsequent
+    queries (e.g., via ``select_best_chain``).
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState (MCMC posterior samples).
+        data: Observation matrix (n_rows, n_cols).
+        partial_row: 1D array of shape (n_cols,) with NaN for missing entries.
+
+    Returns:
+        Tuple of (updated_states, updated_datas, completed_rows) — one
+        per chain.
+    """
+    updated_states = []
+    updated_datas = []
+    completed_rows = []
+    for i, packed in enumerate(packed_states):
+        k = jax.random.fold_in(rng_key, i)
+        new_packed, new_data, completed = packed_sample_and_insert(k, packed, data, partial_row)
+        updated_states.append(new_packed)
+        updated_datas.append(new_data)
+        completed_rows.append(completed)
+    return updated_states, updated_datas, completed_rows

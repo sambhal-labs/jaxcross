@@ -288,3 +288,71 @@ class TestBatchDependenceProbability:
         for p in results:
             assert jnp.isfinite(p)
             assert 0.0 <= float(p) <= 1.0
+
+
+class TestBatchJointPredictiveProb:
+    def test_returns_finite(self):
+        from crosscat.packed_inference import batch_joint_predictive_probability
+
+        key = jax.random.key(80)
+        states, data = _make_packed_states(key, n_chains=1)
+        query_cols = [0, 1]
+        query_vals_list = [
+            jnp.array([0.5, -0.5]),
+            jnp.array([1.0, 0.0]),
+            jnp.array([-1.0, 1.0]),
+        ]
+
+        results = batch_joint_predictive_probability(states[0], data, query_cols, query_vals_list)
+        assert results.shape == (3,)
+        for lp in results:
+            assert jnp.isfinite(lp)
+            assert float(lp) < 0  # log-probabilities are negative
+
+
+class TestBatchSampleAndInsert:
+    def test_inserts_rows(self):
+        from crosscat.packed_inference import batch_sample_and_insert
+
+        key = jax.random.key(81)
+        states, data = _make_packed_states(key, n_chains=1)
+        packed = states[0]
+        n_rows_before = data.shape[0]
+
+        partial_rows = [
+            jnp.array([0.5, jnp.nan, -0.3]),
+            jnp.array([jnp.nan, 1.0, jnp.nan]),
+        ]
+
+        new_packed, new_data, completed = batch_sample_and_insert(
+            jax.random.key(82), packed, data, partial_rows
+        )
+        assert new_data.shape[0] == n_rows_before + 2
+        assert len(completed) == 2
+        for row in completed:
+            assert jnp.all(jnp.isfinite(row))
+
+
+class TestMultiChainSampleAndInsert:
+    def test_per_chain_independent(self):
+        from crosscat.packed_inference import multi_chain_sample_and_insert
+
+        key = jax.random.key(83)
+        states, data = _make_packed_states(key, n_chains=2)
+        n_rows_before = data.shape[0]
+
+        partial_row = jnp.array([jnp.nan, 0.5, jnp.nan])
+
+        new_states, new_datas, completed_rows = multi_chain_sample_and_insert(
+            jax.random.key(84), states, data, partial_row
+        )
+        assert len(new_states) == 2
+        assert len(new_datas) == 2
+        assert len(completed_rows) == 2
+        for nd in new_datas:
+            assert nd.shape[0] == n_rows_before + 1
+        # Each chain imputes independently — completed rows may differ
+        for row in completed_rows:
+            assert jnp.all(jnp.isfinite(row))
+            # Observed value should be preserved
+            assert float(row[1]) == pytest.approx(0.5)
