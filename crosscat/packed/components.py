@@ -662,6 +662,12 @@ def batch_ol_posterior_predictive_logp(
     Returns:
         (n_cols,) log-probabilities.
     """
+    # NaN guards: JAX evaluates all branches of jnp.where, so when called
+    # from _score_row_one_cluster_typed, non-ordinal columns pass garbage
+    # hypers through this path. Clamp to finite range to prevent NaN from
+    # linspace propagating through the "unused" branch.
+    safe_mu0s = jnp.nan_to_num(mu0s, nan=0.0, posinf=0.0, neginf=0.0)
+    safe_s0s = jnp.maximum(jnp.nan_to_num(s0s, nan=1.0, posinf=1.0, neginf=1.0), LOG_EPS)
     return jax.vmap(_ol_posterior_predictive_logp)(
-        xs, counts, cat_counts_batch, cutpoints_batch, mu0s, s0s
+        xs, counts, cat_counts_batch, cutpoints_batch, safe_mu0s, safe_s0s
     )
