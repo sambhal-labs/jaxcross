@@ -1734,3 +1734,232 @@ def packed_joint_predictive_probability(
                 log_p_joint = log_p_joint + log_p
 
     return log_p_joint
+
+
+# ---------------------------------------------------------------------------
+# Additional multi-chain wrappers (Phase C)
+# ---------------------------------------------------------------------------
+
+
+def multi_chain_classify_column(
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    target_col: int,
+    candidate_vals: Array,
+    row_id: int,
+) -> Array:
+    """Classify a column value by averaging log-probabilities across chains.
+
+    For each candidate value, computes the average log P(target_col=v | row)
+    across all chains, then returns the argmax candidate.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC posterior samples).
+        data: Observation matrix (n_rows, n_cols).
+        target_col: Column index to classify.
+        candidate_vals: Array of candidate values.
+        row_id: Row index to condition on.
+
+    Returns:
+        Predicted value (the candidate with highest averaged log probability).
+    """
+    log_probs_sum = jnp.zeros(candidate_vals.shape[0])
+    for packed in packed_states:
+        lps = packed_classify_column(packed, data, target_col, candidate_vals, row_id)
+        log_probs_sum = log_probs_sum + lps
+    avg_log_probs = log_probs_sum / len(packed_states)
+    return candidate_vals[jnp.argmax(avg_log_probs)]
+
+
+def multi_chain_credible_interval(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_col: int,
+    *,
+    n_samples: int = 1000,
+    ci_level: float = 0.90,
+    row_id: int | None = None,
+) -> tuple[Array, Array, Array]:
+    """Compute credible interval by pooling samples across chains.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        query_col: Column to compute interval for.
+        n_samples: Total samples across all chains.
+        ci_level: Credible interval level (default 0.90).
+        row_id: Optional row conditioning.
+
+    Returns:
+        Tuple of (median, lower_bound, upper_bound).
+    """
+    samples = multi_chain_predictive_sample(
+        rng_key, packed_states, data, [query_col], n_samples=n_samples, row_id=row_id
+    )
+    s = samples[:, 0]
+    lower_pct = (1.0 - ci_level) / 2.0
+    upper_pct = 1.0 - lower_pct
+    median = jnp.median(s)
+    lower = jnp.percentile(s, lower_pct * 100)
+    upper = jnp.percentile(s, upper_pct * 100)
+    return median, lower, upper
+
+
+def multi_chain_joint_predictive_probability(
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    query_cols: list[int],
+    query_vals: Array,
+) -> Array:
+    """Average joint predictive probability across chains (log-mean-exp).
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC posterior samples).
+        data: Observation matrix.
+        query_cols: Column indices to query.
+        query_vals: Values to evaluate probability at.
+
+    Returns:
+        Scalar log probability (averaged across chains via log-mean-exp).
+    """
+    log_ps = jnp.array(
+        [
+            packed_joint_predictive_probability(p, data, query_cols, query_vals)
+            for p in packed_states
+        ]
+    )
+    return jax.scipy.special.logsumexp(log_ps) - jnp.log(jnp.float32(len(packed_states)))
+
+
+# ---------------------------------------------------------------------------
+# Additional batch functions (Phase D)
+# ---------------------------------------------------------------------------
+
+
+def batch_predictive_probability(
+    packed: PackedCrossCatState,
+    data: Array,
+    query_col: int,
+    query_vals: Array,
+    row_ids: Array,
+) -> Array:
+    """Compute predictive log-probability for multiple rows at once.
+
+    Args:
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        query_col: Column to query.
+        query_vals: (n_queries,) array of values.
+        row_ids: (n_queries,) array of row indices.
+
+    Returns:
+        (n_queries,) array of log probabilities.
+    """
+    return jnp.array(
+        [
+            packed_predictive_probability(
+                packed, data, [query_col], jnp.array([query_vals[i]]), row_id=int(row_ids[i])
+            )
+            for i in range(len(row_ids))
+        ]
+    )
+
+
+def batch_predictive_sample(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    data: Array,
+    query_cols: list[int],
+    row_ids: Array,
+    *,
+    n_samples_per_row: int = 1,
+) -> Array:
+    """Draw posterior predictive samples for multiple rows.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed: Packed CrossCat state.
+        data: Observation matrix (n_rows, n_cols).
+        query_cols: Column indices to sample.
+        row_ids: (n_queries,) array of row indices.
+        n_samples_per_row: Samples per row (default 1).
+
+    Returns:
+        (n_queries, n_samples_per_row, len(query_cols)) array of samples.
+    """
+    results = []
+    keys = jax.random.split(rng_key, len(row_ids))
+    for i in range(len(row_ids)):
+        s = packed_predictive_sample(
+            keys[i], packed, data, query_cols, n_samples=n_samples_per_row, row_id=int(row_ids[i])
+        )
+        results.append(s)
+    return jnp.stack(results, axis=0)
+
+
+def batch_conditional_entropy(
+    rng_key: Array,
+    packed_states: list[PackedCrossCatState],
+    data: Array,
+    target_cols: list[int],
+    given_cols: list[int],
+    *,
+    n_samples: int = 500,
+) -> Array:
+    """Compute conditional entropy H(target | given) for multiple target columns.
+
+    Args:
+        rng_key: JAX PRNG key.
+        packed_states: List of PackedCrossCatState.
+        data: Observation matrix.
+        target_cols: List of target column indices.
+        given_cols: Conditioning column indices.
+        n_samples: MC samples per target.
+
+    Returns:
+        (n_targets,) array of conditional entropies.
+    """
+    results = []
+    keys = jax.random.split(rng_key, len(target_cols))
+    for i, tc in enumerate(target_cols):
+        h = packed_conditional_entropy(
+            keys[i], packed_states, data, tc, given_cols, n_samples=n_samples
+        )
+        results.append(h)
+    return jnp.array(results)
+
+
+def batch_column_typicality(
+    packed_states: list[PackedCrossCatState],
+    col_ids: list[int] | Array,
+) -> Array:
+    """Compute column typicality for multiple columns.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        col_ids: Column indices to evaluate.
+
+    Returns:
+        (n_cols,) array of typicality scores in [0, 1].
+    """
+    return jnp.array([packed_column_typicality(packed_states, int(c)) for c in col_ids])
+
+
+def batch_dependence_probability(
+    packed_states: list[PackedCrossCatState],
+    col_pairs: list[tuple[int, int]],
+) -> Array:
+    """Compute dependence probability for multiple column pairs.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC samples).
+        col_pairs: List of (col_i, col_j) pairs.
+
+    Returns:
+        (n_pairs,) array of dependence probabilities in [0, 1].
+    """
+    return jnp.array(
+        [packed_dependence_probability(packed_states, ci, cj) for ci, cj in col_pairs]
+    )
