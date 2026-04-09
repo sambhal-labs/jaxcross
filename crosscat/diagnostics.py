@@ -550,6 +550,9 @@ def gelman_rubin_rhat(traces: Array) -> Array:
     # Pooled posterior variance estimate
     var_hat = (n - 1) / n * W + B / n
 
-    rhat = jnp.sqrt(var_hat / jnp.maximum(W, LOG_EPS))
+    # When W ≈ 0 (all chains converged to identical values), both var_hat
+    # and W approach zero.  Dividing by LOG_EPS would overflow to inf.
+    # In this degenerate case R-hat is exactly 1.0 (perfect convergence).
+    rhat = jnp.where(W > 1e-10, jnp.sqrt(var_hat / W), 1.0)
     rhat = jnp.maximum(rhat, 1.0)  # R-hat is theoretically >= 1.0
     return rhat
