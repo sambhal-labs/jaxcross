@@ -5285,8 +5285,8 @@ Hyperparameters:
 mu from the von Mises likelihood × von Mises prior:</p>
 <div class="language-text highlight"><pre><span></span><code>p(data | kappa, a, b) = [1/(2*pi)]^n * I_0(R) / [I_0(kappa)^n * I_0(a)]
 </code></pre></div>
-<p>where R = ||(sum_sin + a<em>sin(b), sum_cos + a</em>cos(b))|| is the posterior
-resultant length combining data with the prior contribution.</p>
+<p>where R = ||(kappa<em>sum_sin + a</em>sin(b), kappa<em>sum_cos + a</em>cos(b))|| is the
+posterior resultant length combining kappa-scaled data with the prior.</p>
 
 
 <details class="hyperparameters" open>

@@ -1386,10 +1386,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-chains-sequentially" class="md-nav__link">
+  <a href="#run-chains-sequentially-legacy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run Chains Sequentially
+        Run Chains Sequentially (Legacy)
       
     </span>
   </a>
@@ -3094,10 +3094,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-chains-sequentially" class="md-nav__link">
+  <a href="#run-chains-sequentially-legacy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run Chains Sequentially
+        Run Chains Sequentially (Legacy)
       
     </span>
   </a>
@@ -3211,7 +3211,12 @@
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Select best chain</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">best</span> <span class="o">=</span> <span class="n">select_best_chain</span><span class="p">(</span><span class="n">batched</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="run-chains-sequentially">Run Chains Sequentially<a class="headerlink" href="#run-chains-sequentially" title="Permanent link">&para;</a></h2>
+<h2 id="run-chains-sequentially-legacy">Run Chains Sequentially (Legacy)<a class="headerlink" href="#run-chains-sequentially-legacy" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The parallel approach above is preferred. Use sequential only when debugging
+or when GPU memory is too limited for vmap-batched chains.</p>
+</div>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat.packed</span><span class="w"> </span><span class="kn">import</span> <span class="n">pack_state</span><span class="p">,</span> <span class="n">packed_gibbs_sweep</span><span class="p">,</span> <span class="n">unpack_state</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_joint</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
@@ -3227,18 +3232,18 @@
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">best</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">final_states</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">log_joint</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">data</span><span class="p">)))</span>
 </span></code></pre></div>
 <h2 id="multi-chain-queries">Multi-Chain Queries<a class="headerlink" href="#multi-chain-queries" title="Permanent link">&para;</a></h2>
-<p>Several queries accept lists of states and average across them:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">dependence_matrix</span><span class="p">,</span> <span class="n">mutual_information</span><span class="p">,</span> <span class="n">row_similarity</span>
+<p>Several queries accept lists of packed states and average across posterior samples:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="n">packed_dependence_matrix</span><span class="p">,</span> <span class="n">packed_mutual_information</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Z-matrix averaged across chains</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">z</span> <span class="o">=</span> <span class="n">dependence_matrix</span><span class="p">(</span><span class="n">final_states</span><span class="p">)</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># MI averaged across chains</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">mi</span><span class="p">,</span> <span class="n">linfoot</span> <span class="o">=</span> <span class="n">mutual_information</span><span class="p">(</span><span class="n">final_states</span><span class="p">,</span> <span class="n">col_i</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">col_j</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># Row similarity averaged across chains</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">sim</span> <span class="o">=</span> <span class="n">row_similarity</span><span class="p">(</span><span class="n">final_states</span><span class="p">,</span> <span class="n">row_a</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">row_b</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">all_chains</span> <span class="o">=</span> <span class="n">unbatch_packed_states</span><span class="p">(</span><span class="n">batched</span><span class="p">,</span> <span class="n">n_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Z-matrix averaged across chains (preferred — stays packed)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">z</span> <span class="o">=</span> <span class="n">packed_dependence_matrix</span><span class="p">(</span><span class="n">all_chains</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># MI averaged across chains</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">mi</span><span class="p">,</span> <span class="n">linfoot</span> <span class="o">=</span> <span class="n">packed_mutual_information</span><span class="p">(</span><span class="n">all_chains</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
 </span></code></pre></div>
+<p>The unpacked path (<code>dependence_matrix</code>, <code>mutual_information</code>) also accepts lists of <code>CrossCatState</code> but is slower.</p>
 <h2 id="multi-chain-packed-wrappers">Multi-Chain Packed Wrappers<a class="headerlink" href="#multi-chain-packed-wrappers" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">crosscat</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">multi_chain_predictive_probability</span><span class="p">,</span>

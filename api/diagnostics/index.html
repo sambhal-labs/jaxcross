@@ -2127,6 +2127,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#crosscat.diagnostics.effective_sample_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_sample_size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.diagnostics.gelman_rubin_rhat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gelman_rubin_rhat
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3240,6 +3262,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#crosscat.diagnostics.effective_sample_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_sample_size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.diagnostics.gelman_rubin_rhat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gelman_rubin_rhat
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4332,6 +4376,226 @@ inference path (<code>packed_predictive_probability</code>,
 'mean_log_lik': mean predictive log-likelihood across all held-out cells
 'n_held_out': total number of held-out cells evaluated
 'per_column': dict mapping column index to per-column metrics</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.diagnostics.effective_sample_size" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">effective_sample_size</span><span class="p">(</span><span class="n">traces</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+<a href="#crosscat.diagnostics.effective_sample_size" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate effective sample size (ESS) from MCMC traces.</p>
+<p>Uses the initial positive sequence estimator (Geyer 1992) applied to
+the pooled autocorrelation across chains.</p>
+<p>.. note::
+    This function uses Python control flow (<code>if pair_sum &lt; 0: break</code>)
+    on JAX traced values and <strong>cannot be JIT-compiled</strong>.  Call it from
+    Python after collecting trace arrays.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>traces</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Array of shape (n_chains, n_samples) containing a scalar
+diagnostic (e.g. log_joint) per sweep per chain.  A 1-D array
+of shape (n_samples,) is treated as a single chain.
+Requires at least 2 samples per chain.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scalar ESS estimate (float array).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If fewer than 2 samples per chain.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.diagnostics.gelman_rubin_rhat" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">gelman_rubin_rhat</span><span class="p">(</span><span class="n">traces</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+
+<a href="#crosscat.diagnostics.gelman_rubin_rhat" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the Gelman-Rubin R-hat convergence diagnostic.</p>
+<p>R-hat compares between-chain and within-chain variance.  Values close
+to 1.0 indicate convergence; R-hat &gt; 1.1 suggests the chains have
+not mixed.</p>
+<p>Uses the split-R-hat formulation (Vehtari et al. 2021): each chain is
+split in half, doubling the number of "chains" for a stricter test.</p>
+<p>.. note::
+    With very short chains (&lt; 20 samples), the variance estimates are
+    noisy and R-hat may be unreliable.  Use at least 50-100 samples
+    per chain for meaningful results.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>traces</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Array of shape (n_chains, n_samples) containing a scalar
+diagnostic (e.g. log_joint) per sweep per chain.  Requires
+n_chains &gt;= 2.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scalar R-hat estimate (float array), always &gt;= 1.0.  Values near</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1.0 indicate convergence.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If fewer than 2 chains or fewer than 4 samples.</p>
               </div>
             </td>
           </tr>
