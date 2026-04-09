@@ -104,14 +104,31 @@ def save_packed_state(
     if _extra_metadata:
         metadata.update(_extra_metadata)
 
-    # Write under exclusive lock to prevent concurrent corruption
+    # Write under exclusive lock with atomic rename to prevent corruption
     lock_path = path / ".lock"
     with _file_lock(lock_path):
-        with open(path / "metadata.json", "w") as f:
-            json.dump(metadata, f, indent=2)
+        # Remove validity marker before writing
+        valid_marker = path / ".valid"
+        valid_marker.unlink(missing_ok=True)
 
+        # Write metadata to temp file, then atomic rename
+        meta_tmp = path / "metadata.json.tmp"
+        meta_final = path / "metadata.json"
+        with open(meta_tmp, "w") as f:
+            json.dump(metadata, f, indent=2)
+        meta_tmp.rename(meta_final)
+
+        # Write arrays to temp file, then atomic rename
+        # np.savez_compressed appends .npz automatically, so use a stem name
+        arrays_tmp_stem = path / "_arrays_tmp"
+        arrays_tmp_file = path / "_arrays_tmp.npz"
+        arrays_final = path / "arrays.npz"
         arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
-        np.savez_compressed(path / "arrays.npz", **arrays)
+        np.savez_compressed(arrays_tmp_stem, **arrays)
+        arrays_tmp_file.rename(arrays_final)
+
+        # Mark as valid only after both files are written
+        valid_marker.touch()
 
     logger.info("Saved packed state to %s (schema v%d)", path, _SCHEMA_VERSION)
     return path
@@ -137,6 +154,15 @@ def load_packed_state(
         path = path.with_suffix(".jxc")
     if not path.exists():
         raise FileNotFoundError(f"No saved state at {path}")
+
+    # Check validity marker (written after both files complete)
+    valid_marker = path / ".valid"
+    if not valid_marker.exists() and (path / "metadata.json").exists():
+        logger.warning(
+            "State at %s may be corrupt (missing .valid marker). "
+            "A previous save may have been interrupted.",
+            path,
+        )
 
     # Read under shared lock to prevent reading during concurrent writes
     lock_path = path / ".lock"

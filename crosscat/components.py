@@ -602,7 +602,7 @@ def _von_mises_sample_best_fisher(key: Array, mu: Array, kappa: Array) -> Array:
     """
     # Guard against kappa=0 (division by zero in Best-Fisher parameters).
     # Use a safe kappa for computation; select uniform sample at the end.
-    safe_kappa = jnp.maximum(kappa, 1e-10)
+    safe_kappa = jnp.maximum(kappa, 1e-8)
 
     # Best-Fisher parameters
     tau = 1.0 + jnp.sqrt(1.0 + 4.0 * safe_kappa**2)
