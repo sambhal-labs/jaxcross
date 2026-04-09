@@ -1,18 +1,22 @@
 """Tests for convergence diagnostics.
 
 Covers: Adjusted Rand Index, collect_diagnostics, random_holdout_mask,
-mean_test_log_likelihood, evaluate_imputation.
+mean_test_log_likelihood, evaluate_imputation, gelman_rubin_rhat,
+effective_sample_size.
 """
 
 from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 from crosscat.diagnostics import (
     adjusted_rand_index,
     collect_diagnostics,
+    effective_sample_size,
     evaluate_imputation,
+    gelman_rubin_rhat,
     mean_test_log_likelihood,
     random_holdout_mask,
 )
@@ -88,3 +92,84 @@ class TestEvaluateImputation:
         result = evaluate_imputation(state, data, mask, column_types, rng_key=jax.random.key(49))
         assert "mae" in result or "accuracy" in result
         assert "mean_log_likelihood" in result
+
+
+class TestGelmanRubinRhat:
+    def test_converged_chains_near_one(self):
+        """Converged chains (same distribution) should give R-hat ≈ 1.0."""
+        key = jax.random.key(100)
+        traces = jax.random.normal(key, (4, 200))
+        rhat = gelman_rubin_rhat(traces)
+        assert float(rhat) >= 1.0
+        assert float(rhat) < 1.1
+
+    def test_divergent_chains_above_threshold(self):
+        """Chains at different means should give R-hat >> 1.1."""
+        traces = jnp.array(
+            [
+                jnp.ones(100) * 0.0 + jax.random.normal(jax.random.key(1), (100,)) * 0.1,
+                jnp.ones(100) * 10.0 + jax.random.normal(jax.random.key(2), (100,)) * 0.1,
+            ]
+        )
+        rhat = gelman_rubin_rhat(traces)
+        assert float(rhat) > 1.5
+
+    def test_constant_chains_rhat_one(self):
+        """Constant chains (stuck) should give R-hat >= 1.0, not < 1.0."""
+        traces = jnp.ones((3, 20))
+        rhat = gelman_rubin_rhat(traces)
+        assert float(rhat) >= 1.0
+
+    def test_error_on_1d(self):
+        with pytest.raises(ValueError, match="at least 2 chains"):
+            gelman_rubin_rhat(jnp.ones(10))
+
+    def test_error_on_single_chain(self):
+        with pytest.raises(ValueError, match="at least 2 chains"):
+            gelman_rubin_rhat(jnp.ones((1, 10)))
+
+    def test_error_on_short_chains(self):
+        with pytest.raises(ValueError, match="at least 4 samples"):
+            gelman_rubin_rhat(jnp.ones((2, 3)))
+
+
+class TestEffectiveSampleSize:
+    def test_iid_ess_near_n(self):
+        """IID samples should have ESS close to n_samples."""
+        traces = jax.random.normal(jax.random.key(200), (1, 500))
+        ess = effective_sample_size(traces)
+        # IID: ESS should be close to 500, allow generous tolerance
+        assert float(ess) > 200
+
+    def test_correlated_ess_less_than_n(self):
+        """Highly correlated traces should have ESS << n_samples."""
+        # Random walk: cumulative sum creates strong autocorrelation
+        steps = jax.random.normal(jax.random.key(300), (1, 500)) * 0.01
+        traces = jnp.cumsum(steps, axis=1)
+        ess = effective_sample_size(traces)
+        assert float(ess) < 200
+
+    def test_constant_trace_ess_small(self):
+        """Constant trace (stuck chain) should give ESS <= n_chains (≈ 1 per chain)."""
+        traces = jnp.ones((1, 100))
+        ess = effective_sample_size(traces)
+        assert float(ess) <= 5  # Should be ~1 for a single constant chain
+
+    def test_1d_input(self):
+        """1-D input treated as single chain."""
+        traces = jax.random.normal(jax.random.key(400), (200,))
+        ess = effective_sample_size(traces)
+        assert float(ess) > 0
+
+    def test_multi_chain(self):
+        """Multi-chain ESS should be > single-chain ESS."""
+        key = jax.random.key(500)
+        traces_1 = jax.random.normal(key, (1, 200))
+        traces_4 = jax.random.normal(key, (4, 200))
+        ess_1 = effective_sample_size(traces_1)
+        ess_4 = effective_sample_size(traces_4)
+        assert float(ess_4) > float(ess_1)
+
+    def test_error_on_single_sample(self):
+        with pytest.raises(ValueError, match="at least 2 samples"):
+            effective_sample_size(jnp.ones((2, 1)))

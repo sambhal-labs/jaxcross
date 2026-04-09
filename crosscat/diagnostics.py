@@ -409,3 +409,147 @@ def packed_evaluate_imputation(
         "n_held_out": n_scored,
         "per_column": per_column_summary,
     }
+
+
+# ---------------------------------------------------------------------------
+# Standard MCMC convergence diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _fft_next_pow2(n: int) -> int:
+    """Next power of 2 >= n."""
+    return 1 << (n - 1).bit_length()
+
+
+def _autocorrelation(x: Array) -> Array:
+    """Compute autocorrelation of a 1-D trace using FFT.
+
+    Returns autocorrelation at lags 0..n-1, normalized so lag-0 = 1.
+    For constant traces (zero variance), returns all ones — this correctly
+    yields ESS ≈ 1 since all samples are perfectly correlated.
+    """
+    n = x.shape[0]
+    x_centered = x - jnp.mean(x)
+    var = jnp.sum(x_centered**2)
+    is_constant = var < LOG_EPS
+
+    fft_len = _fft_next_pow2(2 * n)
+    fft_x = jnp.fft.rfft(x_centered, n=fft_len)
+    acf = jnp.fft.irfft(fft_x * jnp.conj(fft_x), n=fft_len)[:n]
+    acf_normalized = acf / jnp.maximum(acf[0], LOG_EPS)
+
+    return jnp.where(is_constant, jnp.ones(n), acf_normalized)
+
+
+def effective_sample_size(traces: Array) -> Array:
+    """Estimate effective sample size (ESS) from MCMC traces.
+
+    Uses the initial positive sequence estimator (Geyer 1992) applied to
+    the pooled autocorrelation across chains.
+
+    .. note::
+        This function uses Python control flow (``if pair_sum < 0: break``)
+        on JAX traced values and **cannot be JIT-compiled**.  Call it from
+        Python after collecting trace arrays.
+
+    Args:
+        traces: Array of shape (n_chains, n_samples) containing a scalar
+            diagnostic (e.g. log_joint) per sweep per chain.  A 1-D array
+            of shape (n_samples,) is treated as a single chain.
+            Requires at least 2 samples per chain.
+
+    Returns:
+        Scalar ESS estimate (float array).
+
+    Raises:
+        ValueError: If fewer than 2 samples per chain.
+    """
+    if traces.ndim == 1:
+        traces = traces[jnp.newaxis, :]
+
+    n_chains, n_samples = traces.shape
+
+    if n_samples < 2:
+        raise ValueError(f"ESS requires at least 2 samples per chain, got {n_samples}.")
+
+    # Pool within-chain autocorrelations (vectorized over chains)
+    acf_mean = jnp.mean(
+        jnp.stack([_autocorrelation(traces[c]) for c in range(n_chains)]),
+        axis=0,
+    )
+
+    # Initial positive sequence estimator: sum consecutive pairs until
+    # a pair sum becomes negative (Geyer 1992).
+    tau = 0.0
+    for lag in range(1, n_samples, 2):
+        pair_sum = acf_mean[lag] + (acf_mean[lag + 1] if lag + 1 < n_samples else 0.0)
+        if pair_sum < 0:
+            break
+        tau += pair_sum
+    # τ_int = 1 + 2 * Σ ρ(k), where tau accumulated the pair sums
+    tau = 1.0 + 2.0 * tau
+    tau = jnp.maximum(tau, 1.0 / n_samples)  # floor at 1 sample
+
+    return jnp.array(n_chains * n_samples / tau)
+
+
+def gelman_rubin_rhat(traces: Array) -> Array:
+    """Compute the Gelman-Rubin R-hat convergence diagnostic.
+
+    R-hat compares between-chain and within-chain variance.  Values close
+    to 1.0 indicate convergence; R-hat > 1.1 suggests the chains have
+    not mixed.
+
+    Uses the split-R-hat formulation (Vehtari et al. 2021): each chain is
+    split in half, doubling the number of "chains" for a stricter test.
+
+    .. note::
+        With very short chains (< 20 samples), the variance estimates are
+        noisy and R-hat may be unreliable.  Use at least 50-100 samples
+        per chain for meaningful results.
+
+    Args:
+        traces: Array of shape (n_chains, n_samples) containing a scalar
+            diagnostic (e.g. log_joint) per sweep per chain.  Requires
+            n_chains >= 2.
+
+    Returns:
+        Scalar R-hat estimate (float array), always >= 1.0.  Values near
+        1.0 indicate convergence.
+
+    Raises:
+        ValueError: If fewer than 2 chains or fewer than 4 samples.
+    """
+    if traces.ndim == 1:
+        raise ValueError("R-hat requires at least 2 chains; got a 1-D trace array.")
+    if traces.shape[0] < 2:
+        raise ValueError(f"R-hat requires at least 2 chains, got {traces.shape[0]}.")
+
+    # Split each chain in half for split-R-hat
+    n_samples = traces.shape[1]
+    half = n_samples // 2
+    if half < 2:
+        raise ValueError(f"Each chain needs at least 4 samples for split-R-hat, got {n_samples}.")
+    first_half = traces[:, :half]
+    second_half = traces[:, half : 2 * half]
+    split_chains = jnp.concatenate([first_half, second_half], axis=0)  # (2*m, half)
+
+    m = split_chains.shape[0]  # number of split chains
+    n = split_chains.shape[1]  # samples per split chain
+
+    chain_means = jnp.mean(split_chains, axis=1)
+    grand_mean = jnp.mean(chain_means)
+
+    # Between-chain variance
+    B = n * jnp.sum((chain_means - grand_mean) ** 2) / (m - 1)
+
+    # Within-chain variance
+    chain_vars = jnp.var(split_chains, axis=1, ddof=1)
+    W = jnp.mean(chain_vars)
+
+    # Pooled posterior variance estimate
+    var_hat = (n - 1) / n * W + B / n
+
+    rhat = jnp.sqrt(var_hat / jnp.maximum(W, LOG_EPS))
+    rhat = jnp.maximum(rhat, 1.0)  # R-hat is theoretically >= 1.0
+    return rhat

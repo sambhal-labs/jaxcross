@@ -33,6 +33,7 @@ from jax.scipy.special import gammaln
 
 from crosscat.types import (
     LOG_EPS,
+    LOGISTIC_INF,
     ORDINAL_N_GRID,
     ColumnHypers,
     ColumnType,
@@ -419,7 +420,9 @@ class OrderedLogistic:
     @staticmethod
     def _level_probs(mu: Array, cutpoints: Array) -> Array:
         """Compute P(Y=k | μ, cutpoints) for all K levels."""
-        extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
+        extended = jnp.concatenate(
+            [jnp.array([-LOGISTIC_INF]), cutpoints, jnp.array([LOGISTIC_INF])]
+        )
         cum = jax.nn.sigmoid(extended - mu)
         probs = cum[1:] - cum[:-1]
         return jnp.maximum(probs, LOG_EPS)
