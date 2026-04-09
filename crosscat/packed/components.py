@@ -636,3 +636,32 @@ def batch_dc_posterior_predictive_logp(
     )
     idxs = jnp.clip(xs.astype(jnp.int32), 0, cat_counts_batch.shape[-1] - 1)
     return jnp.log(jnp.maximum(probs[jnp.arange(xs.shape[0]), idxs], LOG_EPS))
+
+
+def batch_ol_posterior_predictive_logp(
+    xs: Array,
+    counts: Array,
+    cat_counts_batch: Array,
+    cutpoints_batch: Array,
+    mu0s: Array,
+    s0s: Array,
+) -> Array:
+    """Vectorized Ordered-Logistic posterior predictive for a batch of columns.
+
+    Uses ``jax.vmap`` over ``_ol_posterior_predictive_logp`` since the grid
+    integration cannot be trivially expressed as a single matrix op.
+
+    Args:
+        xs: (n_cols,) observation values.
+        counts: (n_cols,) cluster counts.
+        cat_counts_batch: (n_cols, max_cats) category counts per column.
+        cutpoints_batch: (n_cols, max_cuts) cutpoint arrays per column.
+        mu0s: (n_cols,) prior means.
+        s0s: (n_cols,) prior variances.
+
+    Returns:
+        (n_cols,) log-probabilities.
+    """
+    return jax.vmap(_ol_posterior_predictive_logp)(
+        xs, counts, cat_counts_batch, cutpoints_batch, mu0s, s0s
+    )
