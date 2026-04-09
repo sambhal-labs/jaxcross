@@ -668,6 +668,9 @@ def batch_ol_posterior_predictive_logp(
     # linspace propagating through the "unused" branch.
     safe_mu0s = jnp.nan_to_num(mu0s, nan=0.0, posinf=0.0, neginf=0.0)
     safe_s0s = jnp.maximum(jnp.nan_to_num(s0s, nan=1.0, posinf=1.0, neginf=1.0), LOG_EPS)
+    safe_cutpoints = jnp.nan_to_num(
+        cutpoints_batch, nan=LOGISTIC_INF, posinf=LOGISTIC_INF, neginf=-LOGISTIC_INF
+    )
     return jax.vmap(_ol_posterior_predictive_logp)(
-        xs, counts, cat_counts_batch, cutpoints_batch, safe_mu0s, safe_s0s
+        xs, counts, cat_counts_batch, safe_cutpoints, safe_mu0s, safe_s0s
     )

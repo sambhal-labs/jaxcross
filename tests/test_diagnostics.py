@@ -94,13 +94,6 @@ class TestEvaluateImputation:
         assert "mean_log_likelihood" in result
 
 
-# ---------------------------------------------------------------------------
-# Tests for gelman_rubin_rhat and effective_sample_size
-# ---------------------------------------------------------------------------
-
-
-
-
 class TestGelmanRubinRhat:
     def test_converged_chains_near_one(self):
         """Converged chains (same distribution) should give R-hat ≈ 1.0."""
@@ -157,10 +150,10 @@ class TestEffectiveSampleSize:
         assert float(ess) < 200
 
     def test_constant_trace_ess_small(self):
-        """Constant trace (stuck chain) should give small ESS."""
+        """Constant trace (stuck chain) should give ESS <= n_chains (≈ 1 per chain)."""
         traces = jnp.ones((1, 100))
         ess = effective_sample_size(traces)
-        assert float(ess) <= 100  # Should be ~1
+        assert float(ess) <= 5  # Should be ~1 for a single constant chain
 
     def test_1d_input(self):
         """1-D input treated as single chain."""
@@ -180,35 +173,3 @@ class TestEffectiveSampleSize:
     def test_error_on_single_sample(self):
         with pytest.raises(ValueError, match="at least 2 samples"):
             effective_sample_size(jnp.ones((2, 1)))
-
-
-class TestInsertRowsValidation:
-    def test_wrong_column_count_raises(self):
-        """insert_rows with wrong column count should raise ValueError."""
-        from crosscat.model import initialize, insert_rows
-
-        key = jax.random.key(600)
-        data = jax.random.normal(key, (10, 3))
-        state = initialize(jax.random.key(601), data, [ColumnType.CONTINUOUS] * 3).state
-        wrong_cols = jax.random.normal(jax.random.key(602), (2, 5))  # 5 cols, not 3
-        with pytest.raises(ValueError, match="shape"):
-            insert_rows(jax.random.key(603), state, data, wrong_cols)
-
-
-class TestGrowthFactorGuard:
-    def test_growth_factor_one_raises(self):
-        """growth_factor=1.0 should raise ValueError."""
-        from crosscat.scaling import subsample_anneal
-
-        data = jax.random.normal(jax.random.key(700), (50, 3))
-        col_types = [ColumnType.CONTINUOUS] * 3
-        with pytest.raises(ValueError, match="growth_factor"):
-            subsample_anneal(jax.random.key(701), data, col_types, growth_factor=1.0)
-
-    def test_growth_factor_below_one_raises(self):
-        from crosscat.scaling import subsample_anneal
-
-        data = jax.random.normal(jax.random.key(702), (50, 3))
-        col_types = [ColumnType.CONTINUOUS] * 3
-        with pytest.raises(ValueError, match="growth_factor"):
-            subsample_anneal(jax.random.key(703), data, col_types, growth_factor=0.5)

@@ -181,3 +181,27 @@ class TestInitializeColumnTypes:
         assert state.n_cols == 2
         lj = log_joint(state, data)
         assert jnp.isfinite(lj), f"Non-finite log_joint for {col_type}: {lj}"
+
+
+class TestInsertRowsValidation:
+    def test_wrong_column_count_raises(self):
+        """insert_rows with wrong column count should raise ValueError."""
+        from crosscat.model import initialize, insert_rows
+
+        key = jax.random.key(600)
+        data = jax.random.normal(key, (10, 3))
+        state = initialize(jax.random.key(601), data, [ColumnType.CONTINUOUS] * 3).state
+        wrong_cols = jax.random.normal(jax.random.key(602), (2, 5))  # 5 cols, not 3
+        with pytest.raises(ValueError, match="shape"):
+            insert_rows(jax.random.key(603), state, data, wrong_cols)
+
+    def test_1d_input_raises(self):
+        """1-D input to insert_rows should raise ValueError."""
+        from crosscat.model import initialize, insert_rows
+
+        key = jax.random.key(604)
+        data = jax.random.normal(key, (10, 3))
+        state = initialize(jax.random.key(605), data, [ColumnType.CONTINUOUS] * 3).state
+        wrong_shape = jax.random.normal(jax.random.key(606), (3,))  # 1-D, not 2-D
+        with pytest.raises(ValueError, match="shape"):
+            insert_rows(jax.random.key(607), state, data, wrong_shape)
