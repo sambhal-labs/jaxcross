@@ -1748,10 +1748,10 @@ def multi_chain_classify_column(
     candidate_vals: Array,
     row_id: int,
 ) -> Array:
-    """Classify a column value by averaging log-probabilities across chains.
+    """Classify a column value by averaging probabilities across chains.
 
-    For each candidate value, computes the average log P(target_col=v | row)
-    across all chains, then returns the argmax candidate.
+    Uses log-mean-exp (arithmetic mean in probability space) for Bayesian
+    model averaging, consistent with other multi_chain_* functions.
 
     Args:
         packed_states: List of PackedCrossCatState (MCMC posterior samples).
@@ -1761,13 +1761,18 @@ def multi_chain_classify_column(
         row_id: Row index to condition on.
 
     Returns:
-        Predicted value (the candidate with highest averaged log probability).
+        Predicted value (the candidate with highest averaged probability).
     """
-    log_probs_sum = jnp.zeros(candidate_vals.shape[0])
-    for packed in packed_states:
-        lps = packed_classify_column(packed, data, target_col, candidate_vals, row_id)
-        log_probs_sum = log_probs_sum + lps
-    avg_log_probs = log_probs_sum / len(packed_states)
+    log_probs = jnp.stack(
+        [
+            packed_classify_column(packed, data, target_col, candidate_vals, row_id)
+            for packed in packed_states
+        ]
+    )
+    # log-mean-exp per candidate: log(mean(exp(log_p))) across chains
+    avg_log_probs = jax.scipy.special.logsumexp(log_probs, axis=0) - jnp.log(
+        jnp.float32(len(packed_states))
+    )
     return candidate_vals[jnp.argmax(avg_log_probs)]
 
 
@@ -1794,7 +1799,12 @@ def multi_chain_credible_interval(
 
     Returns:
         Tuple of (median, lower_bound, upper_bound).
+
+    Raises:
+        ValueError: If ci_level is not in (0, 1).
     """
+    if not 0 < ci_level < 1:
+        raise ValueError(f"ci_level must be in (0, 1), got {ci_level}")
     samples = multi_chain_predictive_sample(
         rng_key, packed_states, data, [query_col], n_samples=n_samples, row_id=row_id
     )
@@ -1834,7 +1844,11 @@ def multi_chain_joint_predictive_probability(
 
 
 # ---------------------------------------------------------------------------
-# Additional batch functions (Phase D)
+# Additional batch convenience wrappers (Phase D)
+#
+# These are Python-loop convenience wrappers over single-query packed
+# functions.  They do NOT use jax.vmap — for GPU-vectorized batch
+# operations, see batch_anomaly_score, batch_impute_column, etc. above.
 # ---------------------------------------------------------------------------
 
 
@@ -1846,6 +1860,8 @@ def batch_predictive_probability(
     row_ids: Array,
 ) -> Array:
     """Compute predictive log-probability for multiple rows at once.
+
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
 
     Args:
         packed: Packed CrossCat state.
@@ -1877,6 +1893,8 @@ def batch_predictive_sample(
     n_samples_per_row: int = 1,
 ) -> Array:
     """Draw posterior predictive samples for multiple rows.
+
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
 
     Args:
         rng_key: JAX PRNG key.
@@ -1910,6 +1928,10 @@ def batch_conditional_entropy(
 ) -> Array:
     """Compute conditional entropy H(target | given) for multiple target columns.
 
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+        Accepts ``list[PackedCrossCatState]`` because the underlying
+        ``packed_conditional_entropy`` performs multi-state averaging.
+
     Args:
         rng_key: JAX PRNG key.
         packed_states: List of PackedCrossCatState.
@@ -1937,6 +1959,10 @@ def batch_column_typicality(
 ) -> Array:
     """Compute column typicality for multiple columns.
 
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+        Accepts ``list[PackedCrossCatState]`` because the underlying
+        ``packed_column_typicality`` performs multi-state averaging.
+
     Args:
         packed_states: List of PackedCrossCatState (MCMC samples).
         col_ids: Column indices to evaluate.
@@ -1952,6 +1978,10 @@ def batch_dependence_probability(
     col_pairs: list[tuple[int, int]],
 ) -> Array:
     """Compute dependence probability for multiple column pairs.
+
+    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+        Accepts ``list[PackedCrossCatState]`` because the underlying
+        ``packed_dependence_probability`` performs multi-state averaging.
 
     Args:
         packed_states: List of PackedCrossCatState (MCMC samples).
