@@ -13,7 +13,7 @@ from jax import Array
 from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
-from crosscat.types import LOG_EPS, log_bessel_i0
+from crosscat.types import LOG_EPS, LOGISTIC_INF, log_bessel_i0
 from crosscat.types import ORDINAL_N_GRID as _OL_N_GRID
 
 # Alias for internal callers
@@ -92,7 +92,7 @@ def _ol_level_probs(mu, cutpoints):
     Uses the cumulative logistic link: P(Y=k) = σ(c_k - μ) - σ(c_{k-1} - μ).
     Cutpoints padded with +inf produce probability 0 for padded levels.
     """
-    extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
+    extended = jnp.concatenate([jnp.array([-LOGISTIC_INF]), cutpoints, jnp.array([LOGISTIC_INF])])
     cum = jax.nn.sigmoid(extended - mu)
     probs = cum[1:] - cum[:-1]
     return jnp.maximum(probs, LOG_EPS)
