@@ -65,6 +65,9 @@ def subsample_anneal(
         Tuple of (packed_state, reordered_data) where reordered_data has
         subsample rows first, then remaining rows in insertion order.
     """
+    if growth_factor <= 1.0:
+        raise ValueError(f"growth_factor must be > 1.0 to guarantee progress, got {growth_factor}")
+
     n_rows = data.shape[0]
     if max_clusters is None:
         max_clusters = suggest_max_clusters(n_rows)
