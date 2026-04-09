@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-04-09 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.11.0...v0.12.0)
+
+### Added
+- **Production readiness (Phases A–F)** (#100, #101, #104, #105)
+  - Gelman-Rubin R-hat and Effective Sample Size convergence diagnostics
+  - Batch ordinal scoring (`batch_ol_posterior_predictive_logp`)
+  - `growth_factor` and `initial_size` validation guards in `subsample_anneal`
+  - Shape validation in `insert_rows()` for mismatched column counts
+  - Centralized numerical constants (`LOG_EPS`, `LOGISTIC_INF`, `ORDINAL_N_GRID`) in `types.py`
+- **18 missing inference functions** (#101, #104) — completes the feature matrix:
+  - 7 batch functions: `batch_predictive_probability`, `batch_predictive_sample`,
+    `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`,
+    `batch_joint_predictive_probability`, `batch_sample_and_insert`
+  - 9 multi-chain wrappers: `multi_chain_classify_column`, `multi_chain_credible_interval`,
+    `multi_chain_joint_predictive_probability`, `multi_chain_sample_and_insert`,
+    `multi_chain_predictive_probability`, `multi_chain_predictive_sample`,
+    `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`,
+    `multi_chain_predictive_cdf`
+  - 2 packed queries: `packed_joint_predictive_probability`, `packed_sample_and_insert`
+- **Arrow-first data I/O** (#101) — `save_data()`/`load_data()` convenience wrappers
+  with column type metadata stored in Arrow schema
+- **Atomic serialization writes** (#105) — temp file + rename + `.valid` marker
+  prevents checkpoint corruption on crash
+- **Test coverage** (#105) — 61 new tests (409 total), including batch coverage
+  for 10 previously untested functions
+- **Von Mises kappa scaling fix** (#103) — resultant vector scaled by kappa
+  per Mardia & Jupp §5.3
+
+### Changed
+- Von Mises `_sample_von_mises_bf` kappa threshold unified to `1e-8`
+- `load_packed_state` warns when `.valid` marker is missing
+- Gold-standard workflow updated to use `multi_chain_packed_gibbs_sweep` (vmap)
+  with convergence monitoring (Rhat/ESS) and checkpointing
+- Documentation updated across all guides to use modern multi-chain pattern
+
 ## [0.11.0] - 2026-04-05 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.10.1...v0.11.0)
 
 ### Added
