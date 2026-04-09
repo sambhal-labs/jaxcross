@@ -248,3 +248,21 @@ class TestGrowthFactorGuard:
         col_types = [ColumnType.CONTINUOUS] * 3
         with pytest.raises(ValueError, match="growth_factor"):
             subsample_anneal(jax.random.key(703), data, col_types, growth_factor=0.5)
+
+    def test_initial_size_zero_raises(self):
+        """initial_size=0 should raise ValueError."""
+        from crosscat.scaling import subsample_anneal
+
+        data = jax.random.normal(jax.random.key(704), (50, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        with pytest.raises(ValueError, match="initial_size"):
+            subsample_anneal(jax.random.key(705), data, col_types, initial_size=0)
+
+    def test_initial_size_negative_raises(self):
+        """initial_size=-1 should raise ValueError."""
+        from crosscat.scaling import subsample_anneal
+
+        data = jax.random.normal(jax.random.key(706), (50, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        with pytest.raises(ValueError, match="initial_size"):
+            subsample_anneal(jax.random.key(707), data, col_types, initial_size=-1)
