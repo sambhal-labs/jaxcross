@@ -238,3 +238,53 @@ class TestSaveLoadDataRoundtrip:
             path = Path(tmpdir) / "test.arrow"
             with pytest.raises(ValueError, match="compression"):
                 save_data(path, jnp.ones((5, 3)), compression="gzip")
+
+
+class TestBatchConditionalEntropy:
+    def test_returns_finite(self):
+        """batch_conditional_entropy returns finite values for each pair."""
+        from crosscat.packed_inference import batch_conditional_entropy
+
+        key = jax.random.key(70)
+        states, data = _make_packed_states(key, n_chains=1)
+        target_cols = [0, 1]
+        given_cols = [2, 0]
+
+        results = batch_conditional_entropy(
+            jax.random.key(73), states, data, target_cols, given_cols
+        )
+        assert len(results) == 2
+        for h in results:
+            assert jnp.isfinite(h)
+            assert float(h) >= 0  # entropy is non-negative
+
+
+class TestBatchColumnTypicality:
+    def test_returns_finite(self):
+        """batch_column_typicality returns finite values for each column."""
+        from crosscat.packed_inference import batch_column_typicality
+
+        key = jax.random.key(71)
+        states, _data = _make_packed_states(key, n_chains=1)
+        col_indices = [0, 1, 2]
+
+        results = batch_column_typicality(states, col_indices)
+        assert len(results) == 3
+        for t in results:
+            assert jnp.isfinite(t)
+
+
+class TestBatchDependenceProbability:
+    def test_returns_finite_probabilities(self):
+        """batch_dependence_probability returns values in [0, 1]."""
+        from crosscat.packed_inference import batch_dependence_probability
+
+        key = jax.random.key(72)
+        states, _data = _make_packed_states(key, n_chains=1)
+        col_pairs = [(0, 1), (1, 2), (0, 2)]
+
+        results = batch_dependence_probability(states, col_pairs)
+        assert len(results) == 3
+        for p in results:
+            assert jnp.isfinite(p)
+            assert 0.0 <= float(p) <= 1.0
