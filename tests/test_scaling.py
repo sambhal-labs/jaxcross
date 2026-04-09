@@ -228,3 +228,23 @@ class TestSuggestMaxClusters:
     def test_negative_large_raises(self):
         with pytest.raises(ValueError, match="n_rows must be >= 0"):
             suggest_max_clusters(-100)
+
+
+class TestGrowthFactorGuard:
+    def test_growth_factor_one_raises(self):
+        """growth_factor=1.0 should raise ValueError."""
+        from crosscat.scaling import subsample_anneal
+
+        data = jax.random.normal(jax.random.key(700), (50, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        with pytest.raises(ValueError, match="growth_factor"):
+            subsample_anneal(jax.random.key(701), data, col_types, growth_factor=1.0)
+
+    def test_growth_factor_below_one_raises(self):
+        """growth_factor=0.5 should raise ValueError."""
+        from crosscat.scaling import subsample_anneal
+
+        data = jax.random.normal(jax.random.key(702), (50, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        with pytest.raises(ValueError, match="growth_factor"):
+            subsample_anneal(jax.random.key(703), data, col_types, growth_factor=0.5)
