@@ -28,24 +28,17 @@ diagnostics = collect_diagnostics(state, data)
 **Use multi-chain for any serious analysis.** Single chains can get stuck in local modes.
 
 ```python
+from crosscat.packed import (
+    pack_state, multi_chain_packed_gibbs_sweep,
+    unbatch_packed_states, select_best_chain,
+)
+
 # Initialize 4 chains
 result = initialize(key, data, col_types, n_chains=4)
-states = result.state
+packed_list = [pack_state(s) for s in result.state]
 
-# Run each chain independently
-packed_states = []
-for i, state in enumerate(states):
-    packed = pack_state(state)
-    packed = packed_gibbs_sweep(jax.random.key(i + 100), packed, data, n_sweeps=100)
-    packed_states.append(packed)
-
-# Select the best chain by log-joint
-from crosscat.packed import batch_packed_states, select_best_chain
-from crosscat.packed.kernels import packed_log_joint
-import jax.numpy as jnp
-
-batched = batch_packed_states(packed_states)
-scores = jnp.array([packed_log_joint(p, data) for p in packed_states])
+# Run all chains in parallel (vmap) and select best
+batched, scores = multi_chain_packed_gibbs_sweep(key, packed_list, data, n_sweeps=100)
 best = select_best_chain(batched, scores)
 ```
 
