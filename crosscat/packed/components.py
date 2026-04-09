@@ -175,9 +175,9 @@ def _vm_log_marginal(n, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     See Mardia & Jupp (2000), Section 5.3.
     """
     n = n.astype(jnp.float32)
-    # Posterior resultant length: data + prior(a, b) contribution
-    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
-    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
+    # Posterior resultant length: kappa * data + prior(a, b) contribution
+    total_sin = kappa * sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = kappa * sum_cos + vm_a * jnp.cos(vm_mu)
     R = jnp.sqrt(total_sin**2 + total_cos**2)
     log_ml = (
         -n * jnp.log(2.0 * jnp.pi)
@@ -320,8 +320,8 @@ def _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta):
 
 def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """Von Mises posterior predictive log p(x | suffstats, hypers)."""
-    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
-    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
+    total_sin = kappa * sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = kappa * sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
     return kappa * jnp.cos(x - mu_post) - jnp.log(2.0 * jnp.pi) - _log_bessel_i0(kappa)
 
@@ -457,8 +457,8 @@ def _vm_sample(rng_key, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
     """
     from crosscat.components import _von_mises_sample_best_fisher
 
-    total_sin = sum_sin + vm_a * jnp.sin(vm_mu)
-    total_cos = sum_cos + vm_a * jnp.cos(vm_mu)
+    total_sin = kappa * sum_sin + vm_a * jnp.sin(vm_mu)
+    total_cos = kappa * sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)
 
     return _von_mises_sample_best_fisher(rng_key, mu_post, kappa)
@@ -615,8 +615,8 @@ def batch_vm_posterior_predictive_logp(
     All inputs are (n_cols,) arrays. Returns (n_cols,) logps.
     Skips all type dispatch — caller must ensure all columns are cyclic.
     """
-    total_sin = sum_sins + vm_as * jnp.sin(vm_mus)
-    total_cos = sum_coss + vm_as * jnp.cos(vm_mus)
+    total_sin = kappas * sum_sins + vm_as * jnp.sin(vm_mus)
+    total_cos = kappas * sum_coss + vm_as * jnp.cos(vm_mus)
     mu_post = jnp.arctan2(total_sin, total_cos)
     return kappas * jnp.cos(xs - mu_post) - jnp.log(2.0 * jnp.pi) - log_bessel_i0(kappas)
 

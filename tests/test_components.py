@@ -228,3 +228,82 @@ class TestOrdinalUsesHypers:
         )
         logp = OrderedLogistic.posterior_predictive_logp(jnp.array(float(level)), ss, hypers)
         assert jnp.isfinite(logp), f"Non-finite predictive at level {level}: {logp}"
+
+
+class TestVonMisesKappaScaling:
+    """Verify kappa scales the data sufficient statistics in the resultant vector."""
+
+    def test_kappa_affects_log_marginal(self):
+        """Log marginal must differ when kappa != 1.0 vs kappa == 1.0 (non-trivial data)."""
+        from crosscat.components import VonMises
+
+        data = jnp.array([0.1, 0.5, 1.0, 1.5])
+        ss = VonMises.sufficient_statistics(data)
+        base_hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(1.0),
+            vm_a=jnp.array(1.0),
+            vm_mu=jnp.array(0.0),
+        )
+        high_kappa_hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(5.0),
+            vm_a=jnp.array(1.0),
+            vm_mu=jnp.array(0.0),
+        )
+        lml_k1 = VonMises.log_marginal_likelihood(ss, base_hypers)
+        lml_k5 = VonMises.log_marginal_likelihood(ss, high_kappa_hypers)
+        assert jnp.isfinite(lml_k1) and jnp.isfinite(lml_k5)
+        assert float(lml_k1) != float(lml_k5), "kappa must affect log marginal"
+
+    def test_kappa_affects_posterior_mean(self):
+        """Posterior mean direction must shift toward data as kappa increases."""
+        from crosscat.components import VonMises
+
+        # Data clustered near 0.0, prior mean at pi
+        data = jnp.array([0.0, 0.1, -0.1])
+        ss = VonMises.sufficient_statistics(data)
+
+        low_kappa = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(0.1),
+            vm_a=jnp.array(5.0),
+            vm_mu=jnp.array(jnp.pi),
+        )
+        high_kappa = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(10.0),
+            vm_a=jnp.array(5.0),
+            vm_mu=jnp.array(jnp.pi),
+        )
+        # With low kappa, prior dominates → predictive favors x near pi
+        # With high kappa, data dominates → predictive favors x near 0
+        lp_low_at_0 = float(VonMises.posterior_predictive_logp(jnp.array(0.0), ss, low_kappa))
+        lp_high_at_0 = float(VonMises.posterior_predictive_logp(jnp.array(0.0), ss, high_kappa))
+        assert lp_high_at_0 > lp_low_at_0, (
+            "Higher kappa should give more weight to data (near 0), "
+            f"got lp_high={lp_high_at_0}, lp_low={lp_low_at_0}"
+        )
+
+    def test_packed_matches_unpacked_kappa(self):
+        """Packed and unpacked VM log marginal agree for kappa != 1."""
+        from crosscat.components import VonMises
+        from crosscat.packed.components import _vm_log_marginal
+
+        data = jnp.array([0.2, 0.8, 1.5])
+        ss = VonMises.sufficient_statistics(data)
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(3.0),
+            vm_a=jnp.array(2.0),
+            vm_mu=jnp.array(1.0),
+        )
+        unpacked = float(VonMises.log_marginal_likelihood(ss, hypers))
+        packed = float(
+            _vm_log_marginal(
+                ss.count, ss.sum_sin, ss.sum_cos, hypers.kappa, hypers.vm_a, hypers.vm_mu
+            )
+        )
+        assert jnp.isclose(unpacked, packed, atol=1e-5), (
+            f"Packed/unpacked mismatch: unpacked={unpacked}, packed={packed}"
+        )
