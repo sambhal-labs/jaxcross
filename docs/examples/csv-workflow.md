@@ -40,33 +40,28 @@ print(f"Initialized {len(states)} chains")
 ## 3. Run GPU-Accelerated Inference
 
 ```python
-from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
-from crosscat import packed_log_joint
+from crosscat.packed import (
+    pack_state, multi_chain_packed_gibbs_sweep,
+    unbatch_packed_states, select_best_chain, unpack_state,
+)
 from crosscat.packed.aot_cache import enable_xla_cache
 
 # Enable compilation caching
 enable_xla_cache()
 
-# Run each chain
-final_states = []
-for i, s in enumerate(states):
-    packed = pack_state(s, max_views=8, max_clusters=16)
-    k = jax.random.fold_in(key, i + 100)
-    packed = packed_gibbs_sweep(k, packed, data, n_sweeps=100)
-    s = unpack_state(packed, col_types, data=data)
-    final_states.append(s)
-    score = float(packed_log_joint(pack_state(s), data))
-    print(f"Chain {i}: log_joint={score:.1f}, views={s.n_views}")
+# Run all chains in parallel (GPU-accelerated via vmap)
+packed_list = [pack_state(s, max_views=8, max_clusters=16) for s in states]
+batched, scores = multi_chain_packed_gibbs_sweep(key, packed_list, data, n_sweeps=100)
+print(f"Log-joint scores: {[f'{s:.1f}' for s in scores]}")
 ```
 
 ## 4. Select Best Chain
 
 ```python
-from crosscat import log_joint
-
-best = max(final_states, key=lambda s: float(log_joint(s, data)))
-print(f"Best chain: {best.n_views} views")
-print(f"Column assignments: {best.column_assignments}")
+best = select_best_chain(batched, scores)
+best_state = unpack_state(best, col_types, data=data)
+print(f"Best chain: {best_state.n_views} views")
+print(f"Column assignments: {best_state.column_assignments}")
 ```
 
 ## 5. Explore Dependencies

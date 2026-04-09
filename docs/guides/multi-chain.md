@@ -39,7 +39,11 @@ print(f"Log-joint scores: {scores}")
 best = select_best_chain(batched, scores)
 ```
 
-## Run Chains Sequentially
+## Run Chains Sequentially (Legacy)
+
+!!! note
+    The parallel approach above is preferred. Use sequential only when debugging
+    or when GPU memory is too limited for vmap-batched chains.
 
 ```python
 from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
@@ -59,20 +63,21 @@ best = max(final_states, key=lambda s: float(log_joint(s, data)))
 
 ## Multi-Chain Queries
 
-Several queries accept lists of states and average across them:
+Several queries accept lists of packed states and average across posterior samples:
 
 ```python
-from crosscat import dependence_matrix, mutual_information, row_similarity
+from crosscat import packed_dependence_matrix, packed_mutual_information
 
-# Z-matrix averaged across chains
-z = dependence_matrix(final_states)
+all_chains = unbatch_packed_states(batched, n_chains=4)
+
+# Z-matrix averaged across chains (preferred — stays packed)
+z = packed_dependence_matrix(all_chains)
 
 # MI averaged across chains
-mi, linfoot = mutual_information(final_states, col_i=0, col_j=1)
-
-# Row similarity averaged across chains
-sim = row_similarity(final_states, row_a=10, row_b=20)
+mi, linfoot = packed_mutual_information(all_chains, col_types, 0, 1, rng_key=key)
 ```
+
+The unpacked path (`dependence_matrix`, `mutual_information`) also accepts lists of `CrossCatState` but is slower.
 
 ## Multi-Chain Packed Wrappers
 
