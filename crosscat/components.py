@@ -679,8 +679,8 @@ class VonMises:
 
             p(data | kappa, a, b) = [1/(2*pi)]^n * I_0(R) / [I_0(kappa)^n * I_0(a)]
 
-        where R = ||(sum_sin + a*sin(b), sum_cos + a*cos(b))|| is the posterior
-        resultant length combining data with the prior contribution.
+        where R = ||(kappa*sum_sin + a*sin(b), kappa*sum_cos + a*cos(b))|| is the
+        posterior resultant length combining kappa-scaled data with the prior.
 
         Hyperparameters:
             kappa — likelihood concentration
@@ -695,9 +695,9 @@ class VonMises:
         a = hypers.vm_a
         b = hypers.vm_mu
 
-        # Posterior resultant length: data + prior(a, b)
-        total_sin = suffstats.sum_sin + a * jnp.sin(b)
-        total_cos = suffstats.sum_cos + a * jnp.cos(b)
+        # Posterior resultant length: kappa * data + prior(a, b)
+        total_sin = kappa * suffstats.sum_sin + a * jnp.sin(b)
+        total_cos = kappa * suffstats.sum_cos + a * jnp.cos(b)
         R = jnp.sqrt(total_sin**2 + total_cos**2)
 
         # log p(data) = -n*log(2*pi) + log I_0(R) - n*log I_0(kappa) - log I_0(a)
@@ -721,9 +721,9 @@ class VonMises:
         kappa = hypers.kappa
         a = hypers.vm_a
 
-        # Posterior mean direction from resultant of data + prior(a, b)
-        total_sin = suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
-        total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
+        # Posterior mean direction from resultant of kappa * data + prior(a, b)
+        total_sin = kappa * suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
+        total_cos = kappa * suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
 
         # Von Mises log pdf with likelihood concentration kappa
@@ -744,8 +744,8 @@ class VonMises:
         kappa = hypers.kappa
         a = hypers.vm_a
 
-        total_sin = suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
-        total_cos = suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
+        total_sin = kappa * suffstats.sum_sin + a * jnp.sin(hypers.vm_mu)
+        total_cos = kappa * suffstats.sum_cos + a * jnp.cos(hypers.vm_mu)
         mu_post = jnp.arctan2(total_sin, total_cos)
 
         def _sample_one(key):
