@@ -27,6 +27,8 @@ from crosscat.types import ColumnType
 
 logger = logging.getLogger(__name__)
 
+_VALID_COMPRESSION = {"lz4", "zstd", "uncompressed"}
+
 
 def _warn_float32_coercion(data: np.ndarray) -> None:
     """Emit a warning when float64 data is coerced to float32.
@@ -678,3 +680,119 @@ def load_arrow(
 
     table = pf.read_table(filepath, memory_map=memory_map, columns=columns)
     return _arrow_table_to_jax(table)
+
+
+# ---------------------------------------------------------------------------
+# Arrow-first convenience API
+# ---------------------------------------------------------------------------
+
+
+def save_data(
+    filepath: str | Path,
+    data: Array,
+    *,
+    column_names: list[str] | None = None,
+    column_types: list[ColumnType] | None = None,
+    compression: str = "lz4",
+) -> None:
+    """Save data array with optional metadata in Arrow IPC format.
+
+    This is the recommended high-level I/O function. Column type metadata
+    is stored in the Arrow schema so it can be recovered on load without
+    a separate sidecar file.
+
+    Args:
+        filepath: Output path (conventionally .arrow).
+        data: Data array, shape (n_rows, n_cols).
+        column_names: Column names. Defaults to col_0, col_1, ...
+        column_types: Column type per column. If provided, stored in
+            Arrow schema metadata for recovery on load.
+        compression: Compression codec ("lz4", "zstd", "uncompressed").
+    """
+    import json
+
+    pa = _require_pyarrow()
+
+    if compression not in _VALID_COMPRESSION:
+        raise ValueError(f"compression must be one of {_VALID_COMPRESSION}, got {compression!r}")
+
+    filepath = Path(filepath)
+    _warn_float32_coercion(np.asarray(data))
+    data_np = np.asarray(data, dtype=np.float32)
+    n_cols = data_np.shape[1]
+
+    if column_names is None:
+        column_names = [f"col_{j}" for j in range(n_cols)]
+    elif len(column_names) != n_cols:
+        raise ValueError(
+            f"column_names has {len(column_names)} entries but data has {n_cols} columns"
+        )
+
+    table = pa.table({name: data_np[:, j] for j, name in enumerate(column_names)})
+
+    # Store column types and names in Arrow schema metadata
+    metadata = table.schema.metadata or {}
+    metadata[b"crosscat_column_names"] = json.dumps(column_names).encode()
+    if column_types is not None:
+        if len(column_types) != n_cols:
+            raise ValueError(
+                f"column_types has {len(column_types)} entries but data has {n_cols} columns"
+            )
+        type_names = [ct.name for ct in column_types]
+        metadata[b"crosscat_column_types"] = json.dumps(type_names).encode()
+    table = table.replace_schema_metadata(metadata)
+
+    import pyarrow.feather as pf
+
+    pf.write_feather(table, filepath, compression=compression)
+
+
+def load_data(
+    filepath: str | Path,
+    *,
+    memory_map: bool = True,
+    columns: list[str] | None = None,
+) -> tuple[Array, list[str], list[ColumnType] | None]:
+    """Load data from Arrow IPC format with optional column type metadata.
+
+    This is the recommended high-level I/O function. If column types were
+    saved via ``save_data``, they are recovered from Arrow schema metadata.
+
+    Args:
+        filepath: Path to .arrow file (created by ``save_data`` or ``save_arrow``).
+        memory_map: If True, memory-map the file at the Arrow level.
+        columns: Optional subset of columns to load.
+
+    Returns:
+        Tuple of (data_array, column_names, column_types).
+        column_types is None if metadata was not present.
+    """
+    import json
+
+    _require_pyarrow()
+    import pyarrow.feather as pf
+
+    table = pf.read_table(filepath, memory_map=memory_map, columns=columns)
+
+    # Recover column types from metadata if present, filtered to loaded columns
+    col_types = None
+    metadata = table.schema.metadata
+    if metadata and b"crosscat_column_types" in metadata:
+        all_type_names = json.loads(metadata[b"crosscat_column_types"])
+        all_col_types = [ColumnType[name] for name in all_type_names]
+        if columns is not None and b"crosscat_column_names" in metadata:
+            # Map types by column name for the loaded subset
+            all_col_names = json.loads(metadata[b"crosscat_column_names"])
+            name_to_type = dict(zip(all_col_names, all_col_types, strict=False))
+            loaded_names = [field.name for field in table.schema]
+            try:
+                col_types = [name_to_type[n] for n in loaded_names]
+            except KeyError as e:
+                raise ValueError(f"Column {e} not found in saved column type metadata") from None
+        else:
+            col_types = all_col_types
+            if len(col_types) != table.num_columns:
+                col_types = None  # metadata doesn't match loaded subset
+
+    data, col_names = _arrow_table_to_jax(table)
+    return data, col_names, col_types
