@@ -309,6 +309,32 @@ class TestBatchJointPredictiveProb:
             assert jnp.isfinite(lp)
             assert float(lp) < 0  # log-probabilities are negative
 
+    def test_matches_loop(self):
+        """Batch result matches manual loop over packed_joint_predictive_probability."""
+        from crosscat.packed_inference import (
+            batch_joint_predictive_probability,
+            packed_joint_predictive_probability,
+        )
+
+        key = jax.random.key(85)
+        states, data = _make_packed_states(key, n_chains=1)
+        query_cols = [0, 2]
+        query_vals_list = [
+            jnp.array([0.1, 0.2]),
+            jnp.array([-0.5, 0.8]),
+        ]
+
+        batch_results = batch_joint_predictive_probability(
+            states[0], data, query_cols, query_vals_list
+        )
+        loop_results = jnp.array(
+            [
+                packed_joint_predictive_probability(states[0], data, query_cols, qv)
+                for qv in query_vals_list
+            ]
+        )
+        assert jnp.allclose(batch_results, loop_results, atol=1e-6)
+
 
 class TestBatchSampleAndInsert:
     def test_inserts_rows(self):
@@ -331,6 +357,40 @@ class TestBatchSampleAndInsert:
         assert len(completed) == 2
         for row in completed:
             assert jnp.all(jnp.isfinite(row))
+        # Observed values should be preserved
+        assert float(completed[0][0]) == pytest.approx(0.5)
+        assert float(completed[0][2]) == pytest.approx(-0.3)
+        assert float(completed[1][1]) == pytest.approx(1.0)
+
+    def test_sequential_conditioning(self):
+        """Later rows condition on earlier insertions — matches manual sequential calls."""
+        from crosscat.packed_inference import (
+            batch_sample_and_insert,
+            packed_sample_and_insert,
+        )
+
+        key = jax.random.key(86)
+        states, data = _make_packed_states(key, n_chains=1)
+        packed = states[0]
+
+        partial_rows = [
+            jnp.array([0.5, jnp.nan, -0.3]),
+            jnp.array([jnp.nan, 1.0, jnp.nan]),
+        ]
+
+        # Batch call
+        rng = jax.random.key(87)
+        _, batch_data, batch_completed = batch_sample_and_insert(rng, packed, data, partial_rows)
+
+        # Manual sequential calls with same fold_in keys
+        k0 = jax.random.fold_in(rng, 0)
+        p1, d1, c1 = packed_sample_and_insert(k0, packed, data, partial_rows[0])
+        k1 = jax.random.fold_in(rng, 1)
+        _p2, d2, c2 = packed_sample_and_insert(k1, p1, d1, partial_rows[1])
+
+        assert jnp.allclose(batch_completed[0], c1)
+        assert jnp.allclose(batch_completed[1], c2)
+        assert jnp.allclose(batch_data, d2)
 
 
 class TestMultiChainSampleAndInsert:
