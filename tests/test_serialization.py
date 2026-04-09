@@ -242,3 +242,35 @@ def test_jxc_suffix_added_automatically(mixed_state, tmp_path):
     loaded1, _ = load_packed_state(tmp_path / "mystate")
     loaded2, _ = load_packed_state(tmp_path / "mystate.jxc")
     assert loaded1.n_rows == loaded2.n_rows
+
+
+# ---------------------------------------------------------------------------
+# Atomic write / .valid marker
+# ---------------------------------------------------------------------------
+
+
+def test_valid_marker_created_on_save(mixed_state, tmp_path):
+    """save_packed_state creates a .valid marker after successful write."""
+    state, _, column_types = mixed_state
+    packed = pack_state(state)
+
+    path = save_packed_state(packed, tmp_path / "atomic_test", column_types=column_types)
+    assert (path / ".valid").exists()
+    # No leftover .tmp files
+    tmp_files = list(path.glob("*.tmp"))
+    assert tmp_files == []
+
+
+def test_missing_valid_marker_still_loads(mixed_state, tmp_path):
+    """load_packed_state succeeds even when .valid marker is missing."""
+    state, _, column_types = mixed_state
+    packed = pack_state(state)
+
+    path = save_packed_state(packed, tmp_path / "warn_test", column_types=column_types)
+    # Remove the marker to simulate interrupted write
+    (path / ".valid").unlink()
+    assert not (path / ".valid").exists()
+
+    # Load should still succeed (warns but does not raise)
+    loaded, _ = load_packed_state(path)
+    assert loaded.n_rows == packed.n_rows

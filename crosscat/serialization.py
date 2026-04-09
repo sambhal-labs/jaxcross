@@ -119,11 +119,13 @@ def save_packed_state(
         meta_tmp.rename(meta_final)
 
         # Write arrays to temp file, then atomic rename
-        arrays_tmp = path / "arrays.npz.tmp"
+        # np.savez_compressed appends .npz automatically, so use a stem name
+        arrays_tmp_stem = path / "_arrays_tmp"
+        arrays_tmp_file = path / "_arrays_tmp.npz"
         arrays_final = path / "arrays.npz"
         arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
-        np.savez_compressed(arrays_tmp, **arrays)
-        arrays_tmp.rename(arrays_final)
+        np.savez_compressed(arrays_tmp_stem, **arrays)
+        arrays_tmp_file.rename(arrays_final)
 
         # Mark as valid only after both files are written
         valid_marker.touch()

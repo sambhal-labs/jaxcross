@@ -43,18 +43,19 @@ class TestBatchAnomalyScore:
         assert jnp.all(scores >= 0.0)
         assert jnp.all(scores <= 1.0)
 
-    def test_consistent_ordering(self):
-        """Rows with typical values should score lower than outliers."""
+    def test_all_rows_finite(self):
+        """Scoring all rows produces finite values in [0, 1]."""
         from crosscat.packed_inference import batch_anomaly_score
 
         key = jax.random.key(101)
         states, data = _make_packed_states(key, n_chains=1)
         packed = states[0]
-        # Score all rows — just verify consistency (all finite, in [0,1])
         row_ids = jnp.arange(data.shape[0])
         scores = batch_anomaly_score(packed, data, row_ids)
         assert scores.shape == (data.shape[0],)
         assert jnp.all(jnp.isfinite(scores))
+        assert jnp.all(scores >= 0.0)
+        assert jnp.all(scores <= 1.0)
 
 
 class TestBatchClassifyColumn:
