@@ -89,22 +89,15 @@ print(f"Discovered {state.n_views} views")
 !!! info "First-run JIT compilation"
     The first call to `packed_gibbs_sweep` triggers JAX compilation (~20-60s depending on data size). Subsequent calls with the same data shape are fast. Enable [XLA caching](../guides/xla-cache.md) to skip recompilation across sessions.
 
-For multi-chain inference, run each chain and pick the best:
+For multi-chain inference, run all chains in parallel and pick the best:
 
 ```python
-best_state = None
-best_score = -float('inf')
-for i, s in enumerate(states):
-    packed = pack_state(s)
-    k = jax.random.fold_in(key, i + 100)
-    packed = packed_gibbs_sweep(k, packed, data, n_sweeps=100)
-    s = unpack_state(packed, col_types, data=data)
-    score = float(log_joint(s, data))
-    if score > best_score:
-        best_score = score
-        best_state = s
+from crosscat.packed import multi_chain_packed_gibbs_sweep, select_best_chain, unbatch_packed_states
 
-state = best_state
+packed_list = [pack_state(s) for s in states]
+batched, scores = multi_chain_packed_gibbs_sweep(key, packed_list, data, n_sweeps=100)
+best = select_best_chain(batched, scores)
+state = unpack_state(best, col_types, data=data)
 ```
 
 ## 4. Query the Posterior
