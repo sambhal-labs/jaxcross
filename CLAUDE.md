@@ -68,11 +68,11 @@ The package is `crosscat/` with these core modules:
   - `kernels.py` — all Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, row/column assignments, hypers, CRP alphas, `packed_insert_rows`) via `vmap`/`lax.scan` with type-specialized fast paths. Sub-kernels have `@jax.jit` for independent compilation.
   - `aot_cache.py` — XLA persistent compilation cache (`enable_xla_cache()`, `compile_kernels()`, `clear_cache()`)
 
-- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support (37 public functions):
+- **packed_inference.py** — Vectorized inference queries on packed state. Full parity with inference.py plus batch and multi-chain support (40 public functions):
   - **Single-state packed_ (12):** `packed_classify_column`, `packed_predictive_probability`, `packed_predictive_sample`, `packed_predictive_cdf`, `packed_anomaly_score`, `packed_impute_and_confidence`, `packed_credible_interval`, `packed_row_typicality`, `packed_column_typicality`, `packed_conditional_entropy`, `packed_joint_predictive_probability`, `packed_sample_and_insert`
   - **Multi-state packed_ (4, accept lists):** `packed_mutual_information`, `packed_dependence_matrix`, `packed_dependence_probability`, `packed_row_similarity`
-  - **Batch (13):** `batch_anomaly_score`, `batch_impute_column`, `batch_row_typicality`, `batch_credible_interval`, `batch_predictive_cdf`, `batch_row_similarity`, `batch_classify_column`, `batch_score_columns_binary`, `batch_predictive_probability`, `batch_predictive_sample`, `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`
-  - **Multi-chain wrappers (8):** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`, `multi_chain_classify_column`, `multi_chain_credible_interval`, `multi_chain_joint_predictive_probability`
+  - **Batch (15):** `batch_anomaly_score`, `batch_impute_column`, `batch_row_typicality`, `batch_credible_interval`, `batch_predictive_cdf`, `batch_row_similarity`, `batch_classify_column`, `batch_score_columns_binary`, `batch_predictive_probability`, `batch_predictive_sample`, `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`, `batch_joint_predictive_probability`, `batch_sample_and_insert`
+  - **Multi-chain wrappers (9):** `multi_chain_predictive_probability`, `multi_chain_predictive_sample`, `multi_chain_anomaly_score`, `multi_chain_impute_and_confidence`, `multi_chain_predictive_cdf`, `multi_chain_classify_column`, `multi_chain_credible_interval`, `multi_chain_joint_predictive_probability`, `multi_chain_sample_and_insert`
 
 - **constraints.py** — Enforces column/row dependency constraints via packed Gibbs rejection sampling.
 - **diagnostics.py** — Convergence metrics (Adjusted Rand Index, held-out likelihood, imputation evaluation, Gelman-Rubin R-hat, Effective Sample Size).
@@ -283,7 +283,9 @@ from crosscat import (
     packed_impute_and_confidence,    # Single cell (packed)
     sample_and_insert,               # Impute + insert row (unpacked)
     packed_sample_and_insert,        # Impute + insert row (packed)
+    batch_sample_and_insert,         # Multiple partial rows (packed)
     multi_chain_impute_and_confidence,  # Multi-chain
+    multi_chain_sample_and_insert,   # Per-chain impute + insert
 )
 ```
 
@@ -327,6 +329,9 @@ from crosscat import (
     packed_conditional_entropy,      # H(target | given) (packed, accepts list)
     batch_conditional_entropy,       # Multiple targets (packed)
     batch_column_typicality,         # Multiple columns (packed)
+    packed_joint_predictive_probability,  # Joint P(q1,q2,...) (packed)
+    batch_joint_predictive_probability,  # Multiple query combos (packed)
+    multi_chain_joint_predictive_probability,  # Multi-chain averaged
 )
 ```
 
