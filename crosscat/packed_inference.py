@@ -2019,6 +2019,12 @@ def batch_joint_predictive_probability(
     Returns:
         (n_combos,) array of log joint probabilities.
     """
+    n_q = len(query_cols)
+    for i, qv in enumerate(query_vals_list):
+        if len(qv) != n_q:
+            raise ValueError(
+                f"query_vals_list[{i}] has length {len(qv)}, expected {n_q} (len(query_cols))"
+            )
     return jnp.array(
         [
             packed_joint_predictive_probability(packed, data, query_cols, qv)
@@ -2079,6 +2085,9 @@ def multi_chain_sample_and_insert(
     Returns:
         Tuple of (updated_states, updated_datas, completed_rows) — one
         per chain.
+
+    .. note:: Returns N copies of the data matrix (one per chain), which
+        may be significant on memory-constrained hardware.
     """
     updated_states = []
     updated_datas = []
