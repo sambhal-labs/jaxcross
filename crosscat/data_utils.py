@@ -27,6 +27,8 @@ from crosscat.types import ColumnType
 
 logger = logging.getLogger(__name__)
 
+_VALID_COMPRESSION = {"lz4", "zstd", "uncompressed"}
+
 
 def _warn_float32_coercion(data: np.ndarray) -> None:
     """Emit a warning when float64 data is coerced to float32.
@@ -711,7 +713,6 @@ def save_data(
 
     pa = _require_pyarrow()
 
-    _VALID_COMPRESSION = {"lz4", "zstd", "uncompressed"}
     if compression not in _VALID_COMPRESSION:
         raise ValueError(f"compression must be one of {_VALID_COMPRESSION}, got {compression!r}")
 
@@ -784,9 +785,14 @@ def load_data(
             all_col_names = json.loads(metadata[b"crosscat_column_names"])
             name_to_type = dict(zip(all_col_names, all_col_types, strict=False))
             loaded_names = [field.name for field in table.schema]
-            col_types = [name_to_type[n] for n in loaded_names if n in name_to_type]
+            try:
+                col_types = [name_to_type[n] for n in loaded_names]
+            except KeyError as e:
+                raise ValueError(f"Column {e} not found in saved column type metadata") from None
         else:
             col_types = all_col_types
+            if len(col_types) != table.num_columns:
+                col_types = None  # metadata doesn't match loaded subset
 
     data, col_names = _arrow_table_to_jax(table)
     return data, col_names, col_types
