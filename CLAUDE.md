@@ -83,6 +83,8 @@ The package is `crosscat/` with these core modules:
 - **tb_logger.py** — TensorBoard logging via `tensorboardX`. `TBLogger` context manager logs per-sweep diagnostics (scalars, histograms). Designed to consume the dict returned by `diagnostics.collect_diagnostics()`. Requires optional `tensorboardX` dependency.
 - **validate.py** — State consistency checking.
 - **../contrib/fingerprint.py** — Entity behavioral fingerprinting (LaborLens-specific, not part of core).
+- **../paper/** — LaTeX paper sources (`main.tex`, `references.bib`, figures).
+- **../notebooks/** — `run_tests.ipynb` (Kaggle test runner), `intro_tutorial.ipynb`, `gpu_benchmark.ipynb`.
 
 ## Packed vs Unpacked Paths
 
@@ -120,8 +122,8 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 ## Testing
 
-- **Do NOT run pytest locally** — tests require JAX JIT compilation which is slow even on GPU. Run on Kaggle P100 via `notebooks/run_tests.ipynb`.
-- **CI (GitHub Actions)** runs lint + format + type check only (~1 min). No pytest in CI.
+- **Do NOT run pytest locally** — tests require JAX JIT compilation which is slow even on GPU. Run on Kaggle via `notebooks/run_tests.ipynb` (2xT4 with pmap preferred over single P100).
+- **CI (GitHub Actions)** runs lint + format + type check + CPU-safe tests (`pytest -m cpu --timeout=120`). No GPU tests in CI.
 - **Kaggle setup**: Use `pip install -e . --no-deps` to preserve Kaggle's pre-installed JAX+CUDA stack. Do NOT use `uv sync --extra gpu` on Kaggle (causes ptxas version mismatch).
 - **Test markers**: `@pytest.mark.slow` for GPU-heavy tests (30+ Gibbs sweeps). `@pytest.mark.xfail` for 3 known flaky tests (stochastic recovery).
 - **Test suite**: 279 fast tests (including 34 Hypothesis property tests), 69 slow tests (348 total).
@@ -129,10 +131,12 @@ packed, data = packed_insert_rows(key, packed, data, new_rows)
 
 ## Benchmarks
 
-- **MNIST paper benchmark** (`benchmarks/mnist_paper_colab.ipynb`): Reproduces Section 3.2 of Mansinghka et al. (2016). 16×16 binary MNIST (257 cols), 10 chains × 100 sweeps on P100. Validates Z-matrix, pixel dependence map, inpainting (93% accuracy), and classification (79% accuracy).
-- **Synthetic benchmark** (`benchmarks/paper_synthetic_benchmark.py`): Figure 7 recovery with known ground truth.
-- **JIT benchmark** (`benchmarks/jit_benchmark.py`): Per-sweep timing comparison.
-- Run notebooks on Kaggle (P100) for GPU-accelerated benchmarks.
+- **MNIST benchmark** (`benchmarks/mnist_benchmark.ipynb`): Binary MNIST (257 cols), multi-chain sweeps. Validates Z-matrix, pixel dependence map, inpainting, and classification.
+- **MNIST PCA benchmark** (`benchmarks/mnist_pca_benchmark.ipynb`): PCA-reduced MNIST variant.
+- **Synthetic benchmark** (`benchmarks/paper_synthetic_benchmark.ipynb`): Figure 7 recovery with known ground truth.
+- **JIT benchmark** (`benchmarks/jit_benchmark.ipynb`): Per-sweep timing comparison.
+- **Scalability benchmarks**: `scalability_benchmark.ipynb`, `scaling_10k_benchmark.ipynb`, `scaling_100k_benchmark.ipynb`, `scaling_1m_benchmark.ipynb`.
+- Run notebooks on Kaggle (2xT4 with pmap preferred) for GPU-accelerated benchmarks.
 
 ## Git Workflow
 
@@ -174,7 +178,7 @@ IMPORTANT: Prefer retrieval-led reasoning — read the referenced doc BEFORE mak
 IMPORTANT: Read the WDI benchmark notebook for the latest, fastest code patterns. It is the gold-standard reference for production workflows.
 
 |root: ./benchmarks
-|.:{jit_benchmark.py,paper_synthetic_benchmark.py,mnist_benchmark.py,oflc_benchmark.py,scalability_benchmark.py,scaling_10k_benchmark.py,scaling_100k_benchmark.py,scaling_1m_benchmark.py,utils.py,mnist_colab.ipynb,mnist_paper_colab.ipynb,mnist_paper_kaggle2x.ipynb,paper_benchmarks_colab.ipynb,wdi_macroeconomic_benchmark.ipynb}
+|.:{jit_benchmark.ipynb,paper_synthetic_benchmark.ipynb,mnist_benchmark.ipynb,mnist_pca_benchmark.ipynb,scalability_benchmark.ipynb,scaling_10k_benchmark.ipynb,scaling_100k_benchmark.ipynb,scaling_1m_benchmark.ipynb,wdi_macroeconomic_benchmark.ipynb,utils.py}
 
 ## Common Workflows
 
