@@ -67,6 +67,8 @@ def subsample_anneal(
     """
     if growth_factor <= 1.0:
         raise ValueError(f"growth_factor must be > 1.0 to guarantee progress, got {growth_factor}")
+    if initial_size <= 0:
+        raise ValueError(f"initial_size must be > 0, got {initial_size}")
 
     n_rows = data.shape[0]
     if max_clusters is None:
