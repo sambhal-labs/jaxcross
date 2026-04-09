@@ -380,6 +380,11 @@ def insert_rows(
     Returns:
         Tuple of (updated_state, updated_data) with new rows incorporated.
     """
+    if new_rows.ndim != 2 or new_rows.shape[1] != data.shape[1]:
+        raise ValueError(
+            f"new_rows must have shape (n_new, {data.shape[1]}), got {new_rows.shape}"
+        )
+
     n_new = new_rows.shape[0]
     updated_data = jnp.concatenate([data, new_rows], axis=0)
     keys = jax.random.split(rng_key, len(state.views))

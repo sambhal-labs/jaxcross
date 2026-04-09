@@ -13,7 +13,7 @@ from jax import Array
 from jax.scipy.special import gammaln
 
 from crosscat.packed.state import BINARY_ID, CATEGORICAL_ID, CONTINUOUS_ID, ORDINAL_ID
-from crosscat.types import LOG_EPS, log_bessel_i0
+from crosscat.types import LOG_EPS, LOGISTIC_INF, log_bessel_i0
 from crosscat.types import ORDINAL_N_GRID as _OL_N_GRID
 
 # Alias for internal callers
@@ -92,7 +92,7 @@ def _ol_level_probs(mu, cutpoints):
     Uses the cumulative logistic link: P(Y=k) = σ(c_k - μ) - σ(c_{k-1} - μ).
     Cutpoints padded with +inf produce probability 0 for padded levels.
     """
-    extended = jnp.concatenate([jnp.array([-1e10]), cutpoints, jnp.array([1e10])])
+    extended = jnp.concatenate([jnp.array([-LOGISTIC_INF]), cutpoints, jnp.array([LOGISTIC_INF])])
     cum = jax.nn.sigmoid(extended - mu)
     probs = cum[1:] - cum[:-1]
     return jnp.maximum(probs, LOG_EPS)
@@ -636,3 +636,41 @@ def batch_dc_posterior_predictive_logp(
     )
     idxs = jnp.clip(xs.astype(jnp.int32), 0, cat_counts_batch.shape[-1] - 1)
     return jnp.log(jnp.maximum(probs[jnp.arange(xs.shape[0]), idxs], LOG_EPS))
+
+
+def batch_ol_posterior_predictive_logp(
+    xs: Array,
+    counts: Array,
+    cat_counts_batch: Array,
+    cutpoints_batch: Array,
+    mu0s: Array,
+    s0s: Array,
+) -> Array:
+    """Vectorized Ordered-Logistic posterior predictive for a batch of columns.
+
+    Uses ``jax.vmap`` over ``_ol_posterior_predictive_logp`` since the grid
+    integration cannot be trivially expressed as a single matrix op.
+
+    Args:
+        xs: (n_cols,) observation values.
+        counts: (n_cols,) cluster counts.
+        cat_counts_batch: (n_cols, max_cats) category counts per column.
+        cutpoints_batch: (n_cols, max_cuts) cutpoint arrays per column.
+        mu0s: (n_cols,) prior means.
+        s0s: (n_cols,) prior variances.
+
+    Returns:
+        (n_cols,) log-probabilities.
+    """
+    # NaN guards: JAX evaluates all branches of jnp.where, so when called
+    # from _score_row_one_cluster_typed, non-ordinal columns pass garbage
+    # hypers through this path. Clamp to finite range to prevent NaN from
+    # linspace propagating through the "unused" branch.
+    safe_mu0s = jnp.nan_to_num(mu0s, nan=0.0, posinf=0.0, neginf=0.0)
+    safe_s0s = jnp.maximum(jnp.nan_to_num(s0s, nan=1.0, posinf=1.0, neginf=1.0), LOG_EPS)
+    safe_cutpoints = jnp.nan_to_num(
+        cutpoints_batch, nan=LOGISTIC_INF, posinf=LOGISTIC_INF, neginf=-LOGISTIC_INF
+    )
+    return jax.vmap(_ol_posterior_predictive_logp)(
+        xs, counts, cat_counts_batch, safe_cutpoints, safe_mu0s, safe_s0s
+    )

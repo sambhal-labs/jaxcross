@@ -30,7 +30,9 @@ from crosscat.diagnostics import (
     adjusted_rand_index,
     collect_diagnostics,
     column_partition_ari,
+    effective_sample_size,
     evaluate_imputation,
+    gelman_rubin_rhat,
     mean_test_log_likelihood,
     packed_evaluate_imputation,
     random_holdout_mask,
@@ -124,6 +126,7 @@ from crosscat.serialization import (
 from crosscat.synthetic import add_missing_data, generate_crosscat_data
 from crosscat.types import (
     LOG_EPS,
+    LOGISTIC_INF,
     ColumnHypers,
     ColumnType,
     CrossCatState,
@@ -135,6 +138,7 @@ from crosscat.validate import ValidationError, assert_valid_state, validate_stat
 
 __all__ = [
     # Types
+    "LOGISTIC_INF",
     "LOG_EPS",
     "ColumnHypers",
     "ColumnType",
@@ -175,7 +179,9 @@ __all__ = [
     "adjusted_rand_index",
     "collect_diagnostics",
     "column_partition_ari",
+    "effective_sample_size",
     "evaluate_imputation",
+    "gelman_rubin_rhat",
     "mean_test_log_likelihood",
     "packed_evaluate_imputation",
     "random_holdout_mask",
