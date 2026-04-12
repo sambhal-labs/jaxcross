@@ -35,7 +35,10 @@ Data is cached to Parquet after the first API call, so subsequent runs are insta
 
 ## Multi-Chain Inference
 
-The notebook runs multi-chain packed Gibbs sampling with convergence monitoring:
+The notebook runs multi-chain packed Gibbs sampling with convergence monitoring.
+
+!!! note "Rhat for structure-learning models"
+    CrossCat's partition space is combinatorial (Bell number B(20) ~ 5 x 10^13 possible view structures). Different chains legitimately settle into different posterior modes, so Rhat — designed for unimodal targets — stays high. The key diagnostic is that per-chain log-joint traces stabilize (by ~300 sweeps). We select the best chain for row-level queries and average over all chains for dependence structure.
 
 ```python
 from crosscat import (
@@ -105,6 +108,9 @@ values, confidences = batch_impute_column(
 
 Quality is validated with a 10% holdout: mask observed values, impute, and measure MAE/RMSE/R² per column. The notebook reports per-column metrics and parity plots (true vs. predicted).
 
+!!! warning "R² caveats"
+    R² for categorical columns (Crystal System, Magnetic Ordering) is not meaningful — use accuracy instead. Poisson Ratio has a narrow physical range (~0.1–0.4), so even small absolute errors produce negative R²; the MAE of ~0.08 is reasonable for screening. The overall R² is dominated by high-variance columns; median per-column R² is a more robust summary.
+
 ## Mutual Information
 
 Quantify nonlinear relationships between material property pairs:
@@ -120,7 +126,7 @@ The Linfoot correlation (normalized MI, 0–1 scale) captures nonlinear relation
 
 ## Generative Classification
 
-CrossCat predicts metallicity without a dedicated classifier:
+CrossCat predicts metallicity without a dedicated classifier. Only 3.4% of the dielectric subset are metals (250 / 7,327), so the model's value is as a **metallicity ranker** — surfacing metal-like materials from their property profiles — rather than a binary classifier. The threshold is optimized for F1 rather than using the default 0.5 cutoff.
 
 ```python
 from crosscat import batch_classify_column
