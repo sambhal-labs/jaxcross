@@ -152,6 +152,7 @@ nav:
     - MNIST Benchmark: examples/mnist.md
     - WDI Macroeconomics: examples/wdi-macroeconomics.md
     - CSV End-to-End Workflow: examples/csv-workflow.md
+    - Materials Project Discovery: examples/materials-project.md
   - FAQ & Troubleshooting: faq.md
   - Glossary: glossary.md
   - Roadmap: roadmap.md
