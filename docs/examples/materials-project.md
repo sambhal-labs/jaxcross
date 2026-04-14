@@ -124,10 +124,37 @@ linfoot = float(np.sqrt(1 - np.exp(-2 * float(mi))))
 
 The Linfoot correlation (normalized MI, 0–1 scale) captures nonlinear relationships that Pearson correlation misses — critical for materials data where property relationships are often highly nonlinear.
 
+## Predicting Expensive DFPT Properties
+
+The headline practical result — **CrossCat as a DFPT screening tool.** DFPT (Density Functional Perturbation Theory) dielectric calculations cost 5–10x more than standard DFT relaxation. Only ~7,300 of 150,000+ Materials Project materials have dielectric data. CrossCat predicts ionic dielectric constants at **R²=0.81** from cheap structural/compositional features that require zero additional DFT:
+
+```python
+from crosscat import batch_impute_column, batch_credible_interval
+
+key, k1, k2 = jax.random.split(key, 3)
+
+# Predict ionic dielectric for candidate materials
+predictions, confidence = batch_impute_column(
+    k1, best_packed, data_jax,
+    query_col=ionic_dielectric_col,
+    row_ids=jnp.array(candidate_rows),
+)
+
+# Uncertainty quantification: 90% credible intervals
+medians, ci_lo, ci_hi = batch_credible_interval(
+    k2, best_packed, data_jax,
+    query_col=ionic_dielectric_col,
+    row_ids=jnp.array(candidate_rows),
+    ci_level=0.90,
+)
+```
+
+The 90% credible intervals are well-calibrated: 96% of holdout values fall within the predicted CI (slightly conservative, which is desirable for screening). This means the model reliably communicates when it is uncertain about a prediction.
+
 ## Key Takeaways
 
 - **Joint structure discovery** reveals physically meaningful property groupings that no supervised approach can provide.
 - **Native NaN handling** makes CrossCat ideal for materials databases with natural sparsity — no need to drop incomplete rows or impute before modeling.
-- **Dielectric imputation** is the headline practical result: R²=0.82 for ionic dielectric, R²=0.65 for electronic dielectric. CrossCat can predict missing dielectric constants from structural and compositional data, potentially saving expensive DFT calculations.
+- **DFPT dielectric screening** is the headline practical result: R²=0.81 for ionic dielectric with well-calibrated 90% credible intervals (96% coverage). CrossCat predicts missing dielectric constants from structural and compositional features, saving 5–10x the compute cost of DFPT.
 - **Mixed column types** (continuous, binary, categorical, ordinal) are handled natively within a single model — no separate preprocessing pipelines needed.
 - **Anomaly detection** identifies materials with unusual property combinations for further experimental investigation.
