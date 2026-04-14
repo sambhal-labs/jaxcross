@@ -124,26 +124,10 @@ linfoot = float(np.sqrt(1 - np.exp(-2 * float(mi))))
 
 The Linfoot correlation (normalized MI, 0–1 scale) captures nonlinear relationships that Pearson correlation misses — critical for materials data where property relationships are often highly nonlinear.
 
-## Generative Classification
-
-CrossCat predicts metallicity without a dedicated classifier. Only 3.4% of the dielectric subset are metals (250 / 7,327), so the model's value is as a **metallicity ranker** — surfacing metal-like materials from their property profiles — rather than a binary classifier. The threshold is optimized for F1 rather than using the default 0.5 cutoff.
-
-```python
-from crosscat import batch_classify_column
-
-predictions = batch_classify_column(
-    key, best_packed, data_jax,
-    query_col=is_metal_col,
-    row_ids=jnp.arange(n_rows),
-)
-```
-
-This uses the full posterior predictive P(is_metal | all other properties), averaging over all discovered structures via Bayesian model averaging.
-
 ## Key Takeaways
 
 - **Joint structure discovery** reveals physically meaningful property groupings that no supervised approach can provide.
 - **Native NaN handling** makes CrossCat ideal for materials databases with natural sparsity — no need to drop incomplete rows or impute before modeling.
-- **Imputation from structure** can predict expensive-to-compute mechanical properties from cheaper electronic/structural data, potentially accelerating materials screening.
-- **Mixed column types** (continuous, binary, categorical) are handled natively within a single model — no separate preprocessing pipelines needed.
+- **Dielectric imputation** is the headline practical result: R²=0.82 for ionic dielectric, R²=0.65 for electronic dielectric. CrossCat can predict missing dielectric constants from structural and compositional data, potentially saving expensive DFT calculations.
+- **Mixed column types** (continuous, binary, categorical, ordinal) are handled natively within a single model — no separate preprocessing pipelines needed.
 - **Anomaly detection** identifies materials with unusual property combinations for further experimental investigation.
