@@ -342,18 +342,39 @@ def build_pdf():
     )
     pdf.ln(2)
 
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(40, 40, 100)
+    pdf.cell(0, 7, "Why Calibration Matters More Than R\u00b2:", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
     pdf.body_text(
-        "90% credible interval calibration: 96% of held-out true values fall within the "
-        "predicted 90% CI. The model is slightly conservative (96% > 90%), which is "
-        "preferable for screening -- it rarely gives overconfident predictions."
+        "For screening decisions ('should I spend 5-10x compute on DFPT for this material?'), "
+        "calibrated uncertainty is more valuable than point accuracy. CrossCat's 90% credible "
+        "intervals achieve 96% coverage -- slightly conservative, meaning the model rarely "
+        "gives overconfident predictions. A materials scientist can trust the CI bounds: "
+        "if the predicted ionic dielectric is high AND the CI is tight, that material is "
+        "worth the DFPT investment."
     )
+
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(
+        0,
+        4.5,
+        "Note on electronic dielectric: R\u00b2 is unstable across holdout splits "
+        "(0.05-0.65) because electronic dielectric in View 1 is predicted primarily "
+        "through is_metal and elastic moduli -- informative but coarse proxies for "
+        "the actual electronic structure. Improving electronic prediction would "
+        "require band structure descriptors, which is outside CrossCat's scope as "
+        "a tabular model but straightforward future work.",
+    )
+    pdf.ln(3)
 
     if os.path.exists(f"{NEW_ASSETS}/parity_e_ionic.png"):
         pdf.add_figure(
             f"{NEW_ASSETS}/parity_e_ionic.png",
             "Figure 3: Ionic dielectric predicted vs. true (holdout). R\u00b2=0.81 with "
-            "90% credible intervals shown in red. Predictions cluster tightly around the "
-            "perfect-prediction diagonal across 3 orders of magnitude.",
+            "90% credible intervals. The model achieves 88% of Random Forest accuracy "
+            "while also providing structure discovery and calibrated uncertainty.",
         )
 
     # ================================================================
@@ -385,10 +406,89 @@ def build_pdf():
         )
 
     # ================================================================
-    # PAGE 7: Imputation + Anomaly Detection
+    # PAGE 7: Baseline Comparison
     # ================================================================
     pdf.add_page()
-    pdf.section_title("7. Additional Capabilities")
+    pdf.section_title("7. Baseline Comparison: CrossCat vs Supervised Methods")
+    pdf.body_text(
+        "To contextualize CrossCat's accuracy, we compare against two supervised "
+        "baselines on the same 10% holdout: sklearn IterativeImputer (MICE) and "
+        "Random Forest. All methods use identical data preprocessing."
+    )
+
+    # Comparison table
+    pdf.set_fill_color(40, 40, 100)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 9)
+    cw = [50, 28, 28, 28, 28]
+    for w, h in zip(cw, ["Property", "CrossCat", "MICE", "RF", "Winner"], strict=True):
+        pdf.cell(w, 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    baseline_rows = [
+        ("Ionic Dielectric", "0.81", "0.44", "0.92", "RF"),
+        ("Electronic Dielectric", "0.05", "0.14", "0.64", "RF"),
+        ("Band Gap", "0.27", "0.58", "0.85", "RF"),
+        ("Formation Energy", "0.44", "0.60", "0.85", "RF"),
+        ("E Above Hull", "0.52", "0.20", "0.73", "RF"),
+        ("Bulk Modulus", "0.14", "0.78", "0.97", "RF"),
+    ]
+    pdf.set_text_color(30, 30, 30)
+    for i, (prop, cc, mice, rf, winner) in enumerate(baseline_rows):
+        fill = i % 2 == 0
+        pdf.set_fill_color(245, 245, 252)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(cw[0], 6, prop, border=1, fill=fill)
+        # Bold the winner
+        for val, col_label in [(cc, "CC"), (mice, "MICE"), (rf, "RF")]:
+            if col_label == winner:
+                pdf.set_font("Helvetica", "B", 9)
+            else:
+                pdf.set_font("Helvetica", "", 9)
+            pdf.cell(cw[1], 6, val, border=1, fill=fill, align="C")
+        pdf.cell(cw[4], 6, winner, border=1, fill=fill, align="C")
+        pdf.ln()
+
+    pdf.ln(3)
+    pdf.body_text(
+        "Random Forest wins on raw R\u00b2 in all columns -- as expected for a "
+        "supervised model trained specifically on each target. However, CrossCat "
+        "achieves 88% of RF accuracy on the headline ionic dielectric task (0.81 vs "
+        "0.92) while simultaneously providing capabilities RF cannot:"
+    )
+
+    advantages = [
+        "Structure discovery: 5 physically meaningful property groups (no RF equivalent)",
+        "Calibrated uncertainty: 96% CI coverage for screening decisions (RF has none)",
+        "Native mixed types: continuous + binary + categorical + ordinal in one model",
+        "Anomaly detection with attribution: which properties are surprising?",
+        "No per-target training: one model predicts all 23 properties simultaneously",
+        "Handles arbitrary missingness: no pre-imputation needed (RF requires it)",
+    ]
+    for a in advantages:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(5, 5, "-")
+        pdf.multi_cell(0, 5, a)
+        pdf.ln(1)
+
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(
+        0,
+        4.5,
+        "The comparison is inherently asymmetric: RF is a specialized tool for "
+        "point prediction; CrossCat is a general-purpose probabilistic model for "
+        "structure discovery, uncertainty quantification, and multi-property "
+        "reasoning. CrossCat's value is not replacing RF -- it's providing the "
+        "structure discovery and calibrated uncertainty that RF cannot.",
+    )
+
+    # ================================================================
+    # PAGE 8: Imputation + Anomaly + MI + Future Work
+    # ================================================================
+    pdf.add_page()
+    pdf.section_title("8. Additional Capabilities")
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(40, 40, 100)
@@ -455,10 +555,10 @@ def build_pdf():
     )
 
     # ================================================================
-    # PAGE 8: Summary & Capabilities
+    # PAGE 9: Summary & Capabilities
     # ================================================================
     pdf.add_page()
-    pdf.section_title("8. Summary")
+    pdf.section_title("9. Summary & Future Work")
 
     capabilities = [
         (
@@ -522,8 +622,49 @@ def build_pdf():
     for label, value in metrics:
         pdf.key_metric(label, value)
 
+    # Future Work
+    pdf.ln(6)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(40, 40, 100)
+    pdf.cell(0, 7, "Future Work:", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+    future = [
+        (
+            "Scale to 130K+ materials:",
+            "The trained model can predict ionic dielectric for the ~123,000 "
+            "Materials Project materials that lack DFPT data, using only their "
+            "composition and crystal structure. This would produce a publishable "
+            "predicted dielectric dataset for the materials community.",
+        ),
+        (
+            "Improve electronic dielectric:",
+            "Adding band structure descriptors (orbital-weighted "
+            "electronegativities, average band gap decomposition) as features "
+            "would likely improve electronic dielectric prediction beyond the "
+            "current coarse proxies (is_metal, elastic moduli).",
+        ),
+        (
+            "Publication:",
+            "This analysis is suitable for submission to ICML/NeurIPS "
+            "AI4Science workshops or npj Computational Materials. The 5-view "
+            "structure discovery is the hook, R\u00b2=0.81 is the proof, and "
+            "96% CI calibration is the practical value.",
+        ),
+    ]
+    for title, desc in future:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(5, 5.5, "-")
+        pdf.cell(
+            pdf.get_string_width(title) + 1,
+            5.5,
+            title,
+        )
+        pdf.set_font("Helvetica", "", 9)
+        pdf.multi_cell(0, 5, desc)
+        pdf.ln(2)
+
     # Resources
-    pdf.ln(8)
+    pdf.ln(4)
     pdf.set_draw_color(40, 40, 100)
     pdf.set_line_width(0.3)
     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
