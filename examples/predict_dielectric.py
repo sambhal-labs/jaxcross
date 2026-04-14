@@ -224,39 +224,65 @@ for col_idx, col_label, attr_name in [
     print(f"    (ideal: 90%, actual: {within_ci:.1%})")
 
     # ── Parity plot with CI ──────────────────────────────────
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(10, 7))
 
-    # Sort by true value for cleaner CI visualization
+    # Clip to 99th percentile range to avoid outlier-driven axis compression
+    clip_hi = np.percentile(np.concatenate([holdout_true, imputed]), 99)
+    clip_lo = 0
+
+    # Error bars on evenly-spaced subset for CI visualization
     sort_idx = np.argsort(holdout_true)
-
-    ax.scatter(holdout_true, imputed, alpha=0.3, s=10, c="steelblue", label="Predictions")
-
-    # CI as error bars on a subset for readability
-    subset = sort_idx[::5]  # every 5th point
+    subset = sort_idx[::3]  # every 3rd point
+    yerr_lo = np.clip(imputed[subset] - ci_lo[subset], 0, clip_hi)
+    yerr_hi = np.clip(ci_hi[subset] - imputed[subset], 0, clip_hi)
     ax.errorbar(
         holdout_true[subset],
         imputed[subset],
-        yerr=[imputed[subset] - ci_lo[subset], ci_hi[subset] - imputed[subset]],
+        yerr=[yerr_lo, yerr_hi],
         fmt="none",
-        ecolor="lightcoral",
-        alpha=0.3,
+        ecolor="coral",
+        alpha=0.25,
+        elinewidth=1,
         label="90% CI",
+        zorder=1,
+    )
+
+    # Scatter on top
+    ax.scatter(
+        holdout_true,
+        imputed,
+        alpha=0.6,
+        s=25,
+        c="steelblue",
+        edgecolors="none",
+        label="Predictions",
+        zorder=3,
     )
 
     # Perfect prediction line
-    vmin = min(holdout_true.min(), imputed.min())
-    vmax = max(holdout_true.max(), imputed.max())
-    ax.plot([vmin, vmax], [vmin, vmax], "k--", alpha=0.5, label="Perfect prediction")
-
-    ax.set_xlabel(f"True {col_label} (log1p scale)", fontsize=12)
-    ax.set_ylabel(f"Predicted {col_label} (log1p scale)", fontsize=12)
-    ax.set_title(
-        f"{col_label}: Predicted vs True (Holdout)\n"
-        f"R2={r2:.3f}, MAE={mae:.3f}, CI calibration={within_ci:.0%}",
-        fontsize=13,
+    ax.plot(
+        [clip_lo, clip_hi],
+        [clip_lo, clip_hi],
+        "k--",
+        alpha=0.6,
+        lw=1.5,
+        label="Perfect prediction",
+        zorder=2,
     )
-    ax.legend(fontsize=10)
-    ax.set_aspect("equal")
+
+    ax.set_xlim(clip_lo, clip_hi)
+    ax.set_ylim(clip_lo, clip_hi)
+    ax.set_xlabel(f"True {col_label} (log1p scale)", fontsize=13)
+    ax.set_ylabel(f"Predicted {col_label} (log1p scale)", fontsize=13)
+    ax.set_title(
+        f"{col_label}: Predicted vs True (10% Holdout)\n"
+        f"R\u00b2={r2:.3f}  |  MAE={mae:.2f}  |  "
+        f"90% CI calibration={within_ci:.0%}",
+        fontsize=13,
+        fontweight="bold",
+    )
+    ax.legend(fontsize=11, loc="upper left")
+    ax.grid(True, alpha=0.2)
     plt.tight_layout()
 
     fname = f"parity_{attr_name}.png"
