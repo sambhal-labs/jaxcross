@@ -272,8 +272,8 @@ for col_idx, col_label, attr_name in [
 
     ax.set_xlim(clip_lo, clip_hi)
     ax.set_ylim(clip_lo, clip_hi)
-    ax.set_xlabel(f"True {col_label} (log1p scale)", fontsize=13)
-    ax.set_ylabel(f"Predicted {col_label} (log1p scale)", fontsize=13)
+    ax.set_xlabel(f"True {col_label} (raw units)", fontsize=13)
+    ax.set_ylabel(f"Predicted {col_label} (raw units)", fontsize=13)
     ax.set_title(
         f"{col_label}: Predicted vs True (10% Holdout)\n"
         f"R\u00b2={r2:.3f}  |  MAE={mae:.2f}  |  "
@@ -420,7 +420,7 @@ for ax, col_idx, label, pred_col in [
 
     ax.hist(observed_valid, bins=50, alpha=0.6, label="Observed (DFT)", color="steelblue")
     ax.hist(predicted, bins=50, alpha=0.4, label="CrossCat predicted", color="coral")
-    ax.set_xlabel(f"{label} (log1p scale)", fontsize=11)
+    ax.set_xlabel(f"{label} (raw units)", fontsize=11)
     ax.set_ylabel("Count", fontsize=11)
     ax.set_title(f"{label}: Observed vs Predicted Distribution", fontsize=12)
     ax.legend(fontsize=10)
@@ -484,7 +484,7 @@ for i, (_, row) in enumerate(top30.iterrows()):
 
 ax.set_yticks(y_pos)
 ax.set_yticklabels(formulas, fontsize=8)
-ax.set_xlabel("Ionic Dielectric Constant (log1p scale)", fontsize=11)
+ax.set_xlabel("Ionic Dielectric Constant (raw units)", fontsize=11)
 ax.set_title(
     "Top 30 Screening Candidates: Predicted Ionic Dielectric\n"
     "(bars = CrossCat prediction + 90% CI, diamonds = DFT ground truth)",

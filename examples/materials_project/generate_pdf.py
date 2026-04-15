@@ -238,6 +238,20 @@ def build():
 
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(40, 40, 100)
+    pdf.cell(0, 7, "Why Different Clusters per View?", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(30, 30, 30)
+    pdf.body(
+        "Each view independently clusters the 7,327 materials based on its property subset. "
+        "View 0 (structural/thermodynamic, 9 clusters) captures diverse material families: "
+        "oxides, halides, chalcogenides, intermetallics, etc. View 1 (electronic/mechanical, "
+        "6 clusters) groups materials by conductivity and stiffness. View 2 (ionic dielectric, "
+        "4 clusters) separates low/medium/high lattice polarizability. The singleton views "
+        "(3-4 clusters each) capture independent variation in piezoelectric response and "
+        "elastic anisotropy that doesn't correlate with other properties."
+    )
+
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(40, 40, 100)
     pdf.cell(0, 7, "Key Physical Insight:", new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(30, 30, 30)
     pdf.body(
@@ -307,8 +321,8 @@ def build():
         pdf.fig(
             f"{FIG}/holdout_99ci_parity.png",
             "Figure 3: Holdout parity plot with 99% credible intervals. "
-            "R\u00b2=0.81, 99% CI coverage=99.7%. Predictions cluster tightly "
-            "around the diagonal across 3 orders of magnitude.",
+            "R\u00b2=0.81, 99% CI coverage=99.7%. Ionic dielectric in raw units "
+            "(not log-transformed). Predictions track DFT values across the full range.",
         )
 
     # ================================================================
@@ -395,7 +409,7 @@ def build():
     if os.path.exists(f"{FIG}/ci99_top30_candidates.png"):
         pdf.fig(
             f"{FIG}/ci99_top30_candidates.png",
-            "Figure 6: Top 30 materials by predicted ionic dielectric (99% CI). "
+            "Figure 5: Top 30 materials by predicted ionic dielectric (99% CI). "
             "Blue circles = BMA prediction, red bars = 99% credible interval. "
             "Tight CI bars indicate high cross-chain agreement.",
         )
@@ -428,7 +442,7 @@ def build():
         pdf.ln(2)
         pdf.fig(
             f"{FIG}/baseline_comparison.png",
-            "Figure 7: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
+            "Figure 6: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
             "but requires per-target training and provides no uncertainty. CrossCat (blue) "
             "is a general-purpose model that also discovers structure and quantifies "
             "uncertainty.",
