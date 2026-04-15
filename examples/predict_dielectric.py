@@ -430,37 +430,57 @@ plt.savefig(FIG_DIR / "distribution_comparison.png", dpi=150, bbox_inches="tight
 plt.close()
 print(f"  Saved: {FIG_DIR / 'distribution_comparison.png'}")
 
-# Figure: Screening candidates — predicted ionic dielectric with CI
+# Figure: Screening candidates — predicted vs true with CI
 fig, ax = plt.subplots(figsize=(10, 8))
 top30 = results.nlargest(30, "ionic_pred")
-y_pos = range(len(top30))
+y_pos = np.arange(len(top30))
 formulas = top30["formula"].values
+preds = top30["ionic_pred"].values
+ci_lo = top30["ionic_ci_lo"].values
+ci_hi = top30["ionic_ci_hi"].values
 
-ax.barh(
+# CI bars (horizontal error bars centered on prediction)
+ax.errorbar(
+    preds,
     y_pos,
-    top30["ionic_pred"].values,
-    xerr=[
-        top30["ionic_pred"].values - top30["ionic_ci_lo"].values,
-        top30["ionic_ci_hi"].values - top30["ionic_pred"].values,
-    ],
-    color="steelblue",
-    alpha=0.7,
+    xerr=[preds - ci_lo, ci_hi - preds],
+    fmt="none",
     ecolor="lightcoral",
-    capsize=3,
+    elinewidth=2,
+    capsize=4,
+    label="90% CI",
+    zorder=2,
 )
 
-# Overlay true values where available
+# Predicted value markers (blue circles)
+ax.scatter(
+    preds,
+    y_pos,
+    color="steelblue",
+    s=60,
+    zorder=4,
+    marker="o",
+    edgecolors="darkblue",
+    linewidths=0.5,
+    label="CrossCat prediction",
+)
+
+# True values where available (red diamonds)
+first_true = True
 for i, (_, row) in enumerate(top30.iterrows()):
     if not np.isnan(row["ionic_true"]):
         ax.scatter(
             row["ionic_true"],
             i,
             color="red",
-            s=40,
+            s=50,
             zorder=5,
             marker="d",
-            label="DFT ground truth" if i == 0 else None,
+            edgecolors="darkred",
+            linewidths=0.5,
+            label="DFT ground truth" if first_true else None,
         )
+        first_true = False
 
 ax.set_yticks(y_pos)
 ax.set_yticklabels(formulas, fontsize=8)
