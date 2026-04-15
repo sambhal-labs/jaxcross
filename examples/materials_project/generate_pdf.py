@@ -414,6 +414,15 @@ def build():
             "Tight CI bars indicate high cross-chain agreement.",
         )
 
+    if os.path.exists(f"{FIG}/bma_quality.png"):
+        pdf.fig(
+            f"{FIG}/bma_quality.png",
+            "Figure 6: 49,566 high-confidence materials -- predicted ionic dielectric "
+            "vs cross-chain std across 4 MCMC chains. Color gradient from red (lower "
+            "confidence) to green (higher confidence). Low std (<2.5) confirms all 4 "
+            "chains agree on these predictions.",
+        )
+
     # ================================================================
     # PAGE 8: Baseline Comparison
     # ================================================================
@@ -442,7 +451,7 @@ def build():
         pdf.ln(2)
         pdf.fig(
             f"{FIG}/baseline_comparison.png",
-            "Figure 6: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
+            "Figure 7: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
             "but requires per-target training and provides no uncertainty. CrossCat (blue) "
             "is a general-purpose model that also discovers structure and quantifies "
             "uncertainty.",
