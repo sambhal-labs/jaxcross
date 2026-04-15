@@ -297,8 +297,27 @@ new_meta = df_all.loc[
     ],
 ].reset_index(drop=True)
 
-# Also save the training data (for packed_insert_rows)
-train_data = data_np[is_training]
+# Build training data from DIELECTRIC cache (has actual DFT values)
+# NOT from all-materials (which has NaN for dielectric columns)
+print("\n  Building training data from dielectric cache...")
+df_train = preprocess(df_diel)
+train_data = df_train[VALID_ATTRS].values.astype(np.float32)
+train_data[~np.isfinite(train_data)] = np.nan
+# Apply same IQR clamp
+for ci in range(train_data.shape[1]):
+    col = train_data[:, ci]
+    v = col[np.isfinite(col)]
+    if len(v) > 100:
+        q01, q99 = np.percentile(v, [0.5, 99.5])
+        iqr = q99 - q01
+        lo, hi = q01 - 5 * iqr, q99 + 5 * iqr
+        if ((col < lo) | (col > hi)).sum() > 0:
+            train_data[(train_data[:, ci] < lo) | (train_data[:, ci] > hi), ci] = np.nan
+
+# Verify training data has dielectric values
+ionic_col = VALID_ATTRS.index("e_ionic")
+n_ionic = (~np.isnan(train_data[:, ionic_col])).sum()
+print(f"  Train ionic dielectric: {n_ionic}/{len(train_data)} non-NaN")
 
 print(f"\n  Training materials: {train_data.shape[0]}")
 print(f"  New materials (to predict): {new_data.shape[0]}")
