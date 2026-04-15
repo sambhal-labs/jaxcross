@@ -5,7 +5,6 @@ import os
 
 from fpdf import FPDF
 
-OLD = "examples/results/pdf_assets_v2"
 FIG = "examples/results/materials_project/dielectric_figures"
 OUTPUT = "examples/materials_project_results.pdf"
 
@@ -249,9 +248,9 @@ def build():
         "discovery capability."
     )
 
-    if os.path.exists(f"{OLD}/cell21_img2.png"):
+    if os.path.exists(f"{FIG}/z_matrix.png"):
         pdf.fig(
-            f"{OLD}/cell21_img2.png",
+            f"{FIG}/z_matrix.png",
             "Figure 2: Z-matrix (dependence probability). Clear block structure: "
             "structural/thermodynamic (View 0), electronic/mechanical (View 1), "
             "and ionic dielectric pair (View 2).",
