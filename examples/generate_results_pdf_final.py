@@ -345,7 +345,7 @@ def build():
     # PAGE 6: 49,566 Predictions
     # ================================================================
     pdf.add_page()
-    pdf.stitle("5. Predicting Dielectric for 49,566 Materials")
+    pdf.stitle("6. Predicting Dielectric for 49,566 Materials")
     pdf.body(
         "Using the validated model, we predict ionic dielectric constants for 147,552 "
         "Materials Project materials that lack DFPT data. Each prediction uses Bayesian "
@@ -375,16 +375,15 @@ def build():
     if os.path.exists(f"{FIG}/ci99_distribution.png"):
         pdf.fig(
             f"{FIG}/ci99_distribution.png",
-            "Figure 4: Left: predicted ionic dielectric distribution matches DFT observed. "
-            "Right: confidence distribution -- 99% CI subset (green) has high confidence, "
-            "filtered materials (coral) have wide cross-chain disagreement.",
+            "Figure 5: Left: distribution of 49,566 high-confidence ionic dielectric predictions. "
+            "Right: confidence score distribution (mean=0.795).",
         )
 
     # ================================================================
     # PAGE 6: Screening Candidates
     # ================================================================
     pdf.add_page()
-    pdf.stitle("6. Screening Candidates: Highest Predicted Dielectric")
+    pdf.stitle("7. Screening Candidates: Highest Predicted Dielectric")
     pdf.body(
         "The 99% CI subset enables targeted DFPT calculations: instead of computing "
         "dielectric constants for all 147K materials, experimentalists can prioritize "
@@ -395,7 +394,7 @@ def build():
     if os.path.exists(f"{FIG}/ci99_top30_candidates.png"):
         pdf.fig(
             f"{FIG}/ci99_top30_candidates.png",
-            "Figure 5: Top 30 materials by predicted ionic dielectric (99% CI). "
+            "Figure 6: Top 30 materials by predicted ionic dielectric (99% CI). "
             "Blue circles = BMA prediction, red bars = 99% credible interval. "
             "Tight CI bars indicate high cross-chain agreement.",
         )
@@ -403,16 +402,16 @@ def build():
     if os.path.exists(f"{FIG}/bma_quality.png"):
         pdf.fig(
             f"{FIG}/bma_quality.png",
-            "Figure 6: BMA quality -- prediction magnitude vs cross-chain uncertainty. "
-            "Green = high confidence, red = low confidence. The 49,566 high-confidence "
-            "materials (green cluster) have low cross-chain std.",
+            "Figure 7: 49,566 high-confidence materials -- prediction vs cross-chain std. "
+            "Color indicates confidence (green=high, red=lower). "
+            "Low std confirms 4-chain agreement on these predictions.",
         )
 
     # ================================================================
     # PAGE 7: Baseline Comparison
     # ================================================================
     pdf.add_page()
-    pdf.stitle("7. Baseline Comparison")
+    pdf.stitle("8. Baseline Comparison")
     pdf.body(
         "CrossCat achieves 88% of Random Forest R\u00b2 on ionic dielectric (0.81 vs 0.92) "
         "while providing capabilities no supervised model can match:"
@@ -436,7 +435,7 @@ def build():
         pdf.ln(2)
         pdf.fig(
             f"{FIG}/baseline_comparison.png",
-            "Figure 7: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
+            "Figure 8: R\u00b2 comparison on 10% holdout. RF wins on raw accuracy (green) "
             "but requires per-target training and provides no uncertainty. CrossCat (blue) "
             "is a general-purpose model that also discovers structure and quantifies "
             "uncertainty.",
@@ -457,7 +456,7 @@ def build():
     # PAGE 8: Summary + Future Work
     # ================================================================
     pdf.add_page()
-    pdf.stitle("8. Summary of Contributions")
+    pdf.stitle("9. Summary of Contributions")
 
     contribs = [
         (
