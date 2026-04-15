@@ -4,7 +4,7 @@ Run 4 chains x 100 sweeps sequentially on local GTX 1650.
 Starts all chains from sweep-300 checkpoint with different RNG keys.
 Uses packed_gibbs_step (memory-friendly, 4 small JIT compilations).
 
-Usage: uv run python examples/run_local_multichain.py
+Usage: uv run python examples/materials_project/run_local_multichain.py
 """
 
 import gc
@@ -25,7 +25,7 @@ from crosscat.serialization import load_packed_state, save_packed_state
 from crosscat.types import ColumnType
 
 # ── Configuration ──────────────────────────────────────────────
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 CACHE_PATH = CACHE_DIR / "mp_dielectric_cache_v2.parquet"
 CKPT_SRC = CACHE_DIR / "checkpoints_v2_local" / "checkpoint_sweep_000300.jxc"
 RESULTS_DIR = CACHE_DIR / "multichain_results"

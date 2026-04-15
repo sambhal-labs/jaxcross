@@ -59,8 +59,7 @@ Thumbs.db
 # Benchmark results
 results/
 # Allow materials project checkpoints for Kaggle reproducibility
-!examples/results/
-!examples/results/materials_project/
-!examples/results/materials_project/checkpoints_v2_local/
-!examples/results/materials_project/checkpoints_v2_local/**
+!examples/materials_project/results/
+!examples/materials_project/results/checkpoints_v2_local/
+!examples/materials_project/results/checkpoints_v2_local/**
 site/

@@ -3,7 +3,7 @@
 Baseline comparison: CrossCat vs sklearn IterativeImputer (MICE) vs Random Forest.
 Same 10% holdout, same data preprocessing, same columns.
 
-Usage: uv run python examples/baseline_comparison.py
+Usage: uv run python examples/materials_project/baseline_comparison.py
 """
 
 import time
@@ -23,7 +23,7 @@ from crosscat.serialization import load_packed_state
 from crosscat.types import ColumnType
 
 # ── Configuration ──────────────────────────────────────────────
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 CACHE_PATH = CACHE_DIR / "mp_dielectric_cache_v2.parquet"
 RESULTS_DIR = CACHE_DIR / "multichain_results"
 SEED = 42

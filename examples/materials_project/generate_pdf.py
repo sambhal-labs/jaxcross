@@ -5,8 +5,8 @@ import os
 
 from fpdf import FPDF
 
-FIG = "examples/results/materials_project/dielectric_figures"
-OUTPUT = "examples/materials_project_results.pdf"
+FIG = "examples/materials_project/results/dielectric_figures"
+OUTPUT = "examples/materials_project/results.pdf"
 
 
 class PDF(FPDF):
@@ -542,8 +542,8 @@ def build():
         "GitHub: https://github.com/sambhal-labs/jaxcross",
         "Docs: https://sambhal-labs.github.io/jaxcross/",
         "Data: https://materialsproject.org/ (API v2025.09.25)",
-        "Notebook: examples/materials_project_discovery_v2.ipynb",
-        "Pipeline: examples/skills/{fetch,preprocess,impute}_*.py",
+        "Notebook: examples/materials_project/discovery_v2.ipynb",
+        "Pipeline: examples/materials_project/{fetch,preprocess,impute}_*.py",
     ]:
         pdf.cell(5, 5.5, "-")
         pdf.cell(0, 5.5, r, new_x="LMARGIN", new_y="NEXT")

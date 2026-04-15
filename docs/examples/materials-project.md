@@ -1,11 +1,11 @@
 # Materials Project Structure Discovery
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/examples/materials_project_discovery.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/examples/materials_project/discovery_v2.ipynb)
 
 An industry-grade use case analyzing ~7,000 materials from the [Materials Project](https://materialsproject.org/) database. Every ML paper on Materials Project data predicts one property at a time (band gap, bulk modulus, dielectric constant) using supervised learning. This notebook demonstrates CrossCat's unique capability: **unsupervised joint structure discovery** across all material properties simultaneously — without labels.
 
 !!! info "Notebook"
-    The full example is at [`examples/materials_project_discovery.ipynb`](https://github.com/sambhal-labs/jaxcross/blob/main/examples/materials_project_discovery.ipynb). Run it on Kaggle (T4 or P100) for GPU acceleration. Requires a free [Materials Project API key](https://materialsproject.org/api).
+    The full example is at [`examples/materials_project/discovery_v2.ipynb`](https://github.com/sambhal-labs/jaxcross/blob/main/examples/materials_project/discovery_v2.ipynb). Run it on Kaggle (T4 or P100) for GPU acceleration. Requires a free [Materials Project API key](https://materialsproject.org/api).
 
 ## Dataset
 

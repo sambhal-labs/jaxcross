@@ -4,7 +4,7 @@ Full multi-chain analysis of 4 chains from local GTX 1650 run.
 Produces: Rhat convergence, Z-matrix, view structure, anomalies,
 imputation evaluation, mutual information, classification, typicality.
 
-Usage: uv run python examples/analyze_multichain.py
+Usage: uv run python examples/materials_project/analyze_multichain.py
 """
 
 import time
@@ -30,7 +30,7 @@ from crosscat.serialization import load_packed_state
 from crosscat.types import ColumnType
 
 # ── Configuration ──────────────────────────────────────────────
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 CACHE_PATH = CACHE_DIR / "mp_dielectric_cache_v2.parquet"
 RESULTS_DIR = CACHE_DIR / "multichain_results"
 SEED = 99

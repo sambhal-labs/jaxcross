@@ -8,7 +8,7 @@ Materials Project materials have dielectric data. CrossCat predicts ionic
 dielectric at R2=0.82 from cheap structural/compositional features, enabling
 rapid screening before committing to expensive DFPT calculations.
 
-Usage: uv run python examples/predict_dielectric.py
+Usage: uv run python examples/materials_project/predict_dielectric.py
 """
 
 import time
@@ -32,7 +32,7 @@ from crosscat.serialization import load_packed_state
 from crosscat.types import ColumnType
 
 # ── Configuration ──────────────────────────────────────────────
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 CACHE_PATH = CACHE_DIR / "mp_dielectric_cache_v2.parquet"
 RESULTS_DIR = CACHE_DIR / "multichain_results"
 FIG_DIR = CACHE_DIR / "dielectric_figures"

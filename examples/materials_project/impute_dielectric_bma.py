@@ -10,7 +10,7 @@ Input:  preprocessed/new_materials_data.npy + train_data.npy (from preprocess)
         multichain_results/chain_{0-3}.jxc (trained chains)
 Output: multichain_results/predicted_dielectric_123k.csv
 
-Usage: uv run python examples/skills/impute_dielectric_bma.py
+Usage: uv run python examples/materials_project/impute_dielectric_bma.py
 """
 
 import gc
@@ -26,7 +26,7 @@ from crosscat import batch_impute_column, packed_insert_rows
 from crosscat.serialization import load_packed_state
 
 # ── Configuration ──────────────────────────────────────────────
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 PREPROCESSED_DIR = CACHE_DIR / "preprocessed"
 RESULTS_DIR = CACHE_DIR / "multichain_results"
 OUTPUT_CSV = RESULTS_DIR / "predicted_dielectric_123k.csv"

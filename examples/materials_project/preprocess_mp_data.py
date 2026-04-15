@@ -9,7 +9,7 @@ Output: mp_new_materials_preprocessed.npy  (float32 array, 23 cols)
         mp_new_materials_meta.parquet      (material_id, formula, crystal_system)
         mp_train_data.npy                  (training data array for insertion)
 
-Usage: uv run python examples/skills/preprocess_mp_data.py
+Usage: uv run python examples/materials_project/preprocess_mp_data.py
 """
 
 import time
@@ -22,7 +22,7 @@ from pymatgen.symmetry.groups import SpaceGroup
 
 from crosscat.types import ColumnType
 
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 ALL_CACHE = CACHE_DIR / "mp_all_summary_cache.parquet"
 DIELECTRIC_CACHE = CACHE_DIR / "mp_dielectric_cache_v2.parquet"
 OUTPUT_DIR = CACHE_DIR / "preprocessed"

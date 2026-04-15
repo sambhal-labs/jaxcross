@@ -4,9 +4,9 @@ Fetch summary data for ALL Materials Project materials and cache to Parquet.
 Uses direct REST API with pagination to stay within 3.8GB RAM.
 Bypasses mp-api client which loads all pydantic objects into memory.
 
-Output: examples/results/materials_project/mp_all_summary_cache.parquet
+Output: examples/materials_project/results/mp_all_summary_cache.parquet
 
-Usage: uv run python examples/skills/fetch_mp_data.py
+Usage: uv run python examples/materials_project/fetch_mp_data.py
 """
 
 import gc
@@ -17,7 +17,7 @@ import pandas as pd
 import requests
 
 MP_API_KEY = "yGA3US2qaVGQG51xrjLTDidG80JqvG5e"
-CACHE_DIR = Path("examples/results/materials_project")
+CACHE_DIR = Path("examples/materials_project/results")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT = CACHE_DIR / "mp_all_summary_cache.parquet"
 
