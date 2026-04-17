@@ -26,6 +26,7 @@ from crosscat.packed.kernels import (
     packed_transition_row_assignments,
     packed_transition_row_assignments_minibatch,
     packed_transition_row_assignments_parallel,
+    set_overflow_policy,
 )
 from crosscat.packed.state import (
     _ARRAY_FIELDS,
@@ -98,6 +99,7 @@ __all__ = [
     "packed_transition_row_assignments_parallel",
     "recompute_all_suffstats",
     "select_best_chain",
+    "set_overflow_policy",
     "suggest_max_clusters",
     "unbatch_packed_states",
     "unified_log_marginal",

@@ -351,7 +351,7 @@ class DirichletCategorical:
         # flow through "unused" jnp.where branches in the packed path. Matches
         # packed/components.py which already clips via fixed-size arrays.
         x_safe = jnp.clip(x.astype(jnp.int32), 0, k - 1)
-        return jnp.log(probs[x_safe])
+        return jnp.log(jnp.maximum(probs[x_safe], LOG_EPS))
 
     @staticmethod
     def sample_posterior_predictive(
