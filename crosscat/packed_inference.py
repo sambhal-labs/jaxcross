@@ -957,6 +957,63 @@ def packed_mutual_information(
     return mi, linfoot
 
 
+def batch_mutual_information(
+    packed_states: list[PackedCrossCatState],
+    column_types: list,
+    col_pairs: Array,
+    *,
+    n_samples: int = 1000,
+    rng_key: Array | None = None,
+) -> tuple[Array, Array]:
+    """Compute posterior MI for a batch of column pairs.
+
+    Convenience wrapper over ``packed_mutual_information`` that loops in
+    Python over ``col_pairs``. Typical use is an ``O(p^2)`` upper-triangular
+    sweep across every column pair; for ``p`` in the hundreds that's a few
+    thousand MC estimates — acceptable for Python-loop overhead since each
+    call is dominated by the JIT-compiled ``_packed_estimate_mi_sample``.
+
+    Args:
+        packed_states: List of PackedCrossCatState (MCMC posterior samples).
+        column_types: Column type list (must match all packed_states).
+        col_pairs: Integer array of shape (n_pairs, 2). Each row is
+            ``(col_i, col_j)``.
+        n_samples: MC samples per pair for MI estimation.
+        rng_key: JAX PRNG key (uses ``key(0)`` if not provided). Each pair
+            is scored with ``fold_in(rng_key, pair_idx)`` so different
+            pairs use independent streams.
+
+    Returns:
+        Tuple of (mi, linfoot) arrays, each of shape (n_pairs,). MI values
+        for columns in different views (no shared cluster structure) are
+        clamped to 0; linfoot ``sqrt(1 - exp(-2 MI))`` is in [0, 1].
+    """
+    if rng_key is None:
+        rng_key = jax.random.key(0)
+
+    pairs = jnp.asarray(col_pairs, dtype=jnp.int32)
+    if pairs.ndim != 2 or pairs.shape[-1] != 2:
+        raise ValueError(f"col_pairs must have shape (n_pairs, 2); got {tuple(pairs.shape)}")
+
+    mis: list[float] = []
+    linfoots: list[float] = []
+    for p_idx in range(pairs.shape[0]):
+        c_i = int(pairs[p_idx, 0])
+        c_j = int(pairs[p_idx, 1])
+        mi, linfoot = packed_mutual_information(
+            packed_states,
+            column_types,
+            c_i,
+            c_j,
+            n_samples=n_samples,
+            rng_key=jax.random.fold_in(rng_key, p_idx),
+        )
+        mis.append(float(mi))
+        linfoots.append(float(linfoot))
+
+    return jnp.asarray(mis), jnp.asarray(linfoots)
+
+
 def _packed_estimate_mi_sample(
     rng_key: Array,
     packed: PackedCrossCatState,
