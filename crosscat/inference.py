@@ -171,7 +171,7 @@ def predictive_probability(
         col_type = state.column_types[col]
         hypers = state.column_hypers[col]
         x = query_vals[q_idx]
-        log_mixture = -jnp.inf
+        log_mixture: Array = jnp.asarray(-jnp.inf)
 
         comp = get_component(col_type)
         for c in range(n_clusters):
@@ -240,8 +240,8 @@ def predictive_sample(
 
             # Sample cluster
             k1, k2 = jax.random.split(sample_keys[q_idx])
-            cluster = jax.random.categorical(k1, jnp.log(weights + LOG_EPS))
-            cluster = int(cluster)
+            cluster_idx = jax.random.categorical(k1, jnp.log(weights + LOG_EPS))
+            cluster = int(cluster_idx)
 
             # Find local index
             local_idx = None
@@ -424,9 +424,9 @@ def _estimate_mi_sample(
         y = comp_j.sample_posterior_predictive(k3, ss_j, hypers_j, n=1)[0]
 
         # Compute log p(x), log p(y), log p(x,y) across all clusters
-        log_px = -jnp.inf
-        log_py = -jnp.inf
-        log_pxy = -jnp.inf
+        log_px: Array = jnp.asarray(-jnp.inf)
+        log_py: Array = jnp.asarray(-jnp.inf)
+        log_pxy: Array = jnp.asarray(-jnp.inf)
 
         for c in range(n_clusters):
             ss_ic = view.suffstats[c][local_i]
@@ -886,6 +886,7 @@ def predictive_cdf(
         if row_id is not None:
             weights = _cluster_weights_for_observed_row(view, row_id)
         elif condition_cols:
+            assert condition_vals is not None
             weights = _cluster_weights_conditioned(
                 state, view, view_idx, condition_cols or [], condition_vals, data
             )

@@ -15,6 +15,7 @@ import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import jax.numpy as jnp
 import numpy as np
@@ -124,7 +125,7 @@ def save_packed_state(
         arrays_tmp_file = path / "_arrays_tmp.npz"
         arrays_final = path / "arrays.npz"
         arrays = {name: np.asarray(getattr(packed, name)) for name in _ARRAY_FIELDS}
-        np.savez_compressed(arrays_tmp_stem, **arrays)
+        np.savez_compressed(arrays_tmp_stem, **arrays)  # type: ignore[arg-type]
         arrays_tmp_file.rename(arrays_final)
 
         # Mark as valid only after both files are written
@@ -186,7 +187,7 @@ def load_packed_state(
 
         # Arrays
         npz = np.load(path / "arrays.npz")
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         for name in _ARRAY_FIELDS:
             if name in npz:
                 kwargs[name] = jnp.array(npz[name])
@@ -209,7 +210,7 @@ def load_packed_state(
     for name in _STATIC_FIELDS:
         kwargs[name] = int(metadata[name])
 
-    packed = PackedCrossCatState(**kwargs)
+    packed = PackedCrossCatState(**kwargs)  # type: ignore[arg-type]
 
     # Column types
     column_types = None
