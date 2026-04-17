@@ -426,7 +426,7 @@ def insert_rows(
                         log_probs = log_probs.at[c].add(log_lik)
 
             # New cluster — use CRP prior only (empty cluster prior predictive)
-            log_new = jnp.log(alpha)
+            log_new = jnp.log(jnp.maximum(alpha, LOG_EPS))
             log_probs = jnp.concatenate([log_probs, jnp.array([log_new])])
             log_probs = log_probs - jnp.max(log_probs)
             chosen = int(jax.random.categorical(row_keys[i], log_probs))
@@ -502,11 +502,12 @@ def _log_crp(assignments: Array, alpha: Array) -> Array:
     n_clusters = int(jnp.max(assignments)) + 1
     counts = jnp.bincount(assignments, length=n_clusters).astype(jnp.float32)
 
+    safe_alpha = jnp.maximum(alpha, LOG_EPS)
     log_p = (
-        n_clusters * jnp.log(alpha)
+        n_clusters * jnp.log(safe_alpha)
         + jnp.sum(gammaln(counts))
-        - gammaln(n + alpha)
-        + gammaln(alpha)
+        - gammaln(n + safe_alpha)
+        + gammaln(safe_alpha)
     )
     return log_p
 

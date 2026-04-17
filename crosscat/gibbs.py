@@ -186,7 +186,7 @@ def transition_column_assignments(
         # in its view), reuse the current view's row assignments as the auxiliary
         # variable. Otherwise, sample fresh row assignments from CRP with alpha
         # drawn from the Gamma(1,1) prior.
-        log_prior_new = jnp.log(alpha)
+        log_prior_new = jnp.log(jnp.maximum(alpha, LOG_EPS))
         k_crp, k_cat, k_alpha = jax.random.split(keys[j], 3)
         is_singleton = int(jnp.sum(temp_assignments == old_view)) == 0
         if is_singleton:
@@ -326,7 +326,9 @@ def transition_column_assignments_mh(
             )
 
             # Log acceptance ratio
-            log_prior_ratio = jnp.log(alpha) - jnp.log(jnp.maximum(float(old_count), LOG_EPS))
+            log_prior_ratio = jnp.log(jnp.maximum(alpha, LOG_EPS)) - jnp.log(
+                jnp.maximum(float(old_count), LOG_EPS)
+            )
             log_lik_ratio = log_lik_new - log_lik_old
             log_accept = log_prior_ratio + log_lik_ratio
 
@@ -524,7 +526,7 @@ def transition_row_assignments(
                 log_probs.append(log_prior + log_lik)
 
             # Score new singleton cluster (prior predictive under empty cluster)
-            log_prior_new = jnp.log(alpha)
+            log_prior_new = jnp.log(jnp.maximum(alpha, LOG_EPS))
             empty_stats = []
             for local_idx in range(len(col_indices)):
                 col_idx = int(col_indices[local_idx])
