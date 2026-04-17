@@ -112,6 +112,7 @@ class TBLogger:
             Dict with keys ``rhat`` and ``ess`` (values that were not
             computable are omitted).
         """
+        import jax.numpy as jnp
         import numpy as np
 
         from crosscat.diagnostics import effective_sample_size, gelman_rubin_rhat
@@ -126,14 +127,15 @@ class TBLogger:
 
         n_chains, n_samples = arr.shape
         results: dict[str, float] = {}
+        arr_jax = jnp.asarray(arr)
 
         if n_chains >= 2 and n_samples >= 4:
-            rhat_val = float(gelman_rubin_rhat(arr))
+            rhat_val = float(gelman_rubin_rhat(arr_jax))
             self._writer.add_scalar(f"rhat/{metric_name}", rhat_val, step)
             results["rhat"] = rhat_val
 
         if n_samples >= 2:
-            ess_val = float(effective_sample_size(arr))
+            ess_val = float(effective_sample_size(arr_jax))
             self._writer.add_scalar(f"ess/{metric_name}", ess_val, step)
             results["ess"] = ess_val
 
