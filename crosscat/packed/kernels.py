@@ -7,6 +7,7 @@ Extracted from packed_state.py (v2 kernels) with _v2 suffixes removed.
 from __future__ import annotations
 
 import functools
+import os
 
 import jax
 import jax.numpy as jnp
@@ -48,32 +49,108 @@ from crosscat.types import LOG_EPS
 # Runtime safety helpers
 # ---------------------------------------------------------------------------
 
+_VALID_OVERFLOW_POLICIES = ("warn", "raise")
+# Overflow policy for max_cols_per_view / max_clusters budgets.
+# "warn"  : emit a RuntimeWarning (current, lenient behavior).
+# "raise" : raise RuntimeError (strict mode for production pipelines).
+_OVERFLOW_POLICY = os.environ.get("JAXCROSS_OVERFLOW_POLICY", "warn").lower()
+if _OVERFLOW_POLICY not in _VALID_OVERFLOW_POLICIES:
+    _OVERFLOW_POLICY = "warn"
+
+
+def set_overflow_policy(policy: str) -> None:
+    """Configure how budget overflows are reported.
+
+    Parameters
+    ----------
+    policy : {"warn", "raise"}
+        "warn" (default) emits a RuntimeWarning and continues with the clipped
+        fallback. "raise" raises RuntimeError, which is the recommended setting
+        for production pipelines where silent data corruption is unacceptable.
+
+    Notes
+    -----
+    Can also be set via the ``JAXCROSS_OVERFLOW_POLICY`` environment variable.
+    """
+    global _OVERFLOW_POLICY
+    if policy not in _VALID_OVERFLOW_POLICIES:
+        raise ValueError(f"policy must be one of {_VALID_OVERFLOW_POLICIES}, got {policy!r}")
+    _OVERFLOW_POLICY = policy
+
+
+def _report_overflow(message: str) -> None:
+    import warnings
+
+    if _OVERFLOW_POLICY == "raise":
+        raise RuntimeError(message)
+    warnings.warn(message, stacklevel=3)
+
 
 def _warn_column_overflow(view_idx, n_in_view, max_cpv):
     """Callback to warn when a view exceeds max_cols_per_view during Gibbs."""
     if int(n_in_view) > int(max_cpv):
-        import warnings
-
-        warnings.warn(
+        _report_overflow(
             f"View {int(view_idx)} has {int(n_in_view)} columns but "
             f"max_cols_per_view={int(max_cpv)}. Columns beyond the limit are "
-            f"silently dropped. Increase max_cols_per_view when calling pack_state().",
-            stacklevel=2,
+            f"silently dropped. Increase max_cols_per_view when calling pack_state()."
         )
 
 
 def _warn_cluster_budget_exhausted(view_idx, n_clusters, max_clusters):
     """Callback to warn when cluster budget is exhausted during row insertion."""
     if int(n_clusters) >= int(max_clusters):
-        import warnings
-
-        warnings.warn(
+        _report_overflow(
             f"View {int(view_idx)}: cluster budget exhausted "
             f"({int(n_clusters)}/{int(max_clusters)}). New rows are assigned to "
             f"the largest existing cluster instead of creating new ones. "
-            f"Increase max_clusters when calling pack_state().",
-            stacklevel=2,
+            f"Increase max_clusters when calling pack_state()."
         )
+
+
+def _validate_category_range(
+    data: Array,
+    col_type_ids: Array,
+    max_categories: int,
+    context: str = "data",
+) -> None:
+    """Host-side validation that CATEGORICAL/ORDINAL values fit in [0, max_categories).
+
+    Called from non-JIT entry points (pack_state, packed_insert_rows) to fail
+    loudly instead of silently clipping to `max_categories - 1` inside scatter
+    ops. Runs on CPU via numpy; safe to invoke before the JIT boundary.
+
+    Raises
+    ------
+    ValueError
+        If any categorical or ordinal column has a finite value >= max_categories
+        or < 0.
+    """
+    import numpy as np
+
+    from crosscat.packed.state import CATEGORICAL_ID, ORDINAL_ID
+
+    data_np = np.asarray(data)
+    if data_np.ndim != 2:
+        return
+    type_ids_np = np.asarray(col_type_ids)
+    n_cols = min(data_np.shape[1], type_ids_np.shape[0])
+    for j in range(n_cols):
+        tid = int(type_ids_np[j])
+        if tid != CATEGORICAL_ID and tid != ORDINAL_ID:
+            continue
+        col = data_np[:, j]
+        finite = col[~np.isnan(col)]
+        if finite.size == 0:
+            continue
+        mx = int(np.max(finite))
+        mn = int(np.min(finite))
+        if mx >= max_categories or mn < 0:
+            raise ValueError(
+                f"{context}: column {j} (type_id={tid}) has values in "
+                f"[{mn}, {mx}] but max_categories={max_categories}. "
+                f"Out-of-range categories would be silently clipped. "
+                f"Increase max_categories to at least {mx + 1}."
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +578,7 @@ def _score_row_all_clusters(
             hyper_cutpoints,
             n_columns,
         )
-    log_prior_new = jnp.log(crp_alpha)
+    log_prior_new = jnp.log(jnp.maximum(crp_alpha, LOG_EPS))
     log_prob_new = log_prior_new + log_lik_new
 
     return jnp.concatenate([log_probs_existing, jnp.array([log_prob_new])])
@@ -1592,11 +1669,12 @@ def packed_transition_crp_alphas(
         n_clusters = jnp.sum(counts > 0).astype(jnp.float32)
         valid_counts = jnp.where(counts > 0, counts, 1.0)
         n_total = jnp.sum(counts).astype(jnp.float32)
+        safe_alpha = jnp.maximum(alpha_val, LOG_EPS)
         log_p = (
-            n_clusters * jnp.log(alpha_val)
+            n_clusters * jnp.log(safe_alpha)
             + jnp.sum(jnp.where(counts > 0, gammaln(valid_counts), 0.0))
-            - gammaln(n_total + alpha_val)
-            + gammaln(alpha_val)
+            - gammaln(n_total + safe_alpha)
+            + gammaln(safe_alpha)
         )
         # Exp(1) prior: -alpha_val
         return log_p - alpha_val
@@ -1890,7 +1968,7 @@ def packed_transition_column_assignments(
         # Paper (Algorithm 8, Neal 1998): if column j is a singleton (only column
         # in its view), reuse the current view's row assignments as the auxiliary
         # variable. Otherwise, sample fresh CRP assignments with alpha from Gamma(1,1).
-        log_prior_new = jnp.log(packed.column_crp_alpha)
+        log_prior_new = jnp.log(jnp.maximum(packed.column_crp_alpha, LOG_EPS))
         is_singleton = counts_excl[old_view] == 0
 
         # Always compute both paths (JIT-compatible), select via jnp.where
@@ -2181,11 +2259,12 @@ def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
     # Count columns per view
     col_counts = jnp.bincount(col_assigns, length=packed.max_views).astype(jnp.float32)
     # Only active views contribute
+    safe_col_alpha = jnp.maximum(col_alpha, LOG_EPS)
     col_crp = (
-        n_views_val * jnp.log(col_alpha)
+        n_views_val * jnp.log(safe_col_alpha)
         + jnp.sum(jnp.where(packed.view_mask, gammaln(col_counts), 0.0))
-        - gammaln(n_cols + col_alpha)
-        + gammaln(col_alpha)
+        - gammaln(n_cols + safe_col_alpha)
+        + gammaln(safe_col_alpha)
     )
 
     # --- Row CRP per view (vectorized via vmap) ---
@@ -2201,11 +2280,12 @@ def packed_log_joint(packed: PackedCrossCatState, data: Array) -> Array:
         row_counts = jnp.sum(one_hot, axis=0)
 
         active_mask = jnp.arange(packed.max_clusters) < n_clusters_v
+        safe_alpha_v = jnp.maximum(alpha_v, LOG_EPS)
         crp = (
-            n_clusters_v * jnp.log(alpha_v)
+            n_clusters_v * jnp.log(safe_alpha_v)
             + jnp.sum(jnp.where(active_mask, gammaln(jnp.maximum(row_counts, 1.0)), 0.0))
-            - gammaln(packed.n_rows + alpha_v)
-            + gammaln(alpha_v)
+            - gammaln(packed.n_rows + safe_alpha_v)
+            + gammaln(safe_alpha_v)
         )
         return crp
 
@@ -2547,6 +2627,14 @@ def packed_insert_rows(
     n_old = packed.n_rows
     max_k = packed.max_clusters
     max_views = packed.max_views
+
+    # Validate category ranges on new rows before JIT (matches pack_state policy).
+    _validate_category_range(
+        new_rows,
+        packed.col_type_ids,
+        int(packed.max_categories),
+        context="packed_insert_rows(new_rows)",
+    )
 
     updated_data = jnp.concatenate([data, new_rows], axis=0)
 
