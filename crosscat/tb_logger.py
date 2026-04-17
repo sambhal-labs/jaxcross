@@ -80,6 +80,65 @@ class TBLogger:
                     self._writer.add_scalar(f"mean/{key}", float(np.mean(arr)), step)
                     self._writer.add_histogram(key, arr, step)
 
+    def log_convergence(
+        self,
+        traces,
+        step: int,
+        *,
+        metric_name: str = "log_joint",
+    ) -> dict[str, float]:
+        """Compute and log Gelman-Rubin R-hat and ESS on a multi-chain trace.
+
+        Requires ``traces`` to be convertible to a 2-D array of shape
+        ``(n_chains, n_samples)``. R-hat needs at least 2 chains and 4
+        samples per chain; ESS needs at least 2 samples. If either
+        precondition is unmet the corresponding metric is silently skipped
+        — the intent is that this method is safe to call every ``k`` sweeps
+        without a guard, letting the diagnostics appear once enough history
+        accumulates.
+
+        Both diagnostics are also returned so callers can log them through
+        other sinks or assert in tests.
+
+        Args:
+            traces: Array-like of shape ``(n_chains, n_samples)`` — the
+                statistic (typically ``log_joint``) tracked per sweep per
+                chain.
+            step: TensorBoard x-axis step (usually the sweep counter).
+            metric_name: TensorBoard tag prefix. R-hat logs as
+                ``rhat/{metric_name}`` and ESS as ``ess/{metric_name}``.
+
+        Returns:
+            Dict with keys ``rhat`` and ``ess`` (values that were not
+            computable are omitted).
+        """
+        import numpy as np
+
+        from crosscat.diagnostics import effective_sample_size, gelman_rubin_rhat
+
+        arr = np.asarray(traces, dtype=np.float64)
+        if arr.ndim == 1:
+            arr = arr[np.newaxis, :]
+        if arr.ndim != 2:
+            raise ValueError(
+                f"traces must be 1-D or 2-D (n_chains, n_samples); got shape {arr.shape}"
+            )
+
+        n_chains, n_samples = arr.shape
+        results: dict[str, float] = {}
+
+        if n_chains >= 2 and n_samples >= 4:
+            rhat_val = float(gelman_rubin_rhat(arr))
+            self._writer.add_scalar(f"rhat/{metric_name}", rhat_val, step)
+            results["rhat"] = rhat_val
+
+        if n_samples >= 2:
+            ess_val = float(effective_sample_size(arr))
+            self._writer.add_scalar(f"ess/{metric_name}", ess_val, step)
+            results["ess"] = ess_val
+
+        return results
+
     def close(self) -> None:
         """Flush and close the underlying writer."""
         self._writer.close()

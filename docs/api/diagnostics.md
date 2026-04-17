@@ -42,6 +42,49 @@ Per-sweep diagnostic metrics.
 
 **Returns**: Dict with keys: `log_joint`, `n_views`, `column_crp_alpha`, `row_crp_alphas`, `n_clusters_per_view`.
 
+## `gelman_rubin_rhat`
+
+```python
+gelman_rubin_rhat(traces) -> Array
+```
+
+Split-R-hat convergence diagnostic (Vehtari et al. 2021). Each chain is
+split in half, doubling the effective chain count for a stricter test.
+Values close to 1.0 indicate convergence; `R-hat > 1.1` suggests the
+chains have not yet mixed.
+
+**Input**: `traces` of shape `(n_chains, n_samples)` — a scalar statistic
+(typically `log_joint`) tracked per sweep per chain. Requires
+`n_chains >= 2` and `n_samples >= 4`.
+
+**Output**: scalar `R-hat`, always `>= 1.0`.
+
+**Notes**:
+- With very short chains (< 20 samples) the variance estimates are noisy
+  and R-hat may be unreliable. Prefer 50–100 samples per chain.
+- When chains agree exactly (zero within-chain variance) R-hat is defined
+  as 1.0 rather than NaN.
+
+## `effective_sample_size`
+
+```python
+effective_sample_size(traces) -> Array
+```
+
+Initial-positive-sequence ESS estimator (Geyer 1992). Pools the
+within-chain autocorrelations and sums consecutive lag-pairs until the
+pair sum becomes negative.
+
+**Input**: `traces` of shape `(n_chains, n_samples)` — same contract as
+`gelman_rubin_rhat`. A 1-D trace is treated as a single chain.
+
+**Output**: scalar ESS estimate (effective number of independent samples).
+
+**Important**: this function uses a Python `break` over traced values and
+**cannot be JIT-compiled**. Call it from Python after assembling the
+trace arrays. If you need JIT-friendly convergence tracking, log `R-hat`
+(pure JAX) and the raw log-joint trace to inspect mixing visually.
+
 ## `mean_test_log_likelihood`
 
 ```python
