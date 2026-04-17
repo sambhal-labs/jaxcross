@@ -1413,11 +1413,12 @@ def packed_transition_column_hypers(
         nc = packed.view_n_clusters[v_idx]
         counts_col_cat = packed.ss_cat_counts[v_idx, :, local_idx]  # (max_c, max_cats)
 
-        # Determine actual number of ordinal levels from cat_counts.
-        # Padded levels have zero counts across all clusters.
-        level_has_obs = jnp.any(counts_col_cat > 0, axis=0)  # (max_cats,)
-        max_level_idx = jnp.max(jnp.where(level_has_obs, jnp.arange(max_cats), 0))
-        n_real_cutpoints = max_level_idx  # K levels → K-1 cutpoints
+        # Mask derived from the *declared* number of cutpoints, not from which
+        # levels currently have observations. If a declared level has zero
+        # current data (sparse counts, or an empty cluster created by a split)
+        # its cutpoint must still move — otherwise it freezes at +inf forever
+        # and later rows landing on that level get probability 0.
+        n_real_cutpoints = packed.hyper_n_cutpoints[j]
 
         def _update_one_cutpoint(carry, k_idx):
             cutpts, key = carry
