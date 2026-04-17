@@ -7,6 +7,7 @@ imputation evaluation, mutual information, classification, typicality.
 Usage: uv run python examples/materials_project/analyze_multichain.py
 """
 
+import json
 import time
 from pathlib import Path
 
@@ -493,3 +494,64 @@ Classification (metallicity):
 
 Analysis time: {elapsed:.0f}s
 """)
+
+# ══════════════════════════════════════════════════════════════
+# SAVE OUTPUTS
+# ══════════════════════════════════════════════════════════════
+print("Saving outputs...")
+
+# Z-matrix (23x23 dependence matrix, 4-chain average)
+z_path = RESULTS_DIR / "z_matrix.npy"
+np.save(str(z_path), z_matrix)
+print(f"  Saved Z-matrix: {z_path}")
+
+# Analysis summary as JSON
+summary = {
+    "dataset": {
+        "n_rows": int(n_rows),
+        "n_cols": int(n_cols),
+        "nan_fraction": float(jnp.isnan(data_jax).mean()),
+        "column_types": {
+            "continuous": sum(1 for ct in column_types if ct == ColumnType.CONTINUOUS),
+            "binary": sum(1 for ct in column_types if ct == ColumnType.BINARY),
+            "categorical": sum(1 for ct in column_types if ct == ColumnType.CATEGORICAL),
+            "ordinal": sum(1 for ct in column_types if ct == ColumnType.ORDINAL),
+        },
+    },
+    "convergence": {
+        "rhat": rhat,
+        "ess": ess,
+        "best_log_joint": best_lj,
+        "log_joint_range": [float(traces_jax.min()), float(traces_jax.max())],
+    },
+    "imputation": {
+        "mean_r2": float(np.mean(all_r2)),
+        "median_r2": float(np.median(all_r2)),
+        "columns_with_positive_r2": sum(1 for r in all_r2 if r > 0),
+        "n_columns_tested": len(all_r2),
+    },
+    "classification": {
+        "target": "is_metal",
+        "f1": best_f1,
+        "threshold": best_thresh,
+        "accuracy": float((tp + tn) / len(true_valid)),
+        "precision": float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0,
+        "recall": float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0,
+        "n_metals": n_metal,
+        "n_nonmetals": n_nonmetal,
+    },
+    "anomaly": {
+        "score_mean": float(anom_scores.mean()),
+        "score_std": float(anom_scores.std()),
+    },
+    "typicality": {
+        "score_mean": float(typ_scores.mean()),
+        "score_std": float(typ_scores.std()),
+    },
+    "analysis_time_seconds": round(elapsed, 1),
+}
+
+summary_path = RESULTS_DIR / "analysis_summary.json"
+with open(summary_path, "w") as f:
+    json.dump(summary, f, indent=2)
+print(f"  Saved analysis summary: {summary_path}")

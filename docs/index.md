@@ -73,6 +73,12 @@ CrossCat models this with a **two-level Dirichlet Process**:
 
     Uncover which variables are related in genomics, economics, or sensor data without assuming a model structure
 
+-   **Materials Property Discovery**
+
+    ---
+
+    Predict expensive-to-compute material properties (dielectric, elastic) from cheap structural features with calibrated uncertainty — screen 150K+ candidates from a single model
+
 -   **Feature Relationship Discovery**
 
     ---
@@ -212,6 +218,7 @@ Benchmarked on NVIDIA P100 GPU. See [MNIST Benchmark](examples/mnist.md) for the
 |---------|-------|-------------|
 | **[MNIST Benchmark](examples/mnist.md)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/mnist_paper_colab.ipynb) | Paper reproduction — pixel dependence, inpainting, classification |
 | **[WDI Macroeconomics](examples/wdi-macroeconomics.md)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb) | Real-world GDP, trade, population — structure discovery |
+| **[Materials Project](examples/materials-project.md)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/examples/materials_project/discovery_v2.ipynb) | Dielectric prediction for 150K materials — BMA, calibrated CI |
 | **[Intro Tutorial](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb)** | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb) | End-to-end walkthrough: synthetic data, inference, 7 query types |
 
 ## Getting Help
