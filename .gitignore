@@ -58,8 +58,11 @@ Thumbs.db
 
 # Benchmark results
 results/
-# Allow materials project checkpoints for Kaggle reproducibility
+# Allow materials project results (CSVs, PNGs, PDF) but not checkpoints
 !examples/materials_project/results/
-!examples/materials_project/results/checkpoints_v2_local/
-!examples/materials_project/results/checkpoints_v2_local/**
+examples/materials_project/results/checkpoints_v2/
+examples/materials_project/results/checkpoints_v2_local/
+# DRISHTI proposal PDFs (sensitive application documents)
+examples/drishti_proposals/
+
 site/
