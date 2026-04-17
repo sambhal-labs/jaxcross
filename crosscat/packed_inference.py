@@ -147,6 +147,8 @@ def _resolve_cluster_weights(
     if row_id is not None:
         return _cluster_weights_for_row(packed, view_idx, row_id)
     if condition_cols:
+        if condition_vals is None:
+            raise ValueError("condition_vals must be provided when condition_cols is non-empty")
         return _cluster_weights_conditioned_packed(
             packed, view_idx, condition_cols, condition_vals
         )
