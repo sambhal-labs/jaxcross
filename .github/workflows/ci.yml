@@ -33,9 +33,10 @@ jobs:
         run: uv run mypy crosscat/ --ignore-missing-imports
         continue-on-error: true
 
-      # GPU-heavy tests (packed kernels, full sweeps) require a GPU runner.
-      # Run the full suite on Kaggle P100 via notebooks/run_tests.ipynb.
-      # CPU-safe tests run below in the test-cpu job.
+      # GPU-heavy / multi-sweep tests are marked @pytest.mark.slow and run on
+      # Kaggle (P100 / 2xT4) via notebooks/run_tests.ipynb. Everything else
+      # runs on CPU in the test-cpu job below — the "not slow" selector gives
+      # real coverage instead of the previous narrow "cpu"-marker filter.
 
   test-cpu:
     runs-on: ubuntu-latest
@@ -55,4 +56,4 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run CPU-safe tests
-        run: uv run pytest -m cpu --timeout=120 -x -v
+        run: uv run pytest -m "not slow" --timeout=300 -x -v
