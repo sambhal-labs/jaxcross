@@ -47,6 +47,114 @@ def _cluster_weights_for_row(packed: PackedCrossCatState, view_idx: int, row_id:
     return jax.nn.one_hot(cluster, packed.max_clusters).astype(jnp.float32)
 
 
+def _cluster_weights_conditioned_packed(
+    packed: PackedCrossCatState,
+    view_idx: int,
+    condition_cols: list[int],
+    condition_vals: Array,
+) -> Array:
+    """Cluster weights for a view conditioned on observed values.
+
+    Mirrors the unpacked ``_cluster_weights_conditioned`` in ``inference.py``:
+    p(cluster=c | conds) ∝ p(cluster=c) · ∏_j p(cond_j | cluster=c, col_j in view)
+
+    Only conditioning columns assigned to ``view_idx`` contribute; columns
+    in other views are independent of this view's cluster posterior.
+    NaN conditioning values are skipped.
+
+    Returns a ``(max_clusters,)`` weight vector that sums to 1.
+    """
+    max_k = packed.max_clusters
+    assigns = packed.view_row_assignments[view_idx]
+    one_hot = jax.nn.one_hot(assigns, max_k)
+    counts = one_hot.sum(axis=0).astype(jnp.float32)
+    log_weights = jnp.log(jnp.maximum(counts, LOG_EPS))
+
+    for cond_idx, col in enumerate(condition_cols):
+        cond_view = int(packed.column_assignments[col])
+        if cond_view != view_idx:
+            continue
+        x = condition_vals[cond_idx]
+        if bool(jnp.isnan(x)):
+            continue
+
+        local_idx = _find_local_col_index(packed, view_idx, col)
+        type_id = packed.col_type_ids[col]
+        ss_counts_col = packed.ss_counts[view_idx, :, local_idx].astype(jnp.float32)
+        ss_sum_x_col = packed.ss_sum_x[view_idx, :, local_idx]
+        ss_sum_x_sq_col = packed.ss_sum_x_sq[view_idx, :, local_idx]
+        ss_cat_counts_col = packed.ss_cat_counts[view_idx, :, local_idx]
+        ss_sum_sin_col = packed.ss_sum_sin[view_idx, :, local_idx]
+        ss_sum_cos_col = packed.ss_sum_cos[view_idx, :, local_idx]
+
+        def _logp_one_cluster(
+            c_idx,
+            _col=col,
+            _x=x,
+            _type_id=type_id,
+            _counts=ss_counts_col,
+            _sum_x=ss_sum_x_col,
+            _sum_x_sq=ss_sum_x_sq_col,
+            _cat_counts=ss_cat_counts_col,
+            _sum_sin=ss_sum_sin_col,
+            _sum_cos=ss_sum_cos_col,
+        ):
+            return unified_posterior_predictive_logp(
+                _x,
+                _type_id,
+                _counts[c_idx],
+                _sum_x[c_idx],
+                _sum_x_sq[c_idx],
+                _cat_counts[c_idx],
+                _sum_sin[c_idx],
+                _sum_cos[c_idx],
+                packed.hyper_mu[_col],
+                packed.hyper_r[_col],
+                packed.hyper_s[_col],
+                packed.hyper_nu[_col],
+                packed.hyper_dirichlet_alpha[_col],
+                packed.hyper_alpha[_col],
+                packed.hyper_beta[_col],
+                packed.hyper_kappa[_col],
+                packed.hyper_vm_a[_col],
+                packed.hyper_vm_mu[_col],
+                packed.hyper_cutpoints[_col],
+            )
+
+        per_cluster_logp = jax.vmap(_logp_one_cluster)(jnp.arange(max_k))
+        log_weights = log_weights + per_cluster_logp
+
+    # Mask out clusters that the view never uses (count == 0).
+    log_weights = jnp.where(counts > 0, log_weights, -jnp.inf)
+    log_weights = log_weights - jnp.max(log_weights)
+    weights = jnp.exp(log_weights)
+    return weights / jnp.maximum(weights.sum(), LOG_EPS)
+
+
+def _resolve_cluster_weights(
+    packed: PackedCrossCatState,
+    view_idx: int,
+    *,
+    row_id: int | None,
+    condition_cols: list[int] | None,
+    condition_vals: Array | None,
+) -> Array:
+    """Pick the right cluster-weight strategy (observed row > conditioning > marginal).
+
+    This is the single entry point used by every packed predictive query so
+    all three tiers agree on precedence rules and NaN handling.
+    """
+    if row_id is not None:
+        return _cluster_weights_for_row(packed, view_idx, row_id)
+    if condition_cols:
+        if condition_vals is None:
+            raise ValueError("condition_vals must be provided when condition_cols is non-empty")
+        return _cluster_weights_conditioned_packed(
+            packed, view_idx, condition_cols, condition_vals
+        )
+    return _cluster_weights_packed(packed, view_idx)
+
+
 def _logp_one_column_mixture(
     packed: PackedCrossCatState,
     view_idx: int,
@@ -647,6 +755,8 @@ def packed_predictive_probability(
     query_cols: list[int],
     query_vals: Array,
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     row_id: int | None = None,
 ) -> Array:
     """Compute predictive log probability on PackedCrossCatState.
@@ -659,7 +769,13 @@ def packed_predictive_probability(
         data: Observation matrix (n_rows, n_cols).
         query_cols: Column indices to query.
         query_vals: Values to evaluate probability at.
-        row_id: If provided, use observed row's cluster assignment (one-hot weights).
+        condition_cols: Column indices to condition on (optional).
+        condition_vals: Conditioning values (optional). Must be paired with
+            ``condition_cols`` and have the same length. NaN entries are
+            silently skipped.
+        row_id: If provided, use the observed row's actual cluster assignment.
+            Takes precedence over ``condition_cols`` (matches the unpacked
+            ``predictive_probability`` contract).
 
     Returns:
         Scalar log probability.
@@ -668,11 +784,13 @@ def packed_predictive_probability(
 
     for q_idx, col in enumerate(query_cols):
         view_idx = int(packed.column_assignments[col])
-
-        if row_id is not None:
-            weights = _cluster_weights_for_row(packed, view_idx, row_id)
-        else:
-            weights = _cluster_weights_packed(packed, view_idx)
+        weights = _resolve_cluster_weights(
+            packed,
+            view_idx,
+            row_id=row_id,
+            condition_cols=condition_cols,
+            condition_vals=condition_vals,
+        )
 
         log_mixture = _logp_one_column_mixture(packed, view_idx, col, query_vals[q_idx], weights)
         log_p_total = log_p_total + log_mixture
@@ -686,6 +804,8 @@ def packed_predictive_sample(
     data: Array,
     query_cols: list[int],
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     n_samples: int = 1000,
     row_id: int | None = None,
 ) -> Array:
@@ -699,8 +819,12 @@ def packed_predictive_sample(
         packed: Packed CrossCat state.
         data: Observation matrix.
         query_cols: Column indices to sample.
+        condition_cols: Column indices to condition on (optional).
+        condition_vals: Conditioning values (optional). NaN entries are
+            silently skipped.
         n_samples: Number of posterior predictive samples.
-        row_id: If provided, use observed row's cluster assignment.
+        row_id: If provided, use observed row's cluster assignment (takes
+            precedence over ``condition_cols``).
 
     Returns:
         Array of shape (n_samples, len(query_cols)).
@@ -712,10 +836,13 @@ def packed_predictive_sample(
     weights_list = []
     for q_idx, _col in enumerate(query_cols):
         v = view_indices[q_idx]
-        if row_id is not None:
-            w = _cluster_weights_for_row(packed, v, row_id)
-        else:
-            w = _cluster_weights_packed(packed, v)
+        w = _resolve_cluster_weights(
+            packed,
+            v,
+            row_id=row_id,
+            condition_cols=condition_cols,
+            condition_vals=condition_vals,
+        )
         weights_list.append(w)
     weights_arr = jnp.stack(weights_list)  # (n_q, max_clusters)
 
@@ -1186,6 +1313,8 @@ def packed_predictive_cdf(
     query_col: int,
     query_val: Array,
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     n_samples: int = 10000,
     row_id: int | None = None,
 ) -> Array:
@@ -1197,14 +1326,24 @@ def packed_predictive_cdf(
         data: Observation matrix.
         query_col: Column index.
         query_val: Value at which to evaluate CDF.
+        condition_cols: Column indices to condition on (optional).
+        condition_vals: Conditioning values (optional).
         n_samples: Number of MC samples.
-        row_id: If provided, use observed row's cluster assignment.
+        row_id: If provided, use observed row's cluster assignment (takes
+            precedence over ``condition_cols``).
 
     Returns:
         CDF value P(X <= query_val) in [0, 1].
     """
     samples = packed_predictive_sample(
-        rng_key, packed, data, [query_col], n_samples=n_samples, row_id=row_id
+        rng_key,
+        packed,
+        data,
+        [query_col],
+        condition_cols=condition_cols,
+        condition_vals=condition_vals,
+        n_samples=n_samples,
+        row_id=row_id,
     )
     return jnp.mean(samples[:, 0] <= query_val)
 
@@ -1220,6 +1359,8 @@ def multi_chain_predictive_probability(
     query_cols: list[int],
     query_vals: Array,
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     row_id: int | None = None,
 ) -> Array:
     """Average predictive log probability across multiple chains.
@@ -1233,14 +1374,26 @@ def multi_chain_predictive_probability(
         data: Observation matrix (n_rows, n_cols).
         query_cols: Column indices to query.
         query_vals: Values to evaluate probability at.
-        row_id: If provided, use observed row's cluster assignment.
+        condition_cols: Column indices to condition on (optional, shared
+            across chains).
+        condition_vals: Conditioning values (optional).
+        row_id: If provided, use observed row's cluster assignment (takes
+            precedence over ``condition_cols``).
 
     Returns:
         Scalar log probability (averaged across chains).
     """
     log_ps = jnp.array(
         [
-            packed_predictive_probability(p, data, query_cols, query_vals, row_id=row_id)
+            packed_predictive_probability(
+                p,
+                data,
+                query_cols,
+                query_vals,
+                condition_cols=condition_cols,
+                condition_vals=condition_vals,
+                row_id=row_id,
+            )
             for p in packed_states
         ]
     )
@@ -1253,6 +1406,8 @@ def multi_chain_predictive_sample(
     data: Array,
     query_cols: list[int],
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     n_samples: int = 1000,
     row_id: int | None = None,
 ) -> Array:
@@ -1266,8 +1421,12 @@ def multi_chain_predictive_sample(
         packed_states: List of PackedCrossCatState.
         data: Observation matrix.
         query_cols: Column indices to sample.
+        condition_cols: Column indices to condition on (optional, shared
+            across chains).
+        condition_vals: Conditioning values (optional).
         n_samples: Total number of samples.
-        row_id: If provided, use observed row's cluster assignment.
+        row_id: If provided, use observed row's cluster assignment (takes
+            precedence over ``condition_cols``).
 
     Returns:
         Array of shape (n_samples, len(query_cols)).
@@ -1283,7 +1442,14 @@ def multi_chain_predictive_sample(
         n_i = per_chain + (1 if i < remainder else 0)
         if n_i > 0:
             s = packed_predictive_sample(
-                keys[i], packed, data, query_cols, n_samples=n_i, row_id=row_id
+                keys[i],
+                packed,
+                data,
+                query_cols,
+                condition_cols=condition_cols,
+                condition_vals=condition_vals,
+                n_samples=n_i,
+                row_id=row_id,
             )
             all_samples.append(s)
 
@@ -1372,7 +1538,10 @@ def multi_chain_predictive_cdf(
     query_col: int,
     query_val: Array,
     *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
     n_samples: int = 10000,
+    row_id: int | None = None,
 ) -> Array:
     """Posterior predictive CDF averaged across chains.
 
@@ -1382,13 +1551,25 @@ def multi_chain_predictive_cdf(
         data: Observation matrix.
         query_col: Column index.
         query_val: Value at which to evaluate CDF.
+        condition_cols: Column indices to condition on (optional, shared
+            across chains).
+        condition_vals: Conditioning values (optional).
         n_samples: Total MC samples across all chains.
+        row_id: If provided, use observed row's cluster assignment (takes
+            precedence over ``condition_cols``).
 
     Returns:
         CDF value P(X <= query_val) in [0, 1].
     """
     samples = multi_chain_predictive_sample(
-        rng_key, packed_states, data, [query_col], n_samples=n_samples
+        rng_key,
+        packed_states,
+        data,
+        [query_col],
+        condition_cols=condition_cols,
+        condition_vals=condition_vals,
+        n_samples=n_samples,
+        row_id=row_id,
     )
     return jnp.mean(samples[:, 0] <= query_val)
 
@@ -1857,28 +2038,48 @@ def batch_predictive_probability(
     data: Array,
     query_col: int,
     query_vals: Array,
-    row_ids: Array,
+    row_ids: Array | None = None,
+    *,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
 ) -> Array:
-    """Compute predictive log-probability for multiple rows at once.
+    """Compute predictive log-probability for multiple queries.
 
     .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+
+    Supports three modes:
+    - ``row_ids`` provided: each batch element uses that row's cluster assignment
+      (the historical observed-row workflow).
+    - ``condition_cols``/``condition_vals`` provided, ``row_ids=None``: every
+      query shares the same conditional cluster weights.
+    - Neither provided: marginal mixture (every query gets the same result).
 
     Args:
         packed: Packed CrossCat state.
         data: Observation matrix (n_rows, n_cols).
         query_col: Column to query.
         query_vals: (n_queries,) array of values.
-        row_ids: (n_queries,) array of row indices.
+        row_ids: Optional (n_queries,) array of row indices. Takes precedence
+            over ``condition_cols`` when both are provided.
+        condition_cols: Column indices to condition on (optional, shared).
+        condition_vals: Conditioning values (optional, shared).
 
     Returns:
         (n_queries,) array of log probabilities.
     """
+    n_queries = len(query_vals)
     return jnp.array(
         [
             packed_predictive_probability(
-                packed, data, [query_col], jnp.array([query_vals[i]]), row_id=int(row_ids[i])
+                packed,
+                data,
+                [query_col],
+                jnp.array([query_vals[i]]),
+                condition_cols=condition_cols,
+                condition_vals=condition_vals,
+                row_id=int(row_ids[i]) if row_ids is not None else None,
             )
-            for i in range(len(row_ids))
+            for i in range(n_queries)
         ]
     )
 
@@ -1888,30 +2089,56 @@ def batch_predictive_sample(
     packed: PackedCrossCatState,
     data: Array,
     query_cols: list[int],
-    row_ids: Array,
+    row_ids: Array | None = None,
     *,
     n_samples_per_row: int = 1,
+    condition_cols: list[int] | None = None,
+    condition_vals: Array | None = None,
+    n_queries: int | None = None,
 ) -> Array:
-    """Draw posterior predictive samples for multiple rows.
+    """Draw posterior predictive samples for multiple queries.
 
     .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
+
+    When ``row_ids`` is provided, each batch element uses that row's cluster
+    assignment. When ``row_ids=None`` and ``condition_cols`` is provided,
+    every batch element shares the conditional cluster weights; supply
+    ``n_queries`` to control how many independent draws are returned.
 
     Args:
         rng_key: JAX PRNG key.
         packed: Packed CrossCat state.
         data: Observation matrix (n_rows, n_cols).
         query_cols: Column indices to sample.
-        row_ids: (n_queries,) array of row indices.
-        n_samples_per_row: Samples per row (default 1).
+        row_ids: Optional (n_queries,) array of row indices. Takes precedence
+            over ``condition_cols``.
+        n_samples_per_row: Samples per query (default 1).
+        condition_cols: Column indices to condition on (optional, shared).
+        condition_vals: Conditioning values (optional, shared).
+        n_queries: Number of independent draws when ``row_ids`` is omitted.
+            Defaults to 1 unless inferrable from ``row_ids``.
 
     Returns:
         (n_queries, n_samples_per_row, len(query_cols)) array of samples.
     """
+    if row_ids is not None:
+        n = len(row_ids)
+    elif n_queries is not None:
+        n = n_queries
+    else:
+        n = 1
     results = []
-    keys = jax.random.split(rng_key, len(row_ids))
-    for i in range(len(row_ids)):
+    keys = jax.random.split(rng_key, n)
+    for i in range(n):
         s = packed_predictive_sample(
-            keys[i], packed, data, query_cols, n_samples=n_samples_per_row, row_id=int(row_ids[i])
+            keys[i],
+            packed,
+            data,
+            query_cols,
+            condition_cols=condition_cols,
+            condition_vals=condition_vals,
+            n_samples=n_samples_per_row,
+            row_id=int(row_ids[i]) if row_ids is not None else None,
         )
         results.append(s)
     return jnp.stack(results, axis=0)
