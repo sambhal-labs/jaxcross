@@ -31,7 +31,6 @@ jobs:
 
       - name: Type check
         run: uv run mypy crosscat/ --ignore-missing-imports
-        continue-on-error: true
 
       # GPU-heavy tests (packed kernels, full sweeps) require a GPU runner.
       # Run the full suite on Kaggle P100 via notebooks/run_tests.ipynb.
