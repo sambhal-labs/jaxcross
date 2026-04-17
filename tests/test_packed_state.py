@@ -143,7 +143,7 @@ def test_ordinal_cutpoints_roundtrip():
 
     key = jax.random.key(200)
     column_types = [ColumnType.ORDINAL, ColumnType.CONTINUOUS, ColumnType.ORDINAL]
-    result = generate_crosscat_data(key, 50, column_types, n_views=1, n_clusters=2, n_categories=5)
+    result = generate_crosscat_data(key, 50, column_types, n_views=1, n_clusters=2)
     data = result["data"]
 
     state = initialize(jax.random.key(201), data, column_types).state

@@ -48,7 +48,9 @@ These are areas of active interest. Priority depends on community feedback — [
 - Causal discovery integration
 
 ### Ecosystem
-- PyPI package publication
+- PyPI package publication — the release workflow at `.github/workflows/release.yml`
+  is already wired up (publishes on `v*` git tags via `gh-action-pypi-publish`);
+  cutting the first tag is the remaining step
 - Python 3.12+ compatibility testing
 - Integration examples with pandas, polars, scikit-learn pipelines
 - Docker images for reproducible environments
