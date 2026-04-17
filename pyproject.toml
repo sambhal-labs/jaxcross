@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jax-crosscat"
-version = "0.12.0"
+version = "1.0.0"
 description = "GPU-accelerated nonparametric cross-categorization in JAX"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = "BUSL-1.1"
 authors = [{ name = "jax-crosscat contributors" }]
 keywords = ["bayesian", "crosscat", "dirichlet-process", "jax", "gpu", "gibbs-sampling"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3.11",

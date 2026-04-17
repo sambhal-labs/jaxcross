@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-04-17 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.12.0...v1.0.0)
+
+First production release. Wraps up the four-phase hardening plan driven by
+the production-readiness audit (see the Phase 1–4 pull requests below).
+Bumps `Development Status` to `5 - Production/Stable`. No breaking API
+changes — every prior `0.12.0` call remains source-compatible.
+
+### Added
+- **Phase 1 — correctness hardening** (#117)
+  - `LOG_EPS` guard in `DirichletCategorical.posterior_predictive_logp`
+    to match the existing `BetaBernoulli` / `OrderedLogistic` pattern
+  - `jnp.maximum(alpha, LOG_EPS)` on every unguarded CRP `log(alpha)`
+    site across `model.py`, `gibbs.py`, and `packed/kernels.py`
+  - `_validate_category_range()` host-side check wired into
+    `packed_insert_rows()` to replace silent clip-to-`max_categories-1`
+    with a `ValueError`
+  - `set_overflow_policy("warn"|"raise")` public API (+
+    `JAXCROSS_OVERFLOW_POLICY` env var) for strict production handling
+    of `max_clusters` / `max_cols_per_view` budget overflows
+- **Phase 2 — conditional inference on the packed tier** (#118)
+  - `condition_cols` / `condition_vals` support added to
+    `packed_predictive_probability` / `..._sample` / `..._cdf`, plus the
+    corresponding `batch_*` and `multi_chain_*` wrappers
+  - `_cluster_weights_conditioned_packed()` helper matching the
+    unpacked cluster-weight math (NaN skipping, cross-view independence)
+  - `_resolve_cluster_weights()` single dispatch enforcing
+    `row_id > condition_cols > marginal` precedence across all tiers
+- **Phase 3 — test coverage + MI batching** (#119)
+  - `batch_mutual_information(packed_states, column_types, col_pairs,
+    …)` — Python-loops a `(n_pairs, 2)` array of column pairs, using
+    `fold_in` for per-pair RNG independence; exported from the top-level
+    `crosscat` namespace
+  - `tests/test_packed_parity_extended.py` — 15 new packed/unpacked
+    parity tests across `dependence_probability` / `dependence_matrix`
+    / `row_similarity` / `row_typicality` / `column_typicality` /
+    `predictive_probability` / `predictive_sample` / `predictive_cdf` /
+    `predictive_anomalousness` / `mutual_information` /
+    `conditional_entropy`
+- **Phase 4 — release polish** (#120)
+  - `TBLogger.log_convergence(traces, step, *, metric_name)` — logs
+    `rhat/{metric}` + `ess/{metric}` scalars, silently skipping metrics
+    when preconditions aren't met
+  - Dedicated prose for `gelman_rubin_rhat` + `effective_sample_size`
+    in `docs/api/diagnostics.md` including the "cannot be JIT-compiled"
+    note for ESS
+  - `docs/architecture/gibbs-kernels.md` — new section on the
+    synchronous parallel row kernel's shared-baseline approximation and
+    recommended 3–5 parallel / 1 sequential alternation cadence
+
+### Changed
+- `gibbs_sweep_early_stopping` relative-improvement denominator moved
+  from `abs(prev_lj) + 1e-10` to `max(abs(prev_lj), 1.0)` so the
+  patience mechanism still triggers when `prev_lj` is near zero (#120)
+- `Development Status` classifier flipped to `5 - Production/Stable`
+
+### Fixed
+- Previously unguarded `jnp.log(alpha)` sites could NaN if any future
+  hyperprior change produced a near-zero alpha; guards are defensive
+  no-ops on every call path exercised by the current sampler (#117)
+
 ## [0.12.0] - 2026-04-09 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.11.0...v0.12.0)
 
 ### Added
