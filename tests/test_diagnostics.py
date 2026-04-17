@@ -91,7 +91,7 @@ class TestEvaluateImputation:
         mask = random_holdout_mask(jax.random.key(48), 30, 3, holdout_fraction=0.1)
         result = evaluate_imputation(state, data, mask, column_types, rng_key=jax.random.key(49))
         assert "mae" in result or "accuracy" in result
-        assert "mean_log_likelihood" in result
+        assert "mean_log_lik" in result
 
 
 class TestGelmanRubinRhat:
