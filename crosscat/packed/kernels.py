@@ -737,7 +737,7 @@ def packed_transition_row_assignments(
 
     # Create updated packed state with new assignments
     updated = PackedCrossCatState(
-        **{
+        **{  # type: ignore[arg-type]
             name: (
                 new_row_assigns
                 if name == "view_row_assignments"
@@ -955,7 +955,7 @@ def packed_transition_row_assignments_minibatch(
     )
 
     updated = PackedCrossCatState(
-        **{
+        **{  # type: ignore[arg-type]
             name: (
                 new_row_assigns
                 if name == "view_row_assignments"
@@ -1122,7 +1122,7 @@ def packed_transition_row_assignments_parallel(
     )
 
     updated = PackedCrossCatState(
-        **{
+        **{  # type: ignore[arg-type]
             name: (
                 new_row_assigns
                 if name == "view_row_assignments"
@@ -1629,7 +1629,7 @@ def packed_transition_crp_alphas(
     new_view_alpha = jax.vmap(sample_one_view)(jnp.arange(max_views))
 
     return PackedCrossCatState(
-        **{
+        **{  # type: ignore[arg-type]
             name: (
                 new_col_alpha
                 if name == "column_crp_alpha"
@@ -2054,7 +2054,7 @@ def packed_transition_column_assignments(
 
     # Build updated state (suffstats will be recomputed)
     new_packed = PackedCrossCatState(
-        **{
+        **{  # type: ignore[arg-type]
             name: (
                 compact_col_assigns
                 if name == "column_assignments"
