@@ -2,266 +2,266 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/changelog/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/contributing/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/faq/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/glossary/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/roadmap/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/aot-cache/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/components/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/constraints/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/data-utils/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/diagnostics/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/gibbs/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/inference/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/model/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/packed-components/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/packed-inference/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/packed-kernels/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/packed-state/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/packed-suffstats/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/scaling/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/serialization/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/synthetic/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/tb-logger/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/types/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/api/validation/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/gibbs-kernels/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/jax-patterns/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/model/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/overview/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/packed-state/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/architecture/performance/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/benchmark-results/PLACEHOLDER/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/examples/csv-workflow/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/examples/mnist/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/examples/wdi-macroeconomics/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/getting-started/concepts/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/getting-started/installation/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/getting-started/quickstart/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/constraints/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/dashboard/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/data-loading/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/diagnostics/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/gpu-packed/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/inference/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/initialization/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/missing-data/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/multi-chain/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/online-learning/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/scaling/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/serialization/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/tb-logger/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/tips-and-tricks/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/xla-cache/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/anomaly-detection/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/dependence/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/imputation/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/mutual-information/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/predictive-probability/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/row-similarity/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/use-cases/anomaly-detection/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/use-cases/customer-segmentation/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/use-cases/missing-data/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
     <url>
          <loc>https://sambhal-labs.github.io/jaxcross/use-cases/scientific-exploration/</loc>
-         <lastmod>2026-04-09</lastmod>
+         <lastmod>2026-04-17</lastmod>
     </url>
 </urlset>

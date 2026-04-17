@@ -3325,7 +3325,9 @@
 </ul>
 <h3 id="ecosystem">Ecosystem<a class="headerlink" href="#ecosystem" title="Permanent link">&para;</a></h3>
 <ul>
-<li>PyPI package publication</li>
+<li>PyPI package publication — the release workflow at <code>.github/workflows/release.yml</code>
+  is already wired up (publishes on <code>v*</code> git tags via <code>gh-action-pypi-publish</code>);
+  cutting the first tag is the remaining step</li>
 <li>Python 3.12+ compatibility testing</li>
 <li>Integration examples with pandas, polars, scikit-learn pipelines</li>
 <li>Docker images for reproducible environments</li>

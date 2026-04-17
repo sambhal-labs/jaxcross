@@ -4647,7 +4647,7 @@ alias is preferred for clarity.</p>
 
 
 <h3 id="crosscat.data_utils.load_npy_mmap" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">load_npy_mmap</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mmap_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">load_npy_mmap</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mmap_mode</span><span class="p">:</span> <span class="n">_MmapMode</span> <span class="o">=</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span></code>
 
 <a href="#crosscat.data_utils.load_npy_mmap" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4695,7 +4695,7 @@ batch = jnp.array(data_np[1000:2000])   # only this slice hits RAM/GPU
                 <code>mmap_mode</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="crosscat.data_utils._MmapMode">_MmapMode</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4741,7 +4741,7 @@ batch = jnp.array(data_np[1000:2000])   # only this slice hits RAM/GPU
 
 
 <h3 id="crosscat.data_utils.load_npz_mmap" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">load_npz_mmap</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mmap_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">load_npz_mmap</span><span class="p">(</span><span class="n">filepath</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mmap_mode</span><span class="p">:</span> <span class="n">_MmapMode</span> <span class="o">=</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span></code>
 
 <a href="#crosscat.data_utils.load_npz_mmap" class="headerlink" title="Permanent link">&para;</a></h3>
 
