@@ -713,10 +713,20 @@ class VonMises:
     def posterior_predictive_logp(
         x: Array, suffstats: SufficientStats, hypers: ColumnHypers
     ) -> Array:
-        """Log posterior predictive density for a circular observation.
+        """Log posterior-mode plug-in predictive density for a circular observation.
 
-        Approximation: posterior von Mises with concentration = kappa and
-        mean direction from the posterior resultant vector.
+        Uses a plug-in approximation, not the exact marginal predictive. The
+        posterior mean direction ``mu_post`` is extracted from the kappa-scaled
+        resultant vector of the data plus prior, then plugged into a von Mises
+        likelihood at concentration ``kappa``. The exact marginal predictive
+        would integrate mu out via the Bessel-function ratio (see
+        ``log_marginal_likelihood``); that form is slower and was not adopted
+        here because the plug-in is a close approximation for moderate sample
+        sizes and matches the original CrossCat implementation.
+
+        The packed equivalent (``crosscat.packed.components._vm_posterior_predictive_logp``)
+        uses the same approximation — see ``tests/test_packed_inference_parity.py``
+        for the parity test.
         """
         kappa = hypers.kappa
         a = hypers.vm_a
