@@ -7,6 +7,8 @@ Maps to original CrossCat:
 
 from __future__ import annotations
 
+from typing import Any
+
 import jax
 from jax import Array
 
@@ -108,7 +110,7 @@ def ensure_col_dep_constraints(
     """
     n_total = len(constraints)
     best_satisfied = 0
-    diagnostics = {
+    diagnostics: dict[str, Any] = {
         "success": False,
         "n_attempts": 0,
         "best_n_satisfied": 0,

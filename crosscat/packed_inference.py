@@ -837,7 +837,7 @@ def _packed_estimate_mi_sample(
     col_i: int,
     col_j: int,
     n_samples: int,
-) -> float:
+) -> Array:
     """MC MI estimation for two columns in the same view (packed version).
 
     Maps to original inference_utils.estimate_MI_sample().

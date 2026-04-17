@@ -31,7 +31,6 @@ jobs:
 
       - name: Type check
         run: uv run mypy crosscat/ --ignore-missing-imports
-        continue-on-error: true
 
       # GPU-heavy / multi-sweep tests are marked @pytest.mark.slow and run on
       # Kaggle (P100 / 2xT4) via notebooks/run_tests.ipynb. Everything else
