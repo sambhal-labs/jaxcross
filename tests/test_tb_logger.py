@@ -137,3 +137,75 @@ def test_tblogger_mixed_scalar_and_array():
     # Scalar + mean of array = 2 add_scalar calls
     assert mock_writer.add_scalar.call_count == 2
     mock_writer.add_histogram.assert_called_once()
+
+
+def test_tblogger_log_convergence_emits_rhat_and_ess():
+    """log_convergence writes both rhat/ and ess/ scalars for multi-chain traces."""
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        # 4 chains, 16 samples — enough for split-R-hat.
+        rng = np.random.default_rng(0)
+        traces = rng.normal(size=(4, 16))
+        results = tb.log_convergence(traces, step=10)
+
+    assert "rhat" in results
+    assert "ess" in results
+    tags = [str(call) for call in mock_writer.add_scalar.call_args_list]
+    assert any("rhat/log_joint" in t for t in tags)
+    assert any("ess/log_joint" in t for t in tags)
+
+
+def test_tblogger_log_convergence_skips_rhat_with_single_chain():
+    """Single-chain traces skip R-hat but still log ESS."""
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        traces = np.arange(10, dtype=float)  # 1-D, treated as single chain
+        results = tb.log_convergence(traces, step=0)
+
+    assert "rhat" not in results
+    assert "ess" in results
+    tags = [str(call) for call in mock_writer.add_scalar.call_args_list]
+    assert not any("rhat/" in t for t in tags)
+    assert any("ess/log_joint" in t for t in tags)
+
+
+def test_tblogger_log_convergence_custom_metric_name():
+    import numpy as np
+
+    mock_cls, mock_writer = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        traces = np.arange(20, dtype=float).reshape(4, 5)
+        tb.log_convergence(traces, step=7, metric_name="n_views")
+
+    tags = [str(call) for call in mock_writer.add_scalar.call_args_list]
+    assert any("rhat/n_views" in t for t in tags)
+    assert any("ess/n_views" in t for t in tags)
+
+
+def test_tblogger_log_convergence_rejects_bad_shape():
+    import numpy as np
+
+    mock_cls, _ = _make_mock_summary_writer()
+
+    with patch("crosscat.tb_logger._require_tensorboardx", return_value=mock_cls):
+        from crosscat.tb_logger import TBLogger
+
+        tb = TBLogger("test_dir")
+        with pytest.raises(ValueError, match="1-D or 2-D"):
+            tb.log_convergence(np.zeros((2, 3, 4)), step=0)

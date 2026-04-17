@@ -493,6 +493,51 @@ class TestMinibatchAssignmentInvariants:
 
 
 class TestEarlyStoppingEdgeCases:
+    def test_tiny_log_joint_does_not_fake_convergence(self):
+        """The relative-improvement denominator must not degenerate near 0.
+
+        Regression: the old ``(lj - prev_lj) / (abs(prev_lj) + 1e-10)`` floor
+        turned a log-joint of ~0 into a near-infinite denominator amplifier,
+        so any nonzero delta looked like a huge relative gain and
+        ``stale_count`` never triggered. The stabilized formula scales by
+        ``max(abs(prev_lj), 1.0)`` so tiny deltas are *tiny* relative
+        improvements and patience kicks in as intended.
+        """
+        from unittest.mock import patch
+
+        from crosscat.scaling import gibbs_sweep_early_stopping
+
+        key = jax.random.key(800)
+        data = jax.random.normal(key, (20, 3))
+        col_types = [ColumnType.CONTINUOUS] * 3
+        state = initialize(jax.random.key(801), data, col_types).state
+        packed = pack_state(state)
+
+        # Tiny log-joints around zero with absolute deltas of 1e-5.
+        fake_values = iter([0.0, 1e-5, 2e-5, 3e-5, 4e-5, 5e-5, 6e-5])
+
+        def fake_log_joint(p, d):
+            return jnp.array(next(fake_values))
+
+        with patch("crosscat.scaling.packed_log_joint", side_effect=fake_log_joint):
+            _, history = gibbs_sweep_early_stopping(
+                jax.random.key(802),
+                packed,
+                data,
+                max_sweeps=60,
+                check_interval=5,
+                patience=3,
+                min_improvement=0.001,
+            )
+
+        # Must stop via patience, not via max_sweeps. Patience=3 with the
+        # stabilized formula means ≤ 5 checks. The old formula would keep
+        # running past patience and fill in max_sweeps / check_interval = 12.
+        assert len(history) <= 5, (
+            f"Early stopping failed to detect stale improvement — history has "
+            f"{len(history)} entries, expected ≤ 5 with stabilized formula."
+        )
+
     def test_nan_log_joint_stops_with_warning(self):
         """If log-joint is NaN, early stopping should break with a warning."""
         from unittest.mock import patch

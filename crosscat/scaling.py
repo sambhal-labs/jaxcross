@@ -244,9 +244,14 @@ def gibbs_sweep_early_stopping(
             )
             break
 
-        # Check convergence against previous checkpoint (not all-time best)
+        # Check convergence against previous checkpoint (not all-time best).
+        # The denominator is floored at 1.0 so |prev_lj| never fails to act as
+        # a meaningful scale: for log-joints close to zero the naive
+        # ``/(abs(prev_lj) + 1e-10)`` would amplify any absolute change into
+        # an apparent infinite relative gain, never triggering the stop.
         if prev_lj is not None:
-            rel_improvement = (lj - prev_lj) / (abs(prev_lj) + 1e-10)
+            denom = max(abs(prev_lj), 1.0)
+            rel_improvement = (lj - prev_lj) / denom
             if rel_improvement < min_improvement:
                 stale_count += 1
             else:
