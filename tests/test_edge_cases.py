@@ -199,3 +199,85 @@ def test_cyclic_only_dataset():
     state = initialize(key, data, types).state
 
     assert jnp.isfinite(log_joint(state, data))
+
+
+# ---------------------------------------------------------------------------
+# Invalid-input contracts — tests the public API rejects or copes with bad
+# inputs in documented ways. Guards against silent misbehavior.
+# ---------------------------------------------------------------------------
+
+
+class TestInvalidInputContracts:
+    """Contract tests for the public API under malformed inputs."""
+
+    def test_insert_rows_column_count_mismatch_raises(self):
+        """insert_rows with wrong column count must raise ValueError."""
+        from crosscat.model import insert_rows
+
+        key = jax.random.key(400)
+        data = jax.random.normal(key, (20, 3))
+        types = [ColumnType.CONTINUOUS] * 3
+        state = initialize(key, data, types).state
+
+        wrong_rows = jax.random.normal(jax.random.split(key)[0], (5, 4))
+        with pytest.raises(ValueError, match=r"must have shape"):
+            insert_rows(key, state, data, wrong_rows)
+
+    def test_insert_rows_rejects_1d(self):
+        """insert_rows with 1D new_rows must raise ValueError."""
+        from crosscat.model import insert_rows
+
+        key = jax.random.key(401)
+        data = jax.random.normal(key, (10, 2))
+        types = [ColumnType.CONTINUOUS] * 2
+        state = initialize(key, data, types).state
+
+        with pytest.raises(ValueError, match=r"must have shape"):
+            insert_rows(key, state, data, jnp.array([1.0, 2.0]))
+
+    def test_pack_state_with_out_of_range_category_raises(self):
+        """pack_state with category value >= max_categories raises ValueError.
+
+        Documents the contract: users set max_categories at pack time and
+        observed category values must fit. A silent clip would produce
+        wrong inference results, so pack_state validates upfront when
+        ``data`` is passed.
+        """
+        key = jax.random.key(402)
+        # 4 categories observed, but pack with max_categories=3
+        data = jnp.array([[0.0], [1.0], [2.0], [3.0], [0.0], [1.0]], dtype=jnp.float32)
+        types = [ColumnType.CATEGORICAL]
+        state = initialize(key, data, types).state
+
+        # max_categories too small for observed values → must raise
+        with pytest.raises((ValueError, AssertionError)):
+            pack_state(state, max_categories=3, data=data)
+
+    @pytest.mark.parametrize("n_chains", [1, 4])
+    def test_initialize_n_chains_shape_contract(self, n_chains):
+        """InitResult.state is a single CrossCatState for n_chains=1,
+        a list of length n_chains otherwise. Documents the contract
+        explicitly so downstream callers can branch correctly.
+        """
+        key = jax.random.key(403)
+        data = jax.random.normal(key, (20, 3))
+        types = [ColumnType.CONTINUOUS] * 3
+        result = initialize(key, data, types, n_chains=n_chains)
+
+        if n_chains == 1:
+            assert not isinstance(result.state, list), (
+                "n_chains=1 should return a single CrossCatState (not a list)"
+            )
+            assert result.state.n_rows == 20
+        else:
+            assert isinstance(result.state, list), f"n_chains={n_chains} should return a list"
+            assert len(result.state) == n_chains
+            for s in result.state:
+                assert s.n_rows == 20
+
+    def test_initialize_column_type_mismatch_raises(self):
+        """initialize() rejects a column_types list with the wrong length."""
+        key = jax.random.key(404)
+        data = jax.random.normal(key, (10, 3))
+        with pytest.raises(ValueError):
+            initialize(key, data, [ColumnType.CONTINUOUS, ColumnType.CONTINUOUS])
