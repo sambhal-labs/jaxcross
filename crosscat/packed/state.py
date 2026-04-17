@@ -649,7 +649,7 @@ def batch_packed_states(packed_list: list[PackedCrossCatState]) -> PackedCrossCa
         kwargs[name] = jnp.stack([getattr(p, name) for p in packed_list])
     for name in _STATIC_FIELDS:
         kwargs[name] = getattr(ref, name)
-    return PackedCrossCatState(**kwargs)
+    return PackedCrossCatState(**kwargs)  # type: ignore[arg-type]
 
 
 def unbatch_packed_states(

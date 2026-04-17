@@ -480,14 +480,14 @@ def effective_sample_size(traces: Array) -> Array:
 
     # Initial positive sequence estimator: sum consecutive pairs until
     # a pair sum becomes negative (Geyer 1992).
-    tau = 0.0
+    tau_pairs: Array = jnp.asarray(0.0)
     for lag in range(1, n_samples, 2):
         pair_sum = acf_mean[lag] + (acf_mean[lag + 1] if lag + 1 < n_samples else 0.0)
         if pair_sum < 0:
             break
-        tau += pair_sum
+        tau_pairs = tau_pairs + pair_sum
     # τ_int = 1 + 2 * Σ ρ(k), where tau accumulated the pair sums
-    tau = 1.0 + 2.0 * tau
+    tau = 1.0 + 2.0 * tau_pairs
     tau = jnp.maximum(tau, 1.0 / n_samples)  # floor at 1 sample
 
     return jnp.array(n_chains * n_samples / tau)
