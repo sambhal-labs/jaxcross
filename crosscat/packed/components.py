@@ -319,7 +319,14 @@ def _bb_posterior_predictive_logp(x, count, sum_x, alpha, beta):
 
 
 def _vm_posterior_predictive_logp(x, count, sum_sin, sum_cos, kappa, vm_a, vm_mu):
-    """Von Mises posterior predictive log p(x | suffstats, hypers)."""
+    """Von Mises posterior-mode plug-in predictive log p(x | suffstats, hypers).
+
+    Plug-in approximation (not the exact marginal): extracts the posterior mean
+    direction from the kappa-scaled resultant of data + prior, then plugs it
+    into a VM likelihood at concentration ``kappa``. Matches the unpacked
+    ``crosscat.components.VonMises.posterior_predictive_logp`` — see that
+    docstring for the full derivation note.
+    """
     total_sin = kappa * sum_sin + vm_a * jnp.sin(vm_mu)
     total_cos = kappa * sum_cos + vm_a * jnp.cos(vm_mu)
     mu_post = jnp.arctan2(total_sin, total_cos)

@@ -96,6 +96,43 @@ class TestVonMises:
         log_p = VonMises.posterior_predictive_logp(jnp.array(0.15), ss, hypers)
         assert jnp.isfinite(log_p)
 
+    def test_posterior_predictive_parity_unpacked_packed(self):
+        """Unpacked VonMises.posterior_predictive_logp and packed
+        _vm_posterior_predictive_logp must produce bit-identical values.
+
+        Both implement the same posterior-mode plug-in approximation; if they
+        ever diverge, multi-path inference results would silently disagree.
+        """
+        from crosscat.components import VonMises
+        from crosscat.packed.components import _vm_posterior_predictive_logp
+
+        # Diverse test points spanning the circle with non-trivial suffstats.
+        data = jnp.array([0.1, 0.2, 0.3, 1.5, 4.7])
+        ss = VonMises.sufficient_statistics(data)
+        hypers = ColumnHypers(
+            column_type=ColumnType.CYCLIC,
+            kappa=jnp.array(2.3),
+            vm_a=jnp.array(1.7),
+            vm_mu=jnp.array(0.6),
+        )
+
+        queries = jnp.array([0.0, 0.5, 1.0, jnp.pi, 5.1])
+        for x in queries:
+            unpacked = VonMises.posterior_predictive_logp(x, ss, hypers)
+            packed = _vm_posterior_predictive_logp(
+                x,
+                ss.count.astype(jnp.float32),
+                ss.sum_sin,
+                ss.sum_cos,
+                hypers.kappa,
+                hypers.vm_a,
+                hypers.vm_mu,
+            )
+            assert jnp.allclose(unpacked, packed, atol=1e-6), (
+                f"unpacked vs packed VM predictive disagree at x={float(x):.3f}: "
+                f"unpacked={float(unpacked):.6f}, packed={float(packed):.6f}"
+            )
+
     def test_sample(self, rng_key):
         from crosscat.components import VonMises
 
