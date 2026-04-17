@@ -2566,6 +2566,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#synchronous-parallel-row-kernel-approximation-tradeoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Synchronous (Parallel) Row Kernel — Approximation Tradeoff
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3024,6 +3035,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#synchronous-parallel-row-kernel-approximation-tradeoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Synchronous (Parallel) Row Kernel — Approximation Tradeoff
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3119,6 +3141,41 @@
 <li><strong>CRP alphas</strong>: <code>vmap</code> over log-spaced grid</li>
 </ul>
 <p>All packed kernels are decorated with <code>@jax.jit</code> for independent compilation.</p>
+<h2 id="synchronous-parallel-row-kernel-approximation-tradeoff">Synchronous (Parallel) Row Kernel — Approximation Tradeoff<a class="headerlink" href="#synchronous-parallel-row-kernel-approximation-tradeoff" title="Permanent link">&para;</a></h2>
+<p><code>packed_transition_row_assignments_parallel</code> is an alternate row kernel
+available through <a href="../../guides/scaling/">scaling.parallel_gibbs_sweep</a>. Every
+row evaluates its leave-one-out cluster scores against the <strong>same shared
+baseline</strong> of counts and sufficient statistics, then all rows are reassigned
+in one vectorized step. This is dramatically faster than the sequential
+kernel because the inner loop is a pure <code>vmap</code> with no row-to-row dependency.</p>
+<p>It is <strong>not exactly collapsed Gibbs</strong>, however. The target of the parallel
+kernel is the product of per-row conditional posteriors rather than the joint
+posterior over assignments. In practice convergence to the correct stationary
+distribution is observed, but mixing is slowed for views with heavily
+overlapping clusters (each row "sees" a stale baseline that still contains
+the other movers).</p>
+<p><strong>When to use the parallel kernel</strong>:</p>
+<ul>
+<li>Very wide datasets (many rows) where the sequential kernel is the bottleneck.</li>
+<li>Large minibatch training where approximate steps are already acceptable.</li>
+</ul>
+<p><strong>Recommended cadence</strong>:</p>
+<ul>
+<li>Alternate with one full pass of <code>packed_transition_row_assignments</code>
+  (sequential) every 3–5 parallel sweeps. The sequential pass cleans up
+  inconsistencies the parallel baseline introduces and is cheap relative to
+  the full workload.</li>
+<li>Always finish a run with at least a few sequential sweeps before reading
+  off the final posterior. Inference queries are insensitive to this, but
+  chain comparisons (Rhat, ESS) become more reliable when the final
+  assignments are exact-conditional samples.</li>
+<li>The parallel kernel <strong>cannot create new clusters</strong> — combine with either
+  the sequential kernel or <code>packed_transition_row_assignments_minibatch</code> if
+  cluster birth is required during the run.</li>
+</ul>
+<p>The docstring at <code>crosscat.packed.kernels.packed_transition_row_assignments_parallel</code>
+also describes this tradeoff; the <code>jnp.maximum(counts - 1, 0)</code> clamp inside
+that kernel is load-bearing specifically because of the shared-baseline semantics.</p>
 
 
 

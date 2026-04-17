@@ -2399,6 +2399,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger.log_convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.tb_logger.TBLogger.close" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3078,6 +3089,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.tb_logger.TBLogger.log_convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        log_convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.tb_logger.TBLogger.close" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3361,6 +3383,131 @@ as their mean value with a <code>mean/</code> prefix.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="crosscat.tb_logger.TBLogger.log_convergence" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_convergence</span><span class="p">(</span><span class="n">traces</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metric_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;log_joint&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span></code>
+
+<a href="#crosscat.tb_logger.TBLogger.log_convergence" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute and log Gelman-Rubin R-hat and ESS on a multi-chain trace.</p>
+<p>Requires <code>traces</code> to be convertible to a 2-D array of shape
+<code>(n_chains, n_samples)</code>. R-hat needs at least 2 chains and 4
+samples per chain; ESS needs at least 2 samples. If either
+precondition is unmet the corresponding metric is silently skipped
+— the intent is that this method is safe to call every <code>k</code> sweeps
+without a guard, letting the diagnostics appear once enough history
+accumulates.</p>
+<p>Both diagnostics are also returned so callers can log them through
+other sinks or assert in tests.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>traces</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Array-like of shape <code>(n_chains, n_samples)</code> — the
+statistic (typically <code>log_joint</code>) tracked per sweep per
+chain.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>step</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>TensorBoard x-axis step (usually the sweep counter).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metric_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>TensorBoard tag prefix. R-hat logs as
+<code>rhat/{metric_name}</code> and ESS as <code>ess/{metric_name}</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;log_joint&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dict with keys <code>rhat</code> and <code>ess</code> (values that were not</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>computable are omitted).</p>
+              </div>
             </td>
           </tr>
       </tbody>

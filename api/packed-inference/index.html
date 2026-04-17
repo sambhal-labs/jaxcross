@@ -2385,6 +2385,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#crosscat.packed_inference.batch_mutual_information" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        batch_mutual_information
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#crosscat.packed_inference.packed_dependence_probability" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3918,6 +3929,17 @@
     <span class="md-ellipsis">
       
         packed_mutual_information
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crosscat.packed_inference.batch_mutual_information" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        batch_mutual_information
       
     </span>
   </a>
@@ -5860,7 +5882,7 @@ row's cluster assignment and computes percentile-based CI.</p>
 
 
 <h3 id="crosscat.packed_inference.packed_predictive_probability" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">packed_predictive_probability</span><span class="p">(</span><span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">packed_predictive_probability</span><span class="p">(</span><span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.packed_predictive_probability" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5954,6 +5976,40 @@ for posterior predictive logp, logsumexp for mixture, sum across columns.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional). Must be paired with
+<code>condition_cols</code> and have the same length. NaN entries are
+silently skipped.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>row_id</code>
             </td>
             <td>
@@ -5961,7 +6017,9 @@ for posterior predictive logp, logsumexp for mixture, sum across columns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If provided, use observed row's cluster assignment (one-hot weights).</p>
+                <p>If provided, use the observed row's actual cluster assignment.
+Takes precedence over <code>condition_cols</code> (matches the unpacked
+<code>predictive_probability</code> contract).</p>
               </div>
             </td>
             <td>
@@ -6003,7 +6061,7 @@ for posterior predictive logp, logsumexp for mixture, sum across columns.</p>
 
 
 <h3 id="crosscat.packed_inference.packed_predictive_sample" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">packed_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">packed_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.packed_predictive_sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6097,6 +6155,39 @@ from weights, then sample value from that cluster.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional). NaN entries are
+silently skipped.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>n_samples</code>
             </td>
             <td>
@@ -6120,7 +6211,8 @@ from weights, then sample value from that cluster.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If provided, use observed row's cluster assignment.</p>
+                <p>If provided, use observed row's cluster assignment (takes
+precedence over <code>condition_cols</code>).</p>
               </div>
             </td>
             <td>
@@ -6308,6 +6400,175 @@ with importance weighting by p(x, y).</p>
             <td>
               <div class="doc-md-description">
                 <p>Tuple of (mutual_information, linfoot_correlation).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="crosscat.packed_inference.batch_mutual_information" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">batch_mutual_information</span><span class="p">(</span><span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">column_types</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">col_pairs</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="n">Array</span><span class="p">]</span></code>
+
+<a href="#crosscat.packed_inference.batch_mutual_information" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute posterior MI for a batch of column pairs.</p>
+<p>Convenience wrapper over <code>packed_mutual_information</code> that loops in
+Python over <code>col_pairs</code>. Typical use is an <code>O(p^2)</code> upper-triangular
+sweep across every column pair; for <code>p</code> in the hundreds that's a few
+thousand MC estimates — acceptable for Python-loop overhead since each
+call is dominated by the JIT-compiled <code>_packed_estimate_mi_sample</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>packed_states</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="PackedCrossCatState
+
+
+  
+      dataclass
+   (crosscat.packed.PackedCrossCatState)" href="../packed-state/#crosscat.packed.state.PackedCrossCatState">PackedCrossCatState</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of PackedCrossCatState (MCMC posterior samples).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_types</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column type list (must match all packed_states).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>col_pairs</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Integer array of shape (n_pairs, 2). Each row is
+<code>(col_i, col_j)</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_samples</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>MC samples per pair for MI estimation.</p>
+              </div>
+            </td>
+            <td>
+                  <code>1000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>rng_key</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JAX PRNG key (uses <code>key(0)</code> if not provided). Each pair
+is scored with <code>fold_in(rng_key, pair_idx)</code> so different
+pairs use independent streams.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tuple of (mi, linfoot) arrays, each of shape (n_pairs,). MI values</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jax.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>for columns in different views (no shared cluster structure) are</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="jax.Array">Array</span>, <span title="jax.Array">Array</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>clamped to 0; linfoot <code>sqrt(1 - exp(-2 MI))</code> is in [0, 1].</p>
               </div>
             </td>
           </tr>
@@ -6945,7 +7206,7 @@ averages log probs, and applies sigmoid transform to [0, 1].</p>
 
 
 <h3 id="crosscat.packed_inference.packed_predictive_cdf" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">packed_predictive_cdf</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_val</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">packed_predictive_cdf</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_val</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.packed_predictive_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7053,6 +7314,38 @@ averages log probs, and applies sigmoid transform to [0, 1].</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>n_samples</code>
             </td>
             <td>
@@ -7076,7 +7369,8 @@ averages log probs, and applies sigmoid transform to [0, 1].</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If provided, use observed row's cluster assignment.</p>
+                <p>If provided, use observed row's cluster assignment (takes
+precedence over <code>condition_cols</code>).</p>
               </div>
             </td>
             <td>
@@ -7118,7 +7412,7 @@ averages log probs, and applies sigmoid transform to [0, 1].</p>
 
 
 <h3 id="crosscat.packed_inference.multi_chain_predictive_probability" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">multi_chain_predictive_probability</span><span class="p">(</span><span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">multi_chain_predictive_probability</span><span class="p">(</span><span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.multi_chain_predictive_probability" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7213,6 +7507,39 @@ Bayesian model averaging approach.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional, shared
+across chains).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>row_id</code>
             </td>
             <td>
@@ -7220,7 +7547,8 @@ Bayesian model averaging approach.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If provided, use observed row's cluster assignment.</p>
+                <p>If provided, use observed row's cluster assignment (takes
+precedence over <code>condition_cols</code>).</p>
               </div>
             </td>
             <td>
@@ -7262,7 +7590,7 @@ Bayesian model averaging approach.</p>
 
 
 <h3 id="crosscat.packed_inference.multi_chain_predictive_sample" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">multi_chain_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">multi_chain_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.multi_chain_predictive_sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7356,6 +7684,39 @@ n_samples // n_chains samples) for proper Bayesian model averaging.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional, shared
+across chains).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>n_samples</code>
             </td>
             <td>
@@ -7379,7 +7740,8 @@ n_samples // n_chains samples) for proper Bayesian model averaging.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If provided, use observed row's cluster assignment.</p>
+                <p>If provided, use observed row's cluster assignment (takes
+precedence over <code>condition_cols</code>).</p>
               </div>
             </td>
             <td>
@@ -7706,7 +8068,7 @@ instead of marginalizing over clusters.</p>
 
 
 <h3 id="crosscat.packed_inference.multi_chain_predictive_cdf" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">multi_chain_predictive_cdf</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_val</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">multi_chain_predictive_cdf</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_val</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">row_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.multi_chain_predictive_cdf" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7814,6 +8176,39 @@ instead of marginalizing over clusters.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional, shared
+across chains).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                 <code>n_samples</code>
             </td>
             <td>
@@ -7826,6 +8221,23 @@ instead of marginalizing over clusters.</p>
             </td>
             <td>
                   <code>10000</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>row_id</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If provided, use observed row's cluster assignment (takes
+precedence over <code>condition_cols</code>).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -9204,15 +9616,21 @@ model averaging, consistent with other multi_chain_* functions.</p>
 
 
 <h3 id="crosscat.packed_inference.batch_predictive_probability" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">batch_predictive_probability</span><span class="p">(</span><span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">row_ids</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">batch_predictive_probability</span><span class="p">(</span><span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">query_vals</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">row_ids</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.batch_predictive_probability" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Compute predictive log-probability for multiple rows at once.</p>
+        <p>Compute predictive log-probability for multiple queries.</p>
 <p>.. note:: Convenience wrapper — loops in Python, not GPU-vectorized.</p>
+<p>Supports three modes:
+- <code>row_ids</code> provided: each batch element uses that row's cluster assignment
+  (the historical observed-row workflow).
+- <code>condition_cols</code>/<code>condition_vals</code> provided, <code>row_ids=None</code>: every
+  query shares the same conditional cluster weights.
+- Neither provided: marginal mixture (every query gets the same result).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9300,15 +9718,48 @@ model averaging, consistent with other multi_chain_* functions.</p>
                 <code>row_ids</code>
             </td>
             <td>
-                  <code><span title="jax.Array">Array</span></code>
+                  <code><span title="jax.Array">Array</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>(n_queries,) array of row indices.</p>
+                <p>Optional (n_queries,) array of row indices. Takes precedence
+over <code>condition_cols</code> when both are provided.</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional, shared).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional, shared).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -9346,15 +9797,19 @@ model averaging, consistent with other multi_chain_* functions.</p>
 
 
 <h3 id="crosscat.packed_inference.batch_predictive_sample" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">batch_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">row_ids</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples_per_row</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">batch_predictive_sample</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed</span><span class="p">:</span> <span class="n">PackedCrossCatState</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">query_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">row_ids</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples_per_row</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">condition_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">condition_vals</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_queries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.batch_predictive_sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Draw posterior predictive samples for multiple rows.</p>
+        <p>Draw posterior predictive samples for multiple queries.</p>
 <p>.. note:: Convenience wrapper — loops in Python, not GPU-vectorized.</p>
+<p>When <code>row_ids</code> is provided, each batch element uses that row's cluster
+assignment. When <code>row_ids=None</code> and <code>condition_cols</code> is provided,
+every batch element shares the conditional cluster weights; supply
+<code>n_queries</code> to control how many independent draws are returned.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9442,15 +9897,16 @@ model averaging, consistent with other multi_chain_* functions.</p>
                 <code>row_ids</code>
             </td>
             <td>
-                  <code><span title="jax.Array">Array</span></code>
+                  <code><span title="jax.Array">Array</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>(n_queries,) array of row indices.</p>
+                <p>Optional (n_queries,) array of row indices. Takes precedence
+over <code>condition_cols</code>.</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -9462,11 +9918,60 @@ model averaging, consistent with other multi_chain_* functions.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Samples per row (default 1).</p>
+                <p>Samples per query (default 1).</p>
               </div>
             </td>
             <td>
                   <code>1</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_cols</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column indices to condition on (optional, shared).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condition_vals</code>
+            </td>
+            <td>
+                  <code><span title="jax.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditioning values (optional, shared).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_queries</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of independent draws when <code>row_ids</code> is omitted.
+Defaults to 1 unless inferrable from <code>row_ids</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>

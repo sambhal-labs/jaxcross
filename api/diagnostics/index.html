@@ -2210,6 +2210,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gelman_rubin_rhat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gelman_rubin_rhat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#effective_sample_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_sample_size
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mean_test_log_likelihood" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3338,6 +3360,28 @@
     <span class="md-ellipsis">
       
         collect_diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gelman_rubin_rhat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gelman_rubin_rhat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#effective_sample_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_sample_size
       
     </span>
   </a>
@@ -4632,22 +4676,51 @@ n_chains &gt;= 2.</p>
 </span></code></pre></div>
 <p>Per-sweep diagnostic metrics.</p>
 <p><strong>Returns</strong>: Dict with keys: <code>log_joint</code>, <code>n_views</code>, <code>column_crp_alpha</code>, <code>row_crp_alphas</code>, <code>n_clusters_per_view</code>.</p>
+<h2 id="gelman_rubin_rhat"><code>gelman_rubin_rhat</code><a class="headerlink" href="#gelman_rubin_rhat" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">gelman_rubin_rhat</span><span class="p">(</span><span class="n">traces</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
+</span></code></pre></div>
+<p>Split-R-hat convergence diagnostic (Vehtari et al. 2021). Each chain is
+split in half, doubling the effective chain count for a stricter test.
+Values close to 1.0 indicate convergence; <code>R-hat &gt; 1.1</code> suggests the
+chains have not yet mixed.</p>
+<p><strong>Input</strong>: <code>traces</code> of shape <code>(n_chains, n_samples)</code> — a scalar statistic
+(typically <code>log_joint</code>) tracked per sweep per chain. Requires
+<code>n_chains &gt;= 2</code> and <code>n_samples &gt;= 4</code>.</p>
+<p><strong>Output</strong>: scalar <code>R-hat</code>, always <code>&gt;= 1.0</code>.</p>
+<p><strong>Notes</strong>:
+- With very short chains (&lt; 20 samples) the variance estimates are noisy
+  and R-hat may be unreliable. Prefer 50–100 samples per chain.
+- When chains agree exactly (zero within-chain variance) R-hat is defined
+  as 1.0 rather than NaN.</p>
+<h2 id="effective_sample_size"><code>effective_sample_size</code><a class="headerlink" href="#effective_sample_size" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">effective_sample_size</span><span class="p">(</span><span class="n">traces</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
+</span></code></pre></div>
+<p>Initial-positive-sequence ESS estimator (Geyer 1992). Pools the
+within-chain autocorrelations and sums consecutive lag-pairs until the
+pair sum becomes negative.</p>
+<p><strong>Input</strong>: <code>traces</code> of shape <code>(n_chains, n_samples)</code> — same contract as
+<code>gelman_rubin_rhat</code>. A 1-D trace is treated as a single chain.</p>
+<p><strong>Output</strong>: scalar ESS estimate (effective number of independent samples).</p>
+<p><strong>Important</strong>: this function uses a Python <code>break</code> over traced values and
+<strong>cannot be JIT-compiled</strong>. Call it from Python after assembling the
+trace arrays. If you need JIT-friendly convergence tracking, log <code>R-hat</code>
+(pure JAX) and the raw log-joint trace to inspect mixing visually.</p>
 <h2 id="mean_test_log_likelihood"><code>mean_test_log_likelihood</code><a class="headerlink" href="#mean_test_log_likelihood" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mean_test_log_likelihood</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mean_test_log_likelihood</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
 </span></code></pre></div>
 <p>Mean held-out log-likelihood on specified test rows.</p>
 <h2 id="random_holdout_mask"><code>random_holdout_mask</code><a class="headerlink" href="#random_holdout_mask" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">random_holdout_mask</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">,</span> <span class="n">holdout_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">random_holdout_mask</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">,</span> <span class="n">holdout_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span>
 </span></code></pre></div>
 <p>Create a random boolean mask for held-out evaluation.</p>
 <p><strong>Returns</strong>: <code>Array (n_rows, n_cols)</code> boolean mask.</p>
 <h2 id="evaluate_imputation"><code>evaluate_imputation</code><a class="headerlink" href="#evaluate_imputation" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">evaluate_imputation</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">evaluate_imputation</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
 <p>Evaluate imputation accuracy on held-out cells using the unpacked inference path. Computes MAE (continuous), accuracy (discrete), and log-likelihood.</p>
 <p><strong>Returns</strong>: Dict with per-type metrics.</p>
 <h2 id="packed_evaluate_imputation"><code>packed_evaluate_imputation</code><a class="headerlink" href="#packed_evaluate_imputation" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">packed_evaluate_imputation</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">packed_evaluate_imputation</span><span class="p">(</span><span class="n">packed</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">col_types</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
 <p>Drop-in replacement for <code>evaluate_imputation</code> that uses the packed inference path (<code>packed_predictive_probability</code>, <code>packed_impute_and_confidence</code>) for significantly faster evaluation. Accepts a <code>PackedCrossCatState</code> instead of <code>CrossCatState</code>.</p>
 <p><strong>Returns</strong>: Dict with per-type metrics (same format as <code>evaluate_imputation</code>).</p>
