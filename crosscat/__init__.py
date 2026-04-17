@@ -1,6 +1,6 @@
 """jax-crosscat: GPU-accelerated nonparametric cross-categorization in JAX."""
 
-__version__ = "0.12.0"
+__version__ = "1.0.0"
 
 from crosscat.constraints import (
     check_all_column_constraints,
