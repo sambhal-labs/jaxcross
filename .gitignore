@@ -58,10 +58,14 @@ Thumbs.db
 
 # Benchmark results
 results/
-# Allow materials project results (CSVs, PNGs, PDF) but not checkpoints
+# Allow materials project results (PNGs, PDFs, small metrics tables) but
+# not checkpoints or bulk CSV dumps. Large per-material prediction CSVs
+# belong on GitHub Releases / HuggingFace / Zenodo, not in git history.
 !examples/materials_project/results/
 examples/materials_project/results/checkpoints_v2/
 examples/materials_project/results/checkpoints_v2_local/
+examples/materials_project/results/multichain_results/dielectric_predictions*.csv
+examples/materials_project/results/multichain_results/predicted_dielectric_*.csv
 # DRISHTI proposal PDFs (sensitive application documents)
 examples/drishti_proposals/
 
