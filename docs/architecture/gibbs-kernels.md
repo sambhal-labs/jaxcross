@@ -49,3 +49,42 @@ In the packed path, these kernels are implemented with JAX primitives:
 - **CRP alphas**: `vmap` over log-spaced grid
 
 All packed kernels are decorated with `@jax.jit` for independent compilation.
+
+## Synchronous (Parallel) Row Kernel — Approximation Tradeoff
+
+`packed_transition_row_assignments_parallel` is an alternate row kernel
+available through [scaling.parallel_gibbs_sweep](../guides/scaling.md). Every
+row evaluates its leave-one-out cluster scores against the **same shared
+baseline** of counts and sufficient statistics, then all rows are reassigned
+in one vectorized step. This is dramatically faster than the sequential
+kernel because the inner loop is a pure `vmap` with no row-to-row dependency.
+
+It is **not exactly collapsed Gibbs**, however. The target of the parallel
+kernel is the product of per-row conditional posteriors rather than the joint
+posterior over assignments. In practice convergence to the correct stationary
+distribution is observed, but mixing is slowed for views with heavily
+overlapping clusters (each row "sees" a stale baseline that still contains
+the other movers).
+
+**When to use the parallel kernel**:
+
+- Very wide datasets (many rows) where the sequential kernel is the bottleneck.
+- Large minibatch training where approximate steps are already acceptable.
+
+**Recommended cadence**:
+
+- Alternate with one full pass of `packed_transition_row_assignments`
+  (sequential) every 3–5 parallel sweeps. The sequential pass cleans up
+  inconsistencies the parallel baseline introduces and is cheap relative to
+  the full workload.
+- Always finish a run with at least a few sequential sweeps before reading
+  off the final posterior. Inference queries are insensitive to this, but
+  chain comparisons (Rhat, ESS) become more reliable when the final
+  assignments are exact-conditional samples.
+- The parallel kernel **cannot create new clusters** — combine with either
+  the sequential kernel or `packed_transition_row_assignments_minibatch` if
+  cluster birth is required during the run.
+
+The docstring at `crosscat.packed.kernels.packed_transition_row_assignments_parallel`
+also describes this tradeoff; the `jnp.maximum(counts - 1, 0)` clamp inside
+that kernel is load-bearing specifically because of the shared-baseline semantics.

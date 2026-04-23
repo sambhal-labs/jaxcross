@@ -18,6 +18,7 @@ import csv
 import logging
 import warnings
 from pathlib import Path
+from typing import Any, Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -226,7 +227,7 @@ def gen_column_metadata(
     }
 
     for j in range(n_cols):
-        col_meta = {
+        col_meta: dict[str, Any] = {
             "modeltype": column_types[j].value,
             "name": column_names[j],
         }
@@ -235,7 +236,7 @@ def gen_column_metadata(
             unique_vals = sorted(set(int(v) for v in clean.tolist()))
             col_meta["value_to_code"] = {str(v): i for i, v in enumerate(unique_vals)}
             col_meta["code_to_value"] = {i: str(v) for i, v in enumerate(unique_vals)}
-        metadata["column_metadata"].append(col_meta)
+        metadata["column_metadata"].append(col_meta)  # type: ignore[attr-defined]
 
     return metadata
 
@@ -443,10 +444,13 @@ def save_npz(
     save_npy(filepath, data, column_names)
 
 
+_MmapMode = Literal["r+", "r", "w+", "c"]
+
+
 def load_npy_mmap(
     filepath: str | Path,
     *,
-    mmap_mode: str = "r",
+    mmap_mode: _MmapMode = "r",
 ) -> tuple[np.ndarray, list[str] | None]:
     """Load data from ``.npy`` file with memory-mapping for large files.
 
@@ -495,7 +499,7 @@ def load_npy_mmap(
 def load_npz_mmap(
     filepath: str | Path,
     *,
-    mmap_mode: str = "r",
+    mmap_mode: _MmapMode = "r",
 ) -> tuple[np.ndarray, list[str] | None]:
     """Deprecated: use ``load_npy_mmap`` instead.
 

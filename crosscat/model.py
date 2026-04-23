@@ -395,18 +395,25 @@ def insert_rows(
         row_assignments = view.row_assignments
         n_clusters = int(jnp.max(row_assignments)) + 1
         alpha = view.row_crp_alpha
-        n_existing_clusters = n_clusters
 
         new_assigns = []
         for i in range(n_new):
-            # CRP predictive: score each existing cluster + new cluster
+            # CRP predictive against the *current* assignments (existing rows
+            # plus any rows already placed in this batch). Scoring against the
+            # frozen pre-batch state was a bug: rows 2..n_new couldn't see rows
+            # 1..i-1 in the CRP prior, breaking exchangeability for batches.
             cluster_counts = jnp.array(
-                [jnp.sum(row_assignments == c) for c in range(n_existing_clusters)]
+                [jnp.sum(row_assignments == c) for c in range(n_clusters)]
             ).astype(jnp.float32)
             log_probs = jnp.log(cluster_counts + LOG_EPS)
-            # Add likelihood of row under each cluster using existing suffstats
+            # Add likelihood of row under each existing cluster's suffstats.
+            # Suffstats are only refreshed post-batch (see below), so during
+            # the batch we approximate using pre-batch suffstats — this leaves
+            # a small O(batch_size/cluster_size) bias but preserves the
+            # dominant CRP-prior correctness. Full suffstat update per row is
+            # the packed path's job; this function is the reference slow path.
             row_data = new_rows[i]
-            for c in range(n_existing_clusters):
+            for c in range(len(view.suffstats)):
                 for local_idx, col_idx_val in enumerate(view.column_indices.tolist()):
                     col_idx = int(col_idx_val)
                     col_type = state.column_types[col_idx]
@@ -419,20 +426,23 @@ def insert_rows(
                         log_probs = log_probs.at[c].add(log_lik)
 
             # New cluster — use CRP prior only (empty cluster prior predictive)
-            log_new = jnp.log(alpha)
+            log_new = jnp.log(jnp.maximum(alpha, LOG_EPS))
             log_probs = jnp.concatenate([log_probs, jnp.array([log_new])])
             log_probs = log_probs - jnp.max(log_probs)
             chosen = int(jax.random.categorical(row_keys[i], log_probs))
 
-            if chosen >= n_existing_clusters:
+            if chosen >= n_clusters:
                 chosen = n_clusters
                 n_clusters += 1
+            # Extend row_assignments so the next iteration's CRP prior sees
+            # this placement. This is the fix for intra-batch exchangeability.
+            row_assignments = jnp.concatenate(
+                [row_assignments, jnp.array([chosen], dtype=jnp.int32)]
+            )
             new_assigns.append(chosen)
 
-        # Extend row assignments
-        new_row_assigns = jnp.concatenate(
-            [row_assignments, jnp.array(new_assigns, dtype=jnp.int32)]
-        )
+        # row_assignments now includes both pre-existing and newly-placed rows
+        new_row_assigns = row_assignments
 
         # Recompute suffstats with extended data
         n_clusters_final = int(jnp.max(new_row_assigns)) + 1
@@ -492,11 +502,12 @@ def _log_crp(assignments: Array, alpha: Array) -> Array:
     n_clusters = int(jnp.max(assignments)) + 1
     counts = jnp.bincount(assignments, length=n_clusters).astype(jnp.float32)
 
+    safe_alpha = jnp.maximum(alpha, LOG_EPS)
     log_p = (
-        n_clusters * jnp.log(alpha)
+        n_clusters * jnp.log(safe_alpha)
         + jnp.sum(gammaln(counts))
-        - gammaln(n + alpha)
-        + gammaln(alpha)
+        - gammaln(n + safe_alpha)
+        + gammaln(safe_alpha)
     )
     return log_p
 
