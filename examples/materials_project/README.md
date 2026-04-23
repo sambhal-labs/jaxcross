@@ -47,10 +47,15 @@ uv run python examples/materials_project/generate_pdf.py
 
 ## Outputs
 
-Results are saved to `results/multichain_results/`:
+Running the pipeline writes to `results/multichain_results/`. The checked-in
+artifacts are the small reference outputs (metrics tables, figures,
+`analysis_summary.json`, `z_matrix.npy`); the bulk per-material prediction
+CSVs are generated on first run and are `.gitignore`d to keep repo clones
+light. The expected files are:
 
-- `dielectric_predictions.csv` — 7,327 training materials with predictions and CI
-- `predicted_dielectric_123k.csv` — 49,566 high-confidence new material predictions
+- `dielectric_predictions.csv` — 7,327 training materials with predictions and CI *(generated)*
+- `predicted_dielectric_123k.csv` — 49,566 high-confidence new material predictions *(generated)*
+- `dielectric_predictions_{90,95,99}ci.csv` — CI variants *(generated)*
 - `baseline_comparison.csv` — R²/MAE comparison across methods
 - `analysis_summary.json` — convergence diagnostics, imputation metrics, classification results
 - `z_matrix.npy` — dependence matrix (23×23) averaged over 4 chains
