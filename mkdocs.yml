@@ -120,6 +120,7 @@ nav:
     - Anomaly Detection: use-cases/anomaly-detection.md
     - Scientific Exploration: use-cases/scientific-exploration.md
     - Missing Data Imputation: use-cases/missing-data.md
+    - Materials Property Discovery: use-cases/materials-discovery.md
   - API Reference:
     - api/index.md
     - Types & State: api/types.md
@@ -152,6 +153,7 @@ nav:
     - MNIST Benchmark: examples/mnist.md
     - WDI Macroeconomics: examples/wdi-macroeconomics.md
     - CSV End-to-End Workflow: examples/csv-workflow.md
+    - Materials Project Discovery: examples/materials-project.md
   - FAQ & Troubleshooting: faq.md
   - Glossary: glossary.md
   - Roadmap: roadmap.md
