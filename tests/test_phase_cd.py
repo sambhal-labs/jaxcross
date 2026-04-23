@@ -241,8 +241,13 @@ class TestSaveLoadDataRoundtrip:
 
 
 class TestBatchConditionalEntropy:
+    @pytest.mark.slow
     def test_returns_finite(self):
-        """batch_conditional_entropy returns finite values for each pair."""
+        """batch_conditional_entropy returns finite values for each pair.
+
+        Marked slow: exceeds the 300s CI timeout on CPU JIT compile + MC integration.
+        Runs fine on GPU; kept in the slow suite rather than skipped.
+        """
         from crosscat.packed_inference import batch_conditional_entropy
 
         key = jax.random.key(70)
