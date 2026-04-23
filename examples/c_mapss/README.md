@@ -29,32 +29,50 @@ prognostics paper reports on it. jaxcross's angle is different:
 
 ## Pipeline
 
-Run from the repo root in this order:
+Run from the repo root. **Always run the smoke test before committing to a full run** — it validates the pipeline end-to-end in ~3-5 min.
 
-| Step | Script | What it does | Runtime (GTX 1650) |
-|------|--------|-------------|--------------------|
-| 1 | `fetch_cmapss.py`       | Download NASA C-MAPSS zip, extract 12 txt files       | ~20 s |
-| 2 | `preprocess_cmapss.py`  | Compute RUL, drop constant sensors, z-score, split    | ~30 s (all 4 sets) |
-| 3 | `run_inference.py`      | Multi-chain packed Gibbs; auto single- or multi-GPU    | ~15–45 min (FD001) |
-| 4 | `evaluate_rul.py`       | Insert test engines, impute RUL, measure CI coverage   | ~2–5 min |
+| Step | Script / command | What it does |
+|------|-----------------|--------------|
+| 1 | `fetch_cmapss.py` | Download + extract NASA C-MAPSS zip (~20 s) |
+| 2 | `preprocess_cmapss.py FD001` | Compute RUL, drop constant sensors, z-score (~30 s) |
+| 3a | `run_inference.py FD001 --smoke` | 2 chains × 6 sweeps × 1000 rows end-to-end validation (~3-5 min on any GPU) |
+| 3b | `run_inference.py FD001 ...` | Real multi-chain packed Gibbs; auto single- or multi-GPU |
+| 4 | `evaluate_rul.py FD001` | Insert test engines, impute RUL, 90/95/99 % CI coverage (~2-5 min) |
+| 5 | `baseline_rul.py FD001` | Ridge + RandomForest baselines on the same data (~1 min) |
+| 6 | `evaluate_best_chain.py FD001` | Best-chain-only version of the eval for comparison (~1 min) |
+
+### Local full FD001 run (4 GB GTX 1650)
+
+Subsamples to 5000 rows to fit in VRAM; 4 chains × 100 sweeps; ~45 min.
 
 ```bash
-# Full pipeline for FD001 (the gold-standard RUL benchmark)
 uv run python examples/c_mapss/fetch_cmapss.py
 uv run python examples/c_mapss/preprocess_cmapss.py FD001
-uv run python examples/c_mapss/run_inference.py FD001 --sweeps 200 --chains 4
+uv run python examples/c_mapss/run_inference.py FD001 --smoke              # validate first
+uv run python examples/c_mapss/run_inference.py FD001 \
+    --chains 4 --sweeps 100 --diag-every 20 --subsample 5000
 uv run python examples/c_mapss/evaluate_rul.py FD001 --samples 500
+uv run python examples/c_mapss/baseline_rul.py FD001
+uv run python examples/c_mapss/evaluate_best_chain.py FD001
 ```
 
-To run all four sub-datasets:
+### Checkpointing and resume
+
+`run_inference.py` checkpoints every `--diag-every` sweeps to `results/inference/<fd>/`.
+Safe to kill and re-run with `--resume` (same args as the killed run) — picks up from
+`last_completed_sweep` without repeating work.
 
 ```bash
-uv run python examples/c_mapss/preprocess_cmapss.py        # all 4
-for fd in FD001 FD002 FD003 FD004; do
-    uv run python examples/c_mapss/run_inference.py $fd
-    uv run python examples/c_mapss/evaluate_rul.py $fd
-done
+# Survives notebook / session death:
+uv run python examples/c_mapss/run_inference.py FD001 \
+    --chains 4 --sweeps 150 --diag-every 30 --resume
 ```
+
+Resume rules:
+- Checkpoint must match `n_chains` and `data_shape` exactly — otherwise it is ignored and a fresh run starts.
+- If `--sweeps` is higher than the saved `last_completed_sweep`, resume runs the remaining sweeps.
+- If it is lower or equal, resume is a no-op (nothing to do).
+- To explicitly start over, delete `results/inference/<fd>/` before re-running.
 
 ## Single-GPU vs multi-GPU
 
@@ -78,20 +96,27 @@ A ready-to-run notebook: [kaggle_fd001.ipynb](kaggle_fd001.ipynb).
 
 1. Upload / import the notebook on Kaggle.
 2. Settings → Accelerator → **GPU T4 ×2** and enable Internet.
-3. Run all. It clones the repo at this branch, installs with `--no-deps` (preserves Kaggle's pre-installed JAX+CUDA stack), then runs:
-   - Fetch + preprocess FD001
-   - `run_inference.py --chains 8 --sweeps 300` (no `--subsample` → full 20 631 rows)
-   - `evaluate_rul.py --samples 1000` (BMA + 90/95/99 % CIs)
-   - `baseline_rul.py` + `evaluate_best_chain.py`
-   - Consolidated leaderboard printout
+3. Run cells **sequentially** (not "Run All") — the smoke test (cell 4) must pass before cell 6.
 
-Expected inference runtime: ~30-90 min, well within the Kaggle free-tier 12 h weekly GPU budget.
+The notebook uses **4 chains × 150 sweeps × full 20 631 rows** with checkpointing every 30 sweeps.
+
+**Measured throughput on 2×T4:** ~40 s per chain-sweep post-compile. `fori_loop`
+serializes chains within each device, so with 4 chains each device processes 2
+chains serially. Projection: 4 chains × 150 sweeps on 2×T4 ≈ **~3.3 h total**.
+
+If the Kaggle session dies mid-run, the next `run_inference.py` with `--resume`
+picks up from the last checkpoint — worst-case loss is 30 sweeps (~40 min), not
+the whole run.
+
+**Don't use 8 chains × 300 sweeps on 2×T4.** Measured: ~13.75 h projected, which
+busts the Kaggle 12 h weekly quota. Stick with the notebook's 4 × 150 default unless
+you have paid Kaggle GPU hours to burn.
 
 ## Column layout (per sub-dataset, after preprocessing)
 
 ```
 idx  name             type         notes
-0    time_in_cycles   ORDINAL      current flight cycle
+0    time_in_cycles   CONTINUOUS   z-scored on training-set stats
 1    op_setting_1     CONT/CAT     CAT in FD002/FD004 (6 regimes auto-detected)
 2    op_setting_2     CONT/CAT
 3    op_setting_3     CONT/CAT

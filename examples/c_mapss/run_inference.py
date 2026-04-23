@@ -2,20 +2,34 @@
 """Run multi-chain Gibbs inference on a C-MAPSS sub-dataset.
 
 Auto-selects the execution mode from the JAX device count:
-  - 1 device   -> sequential chains, each using packed_gibbs_sweep
-                  (matches examples/materials_project/run_local_multichain.py
-                  memory profile; safe on 4 GB GTX 1650)
+  - 1 device   -> vmap across chains via multi_chain_packed_gibbs_sweep
   - N devices  -> jax.pmap across devices, CHAINS_PER_DEVICE = N_CHAINS // N
-                  (matches benchmarks/wdi_macroeconomic_benchmark.ipynb)
+                  (pattern from benchmarks/wdi_macroeconomic_benchmark.ipynb)
+
+Checkpoints the full set of chains + trace + meta after every chunk of
+``--diag-every`` sweeps, so a Kaggle session death, interrupt, or OOM only
+costs you the sweeps since the last checkpoint (not the whole run).
 
 Outputs (examples/c_mapss/results/inference/<fd>/):
-  chain_{i}.jxc               per-chain final packed state
-  best_chain.jxc              argmax-log-joint chain
-  log_joint_traces.npy        (N_CHAINS, N_DIAG) diagnostic trace
-  inference_meta.json         config + timing + device info
+  chain_{i}.jxc               per-chain packed state (latest checkpoint)
+  best_chain.jxc              argmax-log-joint chain (latest checkpoint)
+  log_joint_traces.npy        (n_chains, n_diag_points) trace so far
+  train_used.npy              exact training rows the chains saw
+  inference_meta.json         config + timing + last_completed_sweep
 
-Usage:
-    uv run python examples/c_mapss/run_inference.py [FD001] [--sweeps 200] [--chains 4]
+Run a 5-minute smoke test first to validate the pipeline end-to-end:
+
+    uv run python examples/c_mapss/run_inference.py FD001 --smoke
+
+Full run:
+
+    uv run python examples/c_mapss/run_inference.py FD001 \
+        --chains 4 --sweeps 150 --diag-every 30
+
+Resume after a crash/interrupt (same args as the killed run):
+
+    uv run python examples/c_mapss/run_inference.py FD001 \
+        --chains 4 --sweeps 150 --diag-every 30 --resume
 """
 
 from __future__ import annotations
@@ -39,7 +53,7 @@ from crosscat.packed import (
     unbatch_packed_states,
 )
 from crosscat.packed.kernels import multi_chain_packed_gibbs_sweep, packed_log_joint
-from crosscat.serialization import save_packed_state
+from crosscat.serialization import load_packed_state, save_packed_state
 from crosscat.types import ColumnType
 
 PREP_ROOT = Path("examples/c_mapss/results/preprocessed")
@@ -78,24 +92,112 @@ def _pack_initial_chains(
     return [pack_state(s, max_views=max_views, max_clusters=max_clusters) for s in states]
 
 
+# ---------------------------------------------------------------------------
+# Checkpoint IO
+# ---------------------------------------------------------------------------
+
+
+def _save_checkpoint(
+    out_dir: Path,
+    chains: list,
+    traces: np.ndarray,
+    meta: dict,
+    column_types: list[ColumnType],
+    data_np: np.ndarray,
+) -> None:
+    """Atomically persist every chain + trace + meta. Safe to overwrite."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for ci, packed in enumerate(chains):
+        save_packed_state(packed, str(out_dir / f"chain_{ci}.jxc"), column_types=column_types)
+
+    last_scores = (
+        traces[:, -1]
+        if traces.size
+        else np.array([float(meta.get(f"_score_{i}", 0.0)) for i in range(len(chains))])
+    )
+    best_idx = int(np.argmax(last_scores))
+    save_packed_state(chains[best_idx], str(out_dir / "best_chain.jxc"), column_types=column_types)
+    np.save(out_dir / "log_joint_traces.npy", traces)
+    if not (out_dir / "train_used.npy").exists():
+        np.save(out_dir / "train_used.npy", data_np)
+    (out_dir / "inference_meta.json").write_text(json.dumps(meta, indent=2))
+
+
+def _try_resume(
+    out_dir: Path,
+    expected_n_chains: int,
+    expected_n_sweeps: int,
+    expected_data_shape: tuple[int, int],
+) -> tuple[list, np.ndarray, int] | None:
+    """Return (chains, traces, sweeps_done) if a compatible checkpoint exists."""
+    meta_path = out_dir / "inference_meta.json"
+    if not meta_path.exists():
+        return None
+    meta = json.loads(meta_path.read_text())
+    if meta.get("n_chains") != expected_n_chains:
+        print(
+            f"  Resume skipped: checkpoint has {meta.get('n_chains')} chains, "
+            f"current run expects {expected_n_chains}"
+        )
+        return None
+    if tuple(meta.get("data_shape", [])) != expected_data_shape:
+        print(
+            f"  Resume skipped: checkpoint data_shape {meta.get('data_shape')} "
+            f"differs from current {list(expected_data_shape)}"
+        )
+        return None
+    sweeps_done = int(meta.get("last_completed_sweep", 0))
+    if sweeps_done <= 0:
+        return None
+
+    chains: list = []
+    for ci in range(expected_n_chains):
+        p = out_dir / f"chain_{ci}.jxc"
+        if not p.exists():
+            print(f"  Resume skipped: {p.name} missing")
+            return None
+        packed, _ = load_packed_state(str(p))
+        chains.append(packed)
+
+    traces_path = out_dir / "log_joint_traces.npy"
+    traces = (
+        np.load(traces_path)
+        if traces_path.exists()
+        else np.zeros((expected_n_chains, 0), dtype=np.float32)
+    )
+    if sweeps_done >= expected_n_sweeps:
+        print(
+            f"  Checkpoint already at {sweeps_done}/{expected_n_sweeps} sweeps — "
+            f"loading final chains without further inference"
+        )
+    return chains, traces, sweeps_done
+
+
+# ---------------------------------------------------------------------------
+# Run loops — checkpoint after every chunk
+# ---------------------------------------------------------------------------
+
+
 def _run_single_device(
-    init_chains: list,
+    current_list: list,
+    traces_so_far: np.ndarray,
     data: jnp.ndarray,
+    data_np: np.ndarray,
+    sweeps_done: int,
     n_sweeps: int,
     diag_every: int,
     seed: int,
+    out_dir: Path,
+    meta_base: dict,
+    column_types: list[ColumnType],
 ) -> tuple[list, np.ndarray]:
-    """Run N chains on a single device via multi_chain_packed_gibbs_sweep.
-
-    Uses vmap over chains; one JIT compile handles all chains in parallel
-    (still single-device, but avoids 4x recompilation from the sequential loop).
-    """
-    n_chains = len(init_chains)
-    traces: list[list[float]] = [[] for _ in range(n_chains)]
+    """Vmap across chains on a single device, checkpoint after every chunk."""
+    n_chains = len(current_list)
+    traces_rows: list[list[float]] = [list(traces_so_far[i]) for i in range(n_chains)]
     start = time.time()
-    current_list = init_chains
+    run_base = meta_base["_run_start_clock"]
 
-    for chunk_start in range(0, n_sweeps, diag_every):
+    for chunk_start in range(sweeps_done, n_sweeps, diag_every):
         chunk = min(diag_every, n_sweeps - chunk_start)
         chunk_key = jax.random.fold_in(jax.random.key(seed), chunk_start)
 
@@ -107,33 +209,47 @@ def _run_single_device(
 
         done = chunk_start + chunk
         for ci, s in enumerate(np.asarray(scores).tolist()):
-            traces[ci].append(float(s))
-        best = max(traces[ci][-1] for ci in range(n_chains))
+            traces_rows[ci].append(float(s))
+        traces_now = np.array(traces_rows, dtype=np.float32)
+
+        best = float(traces_now[:, -1].max())
+        wall = time.time() - run_base
         print(
             f"  Sweep {done:4d}/{n_sweeps}  best log_joint={best:,.1f}  "
-            f"({time.time() - start:.0f}s, {n_chains} chains vmapped)",
+            f"({wall:.0f}s total, {time.time() - start:.0f}s this session, "
+            f"{n_chains} chains vmapped)",
             flush=True,
         )
+
+        meta = dict(meta_base)
+        meta.update(
+            last_completed_sweep=done,
+            elapsed_seconds=round(wall, 1),
+            final_log_joints=traces_now[:, -1].tolist(),
+            best_chain_idx=int(np.argmax(traces_now[:, -1])),
+        )
+        _save_checkpoint(out_dir, current_list, traces_now, meta, column_types, data_np)
         gc.collect()
 
-    return current_list, np.array(traces, dtype=np.float32)
+    return current_list, np.array(traces_rows, dtype=np.float32)
 
 
 def _run_multi_device(
-    init_chains: list,
+    current_list: list,
+    traces_so_far: np.ndarray,
     data: jnp.ndarray,
+    data_np: np.ndarray,
+    sweeps_done: int,
     n_sweeps: int,
     diag_every: int,
     seed: int,
+    out_dir: Path,
+    meta_base: dict,
+    column_types: list[ColumnType],
 ) -> tuple[list, np.ndarray]:
-    """pmap across devices — one batch of CHAINS_PER_DEVICE per device.
-
-    Layout follows benchmarks/wdi_macroeconomic_benchmark.ipynb:
-        keys_pmap      (n_devices, CHAINS_PER_DEVICE, 2)
-        batched_pmap   PackedCrossCatState with leading (n_devices, CHAINS_PER_DEVICE)
-    """
+    """pmap across devices, fori_loop within each device, checkpoint after every chunk."""
     n_devices = jax.device_count()
-    n_chains = len(init_chains)
+    n_chains = len(current_list)
     assert n_chains % n_devices == 0, (
         f"n_chains ({n_chains}) must be divisible by n_devices ({n_devices})"
     )
@@ -189,15 +305,13 @@ def _run_multi_device(
         return out
 
     base_key = jax.random.key(seed)
-    traces: list[list[float]] = [[] for _ in range(n_chains)]
+    traces_rows: list[list[float]] = [list(traces_so_far[i]) for i in range(n_chains)]
     start = time.time()
-    current = init_chains
+    run_base = meta_base["_run_start_clock"]
+    current = current_list
 
-    for chunk_start in range(0, n_sweeps, diag_every):
+    for chunk_start in range(sweeps_done, n_sweeps, diag_every):
         chunk = min(diag_every, n_sweeps - chunk_start)
-
-        # Per-chunk independent keys: fold the chunk index into the base key,
-        # then split into n_chains scalar keys. Shape: (n_chains,) of key dtype.
         chunk_keys = jax.random.split(jax.random.fold_in(base_key, chunk_start), n_chains)
 
         batched = batch_packed_states(current)
@@ -210,15 +324,43 @@ def _run_multi_device(
 
         chunk_scores = [float(packed_log_joint(p, data)) for p in current]
         for ci, lj in enumerate(chunk_scores):
-            traces[ci].append(lj)
+            traces_rows[ci].append(lj)
+        traces_now = np.array(traces_rows, dtype=np.float32)
+
+        wall = time.time() - run_base
+        # ETA assumes steady-state per-chunk cost after the first chunk.
+        chunks_done = traces_now.shape[1]
+        chunks_total = (n_sweeps + diag_every - 1) // diag_every
+        if chunks_done >= 2:
+            per_chunk_recent = wall / chunks_done
+            eta = per_chunk_recent * (chunks_total - chunks_done)
+            eta_str = f", ETA {eta / 60:.0f} min"
+        else:
+            eta_str = ""
+
         print(
             f"  Sweep {done:4d}/{n_sweeps}  best log_joint={max(chunk_scores):,.1f}  "
-            f"({time.time() - start:.0f}s on {n_devices} devices)",
+            f"({wall:.0f}s total, {time.time() - start:.0f}s this session, "
+            f"{n_devices} devices){eta_str}",
             flush=True,
         )
+
+        meta = dict(meta_base)
+        meta.update(
+            last_completed_sweep=done,
+            elapsed_seconds=round(wall, 1),
+            final_log_joints=traces_now[:, -1].tolist(),
+            best_chain_idx=int(np.argmax(traces_now[:, -1])),
+        )
+        _save_checkpoint(out_dir, current, traces_now, meta, column_types, data_np)
         gc.collect()
 
-    return current, np.array(traces, dtype=np.float32)
+    return current, np.array(traces_rows, dtype=np.float32)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 
 
 def main() -> int:
@@ -226,9 +368,9 @@ def main() -> int:
     parser.add_argument(
         "fd", nargs="?", default="FD001", choices=["FD001", "FD002", "FD003", "FD004"]
     )
-    parser.add_argument("--sweeps", type=int, default=200)
+    parser.add_argument("--sweeps", type=int, default=150)
     parser.add_argument("--chains", type=int, default=4)
-    parser.add_argument("--diag-every", type=int, default=20)
+    parser.add_argument("--diag-every", type=int, default=30)
     parser.add_argument("--max-views", type=int, default=16)
     parser.add_argument("--max-clusters", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42)
@@ -236,24 +378,42 @@ def main() -> int:
         "--subsample",
         type=int,
         default=0,
-        help="If >0, uniformly subsample this many training rows (fixed seed). "
-        "Useful on low-VRAM GPUs; 5000 rows is typically sufficient for CrossCat on C-MAPSS.",
+        help="If >0, uniformly subsample this many training rows. Useful on low-VRAM GPUs.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="If a compatible checkpoint exists, pick up from the last completed sweep.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Fast end-to-end pipeline validation: 2 chains x 6 sweeps x 1000 rows. "
+        "Overrides --chains/--sweeps/--diag-every/--subsample.",
     )
     args = parser.parse_args()
+
+    if args.smoke:
+        args.chains = 2
+        args.sweeps = 6
+        args.diag_every = 3
+        args.subsample = 1000
+        print("SMOKE mode: 2 chains x 6 sweeps x 1000 rows (pipeline validation only)")
 
     n_devices = jax.device_count()
     mode = "single-device (vmap chains)" if n_devices == 1 else f"pmap across {n_devices} devices"
     print(f"JAX backend: {jax.default_backend()}, devices: {jax.devices()}")
     print(f"Mode: {mode}")
 
-    # Round chain count to a multiple of device count for pmap paths.
     n_chains = args.chains
     if n_devices > 1 and n_chains % n_devices:
         rounded = ((n_chains + n_devices - 1) // n_devices) * n_devices
         print(f"  Rounding chains {n_chains} -> {rounded} (must divide n_devices={n_devices})")
         n_chains = rounded
 
-    print(f"Config: fd={args.fd}, {n_chains} chains x {args.sweeps} sweeps")
+    print(
+        f"Config: fd={args.fd}, {n_chains} chains x {args.sweeps} sweeps, diag_every={args.diag_every}"
+    )
 
     data_np, column_types, info = _load_preprocessed(args.fd)
     if args.subsample and args.subsample < data_np.shape[0]:
@@ -268,45 +428,35 @@ def main() -> int:
         f"NaN fraction {float(jnp.isnan(data).mean()):.2%}"
     )
 
-    print("\nInitializing chains...")
-    t0 = time.time()
-    init_chains = _pack_initial_chains(
-        data,
-        column_types,
-        n_chains,
-        args.seed,
-        max_views=args.max_views,
-        max_clusters=args.max_clusters,
-    )
-    print(f"  {n_chains} chains initialized in {time.time() - t0:.0f}s")
-
-    print(f"\n{'=' * 70}\nRUNNING INFERENCE\n{'=' * 70}")
-    t0 = time.time()
-    if n_devices == 1:
-        finals, traces = _run_single_device(
-            init_chains, data, args.sweeps, args.diag_every, args.seed
-        )
-    else:
-        finals, traces = _run_multi_device(
-            init_chains, data, args.sweeps, args.diag_every, args.seed
-        )
-    elapsed = time.time() - t0
-
-    # Save
     out_dir = OUT_ROOT / args.fd
-    out_dir.mkdir(parents=True, exist_ok=True)
-    final_scores = [float(packed_log_joint(p, data)) for p in finals]
-    best_idx = int(np.argmax(final_scores))
+    expected_shape = (data.shape[0], data.shape[1])
 
-    for ci, packed in enumerate(finals):
-        save_packed_state(packed, str(out_dir / f"chain_{ci}.jxc"), column_types=column_types)
-    save_packed_state(finals[best_idx], str(out_dir / "best_chain.jxc"), column_types=column_types)
-    np.save(out_dir / "log_joint_traces.npy", traces)
-    # Persist the exact training array used so evaluate_rul.py can insert
-    # test-engine rows into the same base data (important when --subsample is set).
-    np.save(out_dir / "train_used.npy", data_np)
+    # Try resume first if requested
+    resume_state: tuple[list, np.ndarray, int] | None = None
+    if args.resume:
+        resume_state = _try_resume(out_dir, n_chains, args.sweeps, expected_shape)
+        if resume_state is not None:
+            chains, traces_so_far, sweeps_done = resume_state
+            print(f"  Resuming from sweep {sweeps_done}/{args.sweeps}")
+        else:
+            print("  No compatible checkpoint; starting fresh")
 
-    meta = {
+    if resume_state is None:
+        print("\nInitializing chains...")
+        t0 = time.time()
+        chains = _pack_initial_chains(
+            data,
+            column_types,
+            n_chains,
+            args.seed,
+            max_views=args.max_views,
+            max_clusters=args.max_clusters,
+        )
+        traces_so_far = np.zeros((n_chains, 0), dtype=np.float32)
+        sweeps_done = 0
+        print(f"  {n_chains} chains initialized in {time.time() - t0:.0f}s")
+
+    meta_base = {
         "fd": args.fd,
         "n_chains": n_chains,
         "n_sweeps": args.sweeps,
@@ -314,25 +464,67 @@ def main() -> int:
         "max_views": args.max_views,
         "max_clusters": args.max_clusters,
         "seed": args.seed,
+        "subsample": args.subsample,
+        "smoke": args.smoke,
         "n_devices": n_devices,
         "mode": mode,
-        "elapsed_seconds": round(elapsed, 1),
-        "final_log_joints": final_scores,
-        "best_chain_idx": best_idx,
         "data_shape": list(data.shape),
         "n_train_rows": info["n_train_rows"],
         "n_test_engines": info["n_test_engines"],
+        "_run_start_clock": time.time(),
     }
-    (out_dir / "inference_meta.json").write_text(json.dumps(meta, indent=2))
+
+    print(f"\n{'=' * 70}\nRUNNING INFERENCE\n{'=' * 70}")
+    t0 = time.time()
+    if n_devices == 1:
+        finals, traces = _run_single_device(
+            chains,
+            traces_so_far,
+            data,
+            data_np,
+            sweeps_done,
+            args.sweeps,
+            args.diag_every,
+            args.seed,
+            out_dir,
+            meta_base,
+            column_types,
+        )
+    else:
+        finals, traces = _run_multi_device(
+            chains,
+            traces_so_far,
+            data,
+            data_np,
+            sweeps_done,
+            args.sweeps,
+            args.diag_every,
+            args.seed,
+            out_dir,
+            meta_base,
+            column_types,
+        )
+    elapsed = time.time() - t0
+
+    # One final checkpoint (ensures meta's done-state is written once more)
+    final_scores = traces[:, -1].tolist() if traces.size else []
+    best_idx = int(np.argmax(final_scores)) if final_scores else 0
+
+    final_meta = dict(meta_base)
+    final_meta.pop("_run_start_clock", None)
+    final_meta.update(
+        last_completed_sweep=args.sweeps,
+        elapsed_seconds=round(time.time() - meta_base["_run_start_clock"], 1),
+        final_log_joints=final_scores,
+        best_chain_idx=best_idx,
+    )
+    _save_checkpoint(out_dir, finals, traces, final_meta, column_types, data_np)
 
     print(f"\n{'=' * 70}\nDONE in {elapsed:.0f}s ({elapsed / 60:.1f} min)\n{'=' * 70}")
     for ci, score in enumerate(final_scores):
         marker = "  <-- BEST" if ci == best_idx else ""
         print(f"  Chain {ci}: log_joint={score:,.1f}{marker}")
     print(f"\nSaved to {out_dir}/")
-    print(
-        f"  best_chain.jxc, chain_{{0..{n_chains - 1}}}.jxc, log_joint_traces.npy, inference_meta.json"
-    )
     return 0
 
 
