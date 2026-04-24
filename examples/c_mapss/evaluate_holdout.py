@@ -168,6 +168,12 @@ def main() -> int:
 
     all_idx = np.arange(full_train.shape[0], dtype=np.int64)
     holdout_idx = np.setdiff1d(all_idx, train_indices, assume_unique=False)
+    if holdout_idx.size == 0:
+        raise SystemExit(
+            f"No holdout rows: chains were trained on all {full_train.shape[0]} preprocessed "
+            f"rows. Re-run run_inference.py with --subsample N (N < {full_train.shape[0]}) "
+            "to leave a disjoint holdout for this evaluator."
+        )
     if args.max_holdout and holdout_idx.size > args.max_holdout:
         rng = np.random.default_rng(args.seed)
         holdout_idx = np.sort(rng.choice(holdout_idx, size=args.max_holdout, replace=False))

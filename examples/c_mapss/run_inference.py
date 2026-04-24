@@ -412,7 +412,8 @@ def main() -> int:
         n_chains = rounded
 
     print(
-        f"Config: fd={args.fd}, {n_chains} chains x {args.sweeps} sweeps, diag_every={args.diag_every}"
+        f"Config: fd={args.fd}, {n_chains} chains x {args.sweeps} sweeps, "
+        f"diag_every={args.diag_every}"
     )
 
     data_np, column_types, info = _load_preprocessed(args.fd)
