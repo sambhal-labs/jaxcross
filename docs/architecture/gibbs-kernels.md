@@ -1,5 +1,14 @@
 # Gibbs Kernels in Detail
 
+!!! info "Per-kernel deep-dives"
+    This page is the overview. Each kernel also has its own detailed page:
+
+    - [Row-Assignment Gibbs](algorithms/row-gibbs.md) — CRP prior, vectorized column scoring, type-specialized fast path.
+    - [Column-Assignment Gibbs](algorithms/column-gibbs.md) — view membership, auxiliary view creation, `max_cols_per_view` overflow.
+    - [Hyperparameter Transitions](algorithms/hyper-transitions.md) — grid-based updates per component type.
+    - [CRP Alpha Update](algorithms/crp-alpha.md) — outer and inner DP concentrations.
+    - [Ordered Logistic Grid Integration](algorithms/ordered-logistic-grid.md) — the only non-conjugate component.
+
 ## Row Assignment (Critical Path)
 
 For each view, for each row *i*:

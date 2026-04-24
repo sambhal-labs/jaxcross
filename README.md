@@ -61,6 +61,21 @@ An employee dataset might cluster by `(salary, experience)` into seniority tiers
 - **Scientific Data Exploration** — Uncover which variables are related in genomics, economics, or sensor data without assuming a model
 - **Feature Relationship Discovery** — Build a dependence matrix showing which features carry information about each other, informing ML pipelines
 
+## Choose Your Path
+
+| If you want to... | Start with |
+|-------------------|------------|
+| **Understand CrossCat** (what is it, why use it) | [Core Concepts](https://sambhal-labs.github.io/jaxcross/getting-started/concepts/) |
+| **Run your first model** (60-second quickstart) | [Quickstart](https://sambhal-labs.github.io/jaxcross/getting-started/quickstart/) |
+| **Detect anomalies** | [Anomaly Detection guide](https://sambhal-labs.github.io/jaxcross/guides/queries/anomaly-detection/) |
+| **Impute missing values** | [Imputation guide](https://sambhal-labs.github.io/jaxcross/guides/queries/imputation/) |
+| **Discover column dependencies** | [Dependence guide](https://sambhal-labs.github.io/jaxcross/guides/queries/dependence/) |
+| **Classify / predict** | [Predictive Probability guide](https://sambhal-labs.github.io/jaxcross/guides/queries/predictive-probability/) |
+| **Scale to 10K+ rows** | [Scaling guide](https://sambhal-labs.github.io/jaxcross/guides/scaling/) |
+| **Run on multi-GPU (pmap)** | [Multi-Chain guide](https://sambhal-labs.github.io/jaxcross/guides/multi-chain/) + [WDI benchmark](benchmarks/wdi_macroeconomic_benchmark.ipynb) |
+| **Understand the kernels** (for extending) | [Architecture → Algorithms](https://sambhal-labs.github.io/jaxcross/architecture/algorithms/row-gibbs/) |
+| **Add a new component model** | [CLAUDE.md → Adding a new component model](CLAUDE.md) |
+
 ## Key Capabilities
 
 <table>
@@ -179,7 +194,7 @@ from crosscat import (
 )
 ```
 
-All 15 unpacked queries have packed equivalents with GPU acceleration, plus 8 batch functions and 5 multi-chain wrappers (29 total in packed_inference.py) for production use. All queries are fully Bayesian — they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
+All 15 unpacked queries have packed equivalents with GPU acceleration (16 `packed_*` functions including `classify_column`), plus 16 `batch_*` functions (vmapped over rows/queries) and 9 `multi_chain_*` wrappers (Bayesian model averaging across chains) — **41 total in `packed_inference.py`** for production use. All queries are fully Bayesian: they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
 
 ## Performance
 
@@ -198,7 +213,7 @@ Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction 
 | **Column Types** | Continuous (Normal-Gamma), Categorical (Dirichlet-Categorical), Binary (Beta-Bernoulli), Ordinal (Ordered Logistic), Cyclic (Von Mises) |
 | **Inference** | Collapsed Gibbs sampling, multi-chain with best-chain selection, constraint enforcement, convergence diagnostics |
 | **GPU Acceleration** | JIT-compiled packed state, vectorized kernels via `vmap`/`lax.scan`, XLA persistent compilation cache, 12x speedup |
-| **Query API** | 15 unpacked + 16 packed + 8 batch + 5 multi-chain query functions: predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy, classification |
+| **Query API** | 15 unpacked + 16 packed + 16 batch + 9 multi-chain query functions (41 in `packed_inference.py`): predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy, classification |
 | **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
 | **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
 | **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY/NPZ I/O, auto type detection, discretization, chunked reading, memory-mapped loading |
@@ -242,7 +257,7 @@ crosscat/                            # Core library
 │   ├── kernels.py                   #     Vectorized Gibbs kernels (vmap + lax.scan)
 │   ├── suffstats.py                 #     Batched sufficient statistics
 │   └── aot_cache.py                 #     XLA persistent compilation cache
-├── packed_inference.py              #   16 packed + 8 batch + 5 multi-chain query functions
+├── packed_inference.py              #   16 packed + 16 batch + 9 multi-chain query functions (41 total)
 ├── constraints.py                   #   Column/row dependency enforcement
 ├── diagnostics.py                   #   ARI, log-joint, held-out likelihood
 ├── serialization.py                 #   Save/load in .jxc format
@@ -270,7 +285,7 @@ paper/                               # Research paper materials
 | **[Getting Started](https://sambhal-labs.github.io/jaxcross/getting-started/installation/)** | Installation, quickstart, core concepts |
 | **[Feature Guides](https://sambhal-labs.github.io/jaxcross/guides/)** | Deep dives into every capability |
 | **[Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/)** | Dedicated guides for each query type |
-| **[API Reference](https://sambhal-labs.github.io/jaxcross/api/types/)** | Complete function documentation (116 exported symbols) |
+| **[API Reference](https://sambhal-labs.github.io/jaxcross/api/types/)** | Complete function documentation (134 exported symbols across 18 modules) |
 | **[Architecture](https://sambhal-labs.github.io/jaxcross/architecture/overview/)** | Internal design, JAX patterns, performance |
 | **[Benchmarks](benchmarks/)** | MNIST, synthetic recovery, JIT timing |
 | **[Full Docs Site](https://sambhal-labs.github.io/jaxcross/)** | Searchable hosted documentation |

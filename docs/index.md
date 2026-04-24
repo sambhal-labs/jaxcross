@@ -33,6 +33,41 @@ No feature engineering. No model selection. Just jaxcross.
   <a href="https://colab.research.google.com/github/sambhal-labs/jaxcross/blob/main/notebooks/intro_tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
 </p>
 
+## Choose Your Path
+
+<div class="grid cards" markdown>
+
+-   :material-rocket-launch: **Newcomer**
+
+    ---
+
+    Never used CrossCat? Start here.
+
+    [:octicons-arrow-right-24: Core Concepts](getting-started/concepts.md)
+    [:octicons-arrow-right-24: Quickstart](getting-started/quickstart.md)
+
+-   :material-server-network: **Production / GPU**
+
+    ---
+
+    Scaling to 10K+ rows, multi-chain, pmap.
+
+    [:octicons-arrow-right-24: GPU + Packed State](guides/gpu-packed.md)
+    [:octicons-arrow-right-24: Multi-Chain](guides/multi-chain.md)
+    [:octicons-arrow-right-24: Scaling](guides/scaling.md)
+
+-   :material-wrench: **Extender / Researcher**
+
+    ---
+
+    Adding components, kernels, or queries.
+
+    [:octicons-arrow-right-24: Architecture Overview](architecture/overview.md)
+    [:octicons-arrow-right-24: Algorithm Pages](architecture/algorithms/row-gibbs.md)
+    [:octicons-arrow-right-24: Contributing](contributing.md)
+
+</div>
+
 ## Why jax-crosscat?
 
 Most clustering methods force a single partition over all columns. CrossCat discovers that *different subsets of columns may cluster rows differently*.

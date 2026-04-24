@@ -1,6 +1,36 @@
 # Quick Start
 
-This guide walks through a complete analysis: loading CSV data, running inference, and querying the posterior.
+This guide walks through a complete analysis: loading CSV data, running inference, and querying the posterior. Two paths — pick yours.
+
+## 60-Second Path
+
+The minimal pipeline on synthetic data, so you can verify your install and see a query work end-to-end.
+
+```python
+import jax
+import jax.numpy as jnp
+from crosscat import initialize, dependence_matrix
+from crosscat.packed import pack_state, packed_gibbs_sweep, unpack_state
+from crosscat.types import ColumnType
+
+key = jax.random.key(0)
+data = jax.random.normal(key, (200, 6)).astype(jnp.float32)
+col_types = [ColumnType.CONTINUOUS] * 6
+
+result = initialize(key, data, col_types)
+packed = pack_state(result.state)
+packed = packed_gibbs_sweep(jax.random.key(1), packed, data, n_sweeps=50)
+state = unpack_state(packed, col_types, data=data)
+
+z = dependence_matrix([state])  # 6x6 probability of column dependence
+print(z)
+```
+
+If `z` prints as a 6x6 array with values in `[0, 1]` — you're ready for the full walkthrough below.
+
+## 10-Minute Path
+
+The rest of this page is the full CSV-in → queries-out pipeline with multi-chain inference, convergence checks, and production-grade query patterns. Read it linearly for a complete mental model.
 
 ## 1. Load Your Data
 

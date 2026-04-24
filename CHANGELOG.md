@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-04-24 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v1.0.0...v1.0.1)
+
+Documentation overhaul. No code changes; all `1.0.0` public APIs remain source-compatible.
+
+### Added
+- **Complete API narrative coverage** — handwritten entries for all `packed_inference.py` functions
+  (41 total): added missing 8 `batch_*` wrappers (`batch_predictive_probability`, `batch_predictive_sample`,
+  `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`,
+  `batch_joint_predictive_probability`, `batch_sample_and_insert`, `batch_mutual_information`) and 4 `multi_chain_*` wrappers
+  (`multi_chain_classify_column`, `multi_chain_credible_interval`,
+  `multi_chain_joint_predictive_probability`, `multi_chain_sample_and_insert`) to
+  `docs/api/packed-inference.md`. Added a "See Also" cross-reference block.
+- **High-level I/O section** in `docs/api/data-utils.md` — `save_data` / `load_data`
+  (Arrow IPC with embedded column type metadata) are now documented up front as the
+  recommended entry points.
+- **Algorithm pages** under `docs/architecture/algorithms/` — 5 new deep-dives on each Gibbs
+  kernel with math, pseudocode, JAX pitfalls, and hyperparameter guidance:
+  `row-gibbs.md`, `column-gibbs.md`, `hyper-transitions.md`, `crp-alpha.md`,
+  `ordered-logistic-grid.md`. Linked from `docs/architecture/gibbs-kernels.md`
+  and added to `mkdocs.yml` navigation.
+- **probcomp/crosscat parity appendix** at `docs/reference/probcomp-parity.md` —
+  feature-by-feature comparison table, API differences, and intentional divergences.
+- **Newcomer on-ramp**: "Choose Your Path" triage block on `docs/index.md`, expanded
+  "When to Use CrossCat (and when not to)" on `docs/getting-started/concepts.md`,
+  "60-second" vs "10-minute" paths on `docs/getting-started/quickstart.md`, "What do
+  you want to do?" decision table on `README.md`.
+- **Production/GPU polish**:
+    - Memory footprint table + low-VRAM guidance in `docs/guides/gpu-packed.md`.
+    - `jax.pmap` pattern for multi-GPU in `docs/guides/multi-chain.md`.
+    - "Profiling JAX kernels" section in `docs/architecture/performance.md`
+      (`jax.profiler.trace`, `block_until_ready`, TensorBoard).
+- **`LOGISTIC_INF` constant documentation** in `docs/api/types.md` plus `Related` cross-links.
+
+### Changed
+- `docs/api/index.md` — module map expanded to 17 modules; added "Three Tiers of
+  Inference Functions" table (`packed_*` / `batch_*` / `multi_chain_*`).
+- `README.md` — fixed count drift: packed_inference is 41 public functions (16 packed +
+  16 batch + 9 multi-chain), 134 total exports across 18 modules.
+- `CLAUDE.md` — clarified `packed_inference.py` scope (41) vs full packed-path exports
+  (55) vs library-wide (134).
+
+### Removed
+- `notebooks/gpu_benchmark.ipynb` — stale 4 KB stub referencing "packed v2"
+  terminology. Canonical benchmarks live in [benchmarks/](benchmarks/) — see
+  `jit_benchmark.ipynb` for per-sweep timing.
+
 ## [1.0.0] - 2026-04-17 — [diff](https://github.com/sambhal-labs/jaxcross/compare/v0.12.0...v1.0.0)
 
 First production release. Wraps up the four-phase hardening plan driven by

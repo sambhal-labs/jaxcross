@@ -113,6 +113,64 @@ individuals = unbatch_packed_states(batched, n_chains=4)
 - Use `initialization="apart"` for half the chains and `"together"` for the other half
 - The Z-matrix is most useful with multi-chain results — single-chain gives binary values
 
+## `multi_chain_packed_gibbs_sweep` vs `jax.pmap`
+
+Two ways to actually run chains in parallel:
+
+| Approach | What it does | When to use |
+|----------|--------------|-------------|
+| `multi_chain_packed_gibbs_sweep` | Stacks chains into a leading batch dim and `vmap`s the single-chain kernel on **one device**. | Single-GPU or multi-chain on CPU. Simplest to set up. |
+| Explicit `jax.pmap` | Replicates the kernel across **multiple physical devices** (GPUs/TPU cores). One chain per device. | Multi-GPU (Kaggle 2×T4, 4×A100), or TPU v4-8. |
+
+### Multi-GPU pmap pattern
+
+For Kaggle's dual-T4 setup or any multi-GPU host, `jax.pmap` runs one chain per device in true parallel:
+
+```python
+import jax
+from crosscat import initialize
+from crosscat.packed import pack_state, packed_gibbs_sweep, select_best_chain
+
+N_DEVICES = jax.device_count()  # 2 on Kaggle T4x2
+print(f"Running {N_DEVICES} chains on {N_DEVICES} devices")
+
+# 1. Initialize one chain per device
+key = jax.random.key(42)
+result = initialize(key, data, col_types, n_chains=N_DEVICES)
+packed_per_chain = [pack_state(s, max_views=16, max_clusters=32) for s in result.state]
+
+# 2. Stack into a device-sharded pytree
+from crosscat.packed import batch_packed_states
+batched = batch_packed_states(packed_per_chain)
+
+# 3. Replicate data (broadcast) and split keys
+keys = jax.random.split(key, N_DEVICES)
+data_rep = jax.numpy.broadcast_to(data, (N_DEVICES, *data.shape))
+
+# 4. pmap the sweep
+pmap_sweep = jax.pmap(
+    lambda k, p, d: packed_gibbs_sweep(k, p, d, n_sweeps=50),
+    axis_name="chain",
+)
+batched = pmap_sweep(keys, batched, data_rep)
+
+# 5. Score each chain and pick the best
+from crosscat.packed import packed_log_joint
+scores = jax.pmap(packed_log_joint)(batched, data_rep)
+best = select_best_chain(batched, scores)
+```
+
+See [`benchmarks/wdi_macroeconomic_benchmark.ipynb`](https://github.com/sambhal-labs/jaxcross/blob/main/benchmarks/wdi_macroeconomic_benchmark.ipynb) for a full worked example including checkpointing and Rhat monitoring across pmap'd chains.
+
+!!! tip "Hardware recommendation"
+    Per jaxcross memory, **prefer Kaggle 2×T4 with pmap** over a single P100 for multi-chain workloads — the T4 cluster is faster on per-chain throughput *and* runs true-parallel chains.
+
+### Gotchas
+
+- `batch_packed_states` produces a pytree with a leading `(N_CHAINS,)` axis. `jax.pmap` requires the leading axis equal `jax.device_count()`.
+- Data must be broadcast to the chains dim (`(N_DEVICES, n_rows, n_cols)`), *not* sharded — all chains see the full dataset.
+- `key` must be split per-chain *before* entering the pmap.
+
 ## API Reference
 
 - [`multi_chain_packed_gibbs_sweep`](../api/packed-kernels.md#multi_chain_packed_gibbs_sweep)

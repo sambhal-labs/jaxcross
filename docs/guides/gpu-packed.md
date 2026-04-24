@@ -53,6 +53,35 @@ packed = pack_state(state, max_views=16, max_clusters=32, max_categories=64)
 !!! warning "Out of memory"
     If you get GPU OOM errors, reduce `max_views` and `max_clusters`. These control the size of all padded arrays.
 
+### Memory Footprint (rough)
+
+`PackedCrossCatState` allocates fixed-size arrays up front. The dominant terms for `n_rows × n_cols` data with `V = max_views`, `K = max_clusters`, `C = max_categories`:
+
+| Array | Approx size (float32) | Scales with |
+|-------|-----------------------|-------------|
+| `ss_counts` | `V × K × max_cols_per_view` | views × clusters × columns |
+| `ss_sum_x`, `ss_sum_x_sq` | `V × K × max_cols_per_view` | per continuous/binary column |
+| `ss_cat_counts` | `V × K × max_cols_per_view × C` | per categorical/ordinal column |
+| `ss_sum_sin`, `ss_sum_cos` | `V × K × max_cols_per_view` | per cyclic column |
+| `view_row_assignments` | `V × n_rows` | views × rows |
+| `column_assignments` | `n_cols` | columns |
+| `data` (caller-owned) | `n_rows × n_cols` | full matrix |
+
+All suffstat fields are flat attributes on `PackedCrossCatState` (there is no nested `.suffstats` accessor). For MNIST 16×16 (`n_rows=1000`, `n_cols=257`, `V=8`, `K=16`, `C=2` for binary) the packed state is about **50 MB**; the data matrix adds another **1 MB** (`float32`). Plenty of room even on a 4 GB card.
+
+For MNIST 28×28 (`n_cols=785`) with `C=256` (categorical grayscale), `ss_cat_counts` alone becomes `8 × 16 × 785 × 256 ≈ 100 MB` — still fine, but cut `max_categories` or convert to ordinal to halve it.
+
+Use [`estimate_packed_memory`](../api/packed-state.md) to compute the exact footprint before calling `pack_state`.
+
+### Low-VRAM Hardware (4 GB or less)
+
+GTX 1650 / MX-series / TX1 class: stay under 1 GB of packed state. Guidelines:
+
+- `max_views = 8`, `max_clusters = 16` — revisit if inference saturates the budgets.
+- Prefer `ORDINAL` over `CATEGORICAL` for 20+ level columns.
+- Avoid multi-chain on one device — run chains sequentially and checkpoint between, or use pmap across physical devices.
+- Disable TensorFlow/TensorBoard eager-mode memory hogs.
+
 ## Querying Packed State Directly
 
 You can run inference queries directly on packed state without unpacking:
