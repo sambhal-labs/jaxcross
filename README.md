@@ -194,7 +194,7 @@ from crosscat import (
 )
 ```
 
-All 15 unpacked queries have packed equivalents with GPU acceleration (16 `packed_*` functions including `classify_column`), plus 15 `batch_*` functions (vmapped over rows/queries) and 9 `multi_chain_*` wrappers (Bayesian model averaging across chains) — **40 total in `packed_inference.py`** for production use. All queries are fully Bayesian: they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
+All 15 unpacked queries have packed equivalents with GPU acceleration (16 `packed_*` functions including `classify_column`), plus 16 `batch_*` functions (vmapped over rows/queries) and 9 `multi_chain_*` wrappers (Bayesian model averaging across chains) — **41 total in `packed_inference.py`** for production use. All queries are fully Bayesian: they integrate over cluster assignment uncertainty, not just point estimates. See the [Query Guides](https://sambhal-labs.github.io/jaxcross/guides/queries/sampling/) for detailed examples.
 
 ## Performance
 
@@ -213,7 +213,7 @@ Benchmarked on NVIDIA P100 GPU. See [benchmarks/](benchmarks/) for reproduction 
 | **Column Types** | Continuous (Normal-Gamma), Categorical (Dirichlet-Categorical), Binary (Beta-Bernoulli), Ordinal (Ordered Logistic), Cyclic (Von Mises) |
 | **Inference** | Collapsed Gibbs sampling, multi-chain with best-chain selection, constraint enforcement, convergence diagnostics |
 | **GPU Acceleration** | JIT-compiled packed state, vectorized kernels via `vmap`/`lax.scan`, XLA persistent compilation cache, 12x speedup |
-| **Query API** | 15 unpacked + 16 packed + 15 batch + 9 multi-chain query functions (40 in `packed_inference.py`): predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy, classification |
+| **Query API** | 15 unpacked + 16 packed + 16 batch + 9 multi-chain query functions (41 in `packed_inference.py`): predictive probability, sampling, CDF, anomaly detection, mutual information, dependence discovery, imputation with confidence, row similarity, credible intervals, conditional entropy, classification |
 | **Batched Operations** | Vectorized column scoring, batched suffstat updates, batch posterior predictive for all 5 types, multi-chain wrappers |
 | **Streaming / Online** | `packed_insert_rows` for incremental row insertion without full re-inference, `sample_and_insert` for posterior-aware insertion |
 | **Data Handling** | Transparent NaN (missing data), CSV/Parquet/Arrow/NPY/NPZ I/O, auto type detection, discretization, chunked reading, memory-mapped loading |
@@ -257,7 +257,7 @@ crosscat/                            # Core library
 │   ├── kernels.py                   #     Vectorized Gibbs kernels (vmap + lax.scan)
 │   ├── suffstats.py                 #     Batched sufficient statistics
 │   └── aot_cache.py                 #     XLA persistent compilation cache
-├── packed_inference.py              #   16 packed + 15 batch + 9 multi-chain query functions (40 total)
+├── packed_inference.py              #   16 packed + 16 batch + 9 multi-chain query functions (41 total)
 ├── constraints.py                   #   Column/row dependency enforcement
 ├── diagnostics.py                   #   ARI, log-joint, held-out likelihood
 ├── serialization.py                 #   Save/load in .jxc format

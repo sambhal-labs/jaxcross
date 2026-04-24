@@ -57,7 +57,7 @@ Because each alpha only depends on *its own* partition's `(k, n)`, the update is
 
 ## Gotchas
 
-- **`alpha_v` is per-view.** Don't assume a single `alpha` governs all views — `PackedCrossCatState.row_crp_alpha` is shape `(n_views,)`.
+- **`alpha_v` is per-view.** Don't assume a single `alpha` governs all views — `PackedCrossCatState.view_row_crp_alpha` is shape `(max_views,)`.
 - **Alpha affects model complexity, not fit.** A higher `alpha` means more groups are a-priori likely, but the data likelihood still drives assignment. Tuning `alpha` manually is almost never necessary — let the Gibbs update do its job.
 - **Resetting between runs.** When reloading a checkpointed state (`load_packed_state`), the alphas are restored — do not reinitialize them to a prior mean.
 

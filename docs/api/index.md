@@ -22,7 +22,7 @@ Complete reference for the jax-crosscat public API, organized by module. **All 1
 | [`crosscat.packed.state`](packed-state.md) | `PackedCrossCatState`, `pack_state()`, `unpack_state()`, batching, `suggest_max_clusters`, `estimate_packed_memory` | [Packed State](packed-state.md) |
 | [`crosscat.packed.kernels`](packed-kernels.md) | JIT-compiled Gibbs kernels (`packed_gibbs_sweep`, `packed_gibbs_step`, `multi_chain_packed_gibbs_sweep`, row/column/hyper/alpha transitions, `packed_insert_rows`, `packed_log_joint`) | [Packed Kernels](packed-kernels.md) |
 | [`crosscat.packed.components`](packed-components.md) | Unified scoring functions for type dispatch | [Packed Components](packed-components.md) |
-| [`crosscat.packed_inference`](packed-inference.md) | Vectorized inference queries on packed state (40 functions: 12 single-state, 4 multi-state, 15 batch, 9 multi-chain) | [Packed Inference](packed-inference.md) |
+| [`crosscat.packed_inference`](packed-inference.md) | Vectorized inference queries on packed state (41 functions: 12 single-state, 4 multi-state, 16 batch, 9 multi-chain) | [Packed Inference](packed-inference.md) |
 | [`crosscat.packed.suffstats`](packed-suffstats.md) | Vectorized sufficient statistics | [Packed Suffstats](packed-suffstats.md) |
 | [`crosscat.packed.aot_cache`](aot-cache.md) | XLA persistent compilation cache (`enable_xla_cache`, `compile_kernels`, `clear_cache`) | [AOT Cache](aot-cache.md) |
 

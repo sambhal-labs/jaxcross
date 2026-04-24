@@ -59,16 +59,17 @@ packed = pack_state(state, max_views=16, max_clusters=32, max_categories=64)
 
 | Array | Approx size (float32) | Scales with |
 |-------|-----------------------|-------------|
-| `suffstats.count` | `V × K` | views × clusters |
-| `suffstats.sum_x`, `sum_x_sq` | `V × K × n_cols` | per continuous/binary column |
-| `suffstats.category_counts` | `V × K × n_cols × C` | per categorical/ordinal column |
-| `row_assignments` | `V × n_rows` | views × rows |
+| `ss_counts` | `V × K × max_cols_per_view` | views × clusters × columns |
+| `ss_sum_x`, `ss_sum_x_sq` | `V × K × max_cols_per_view` | per continuous/binary column |
+| `ss_cat_counts` | `V × K × max_cols_per_view × C` | per categorical/ordinal column |
+| `ss_sum_sin`, `ss_sum_cos` | `V × K × max_cols_per_view` | per cyclic column |
+| `view_row_assignments` | `V × n_rows` | views × rows |
 | `column_assignments` | `n_cols` | columns |
 | `data` (caller-owned) | `n_rows × n_cols` | full matrix |
 
-For MNIST 16×16 (`n_rows=1000`, `n_cols=257`, `V=8`, `K=16`, `C=2` for binary) the packed state is about **50 MB**; the data matrix adds another **1 MB** (`float32`). Plenty of room even on a 4 GB card.
+All suffstat fields are flat attributes on `PackedCrossCatState` (there is no nested `.suffstats` accessor). For MNIST 16×16 (`n_rows=1000`, `n_cols=257`, `V=8`, `K=16`, `C=2` for binary) the packed state is about **50 MB**; the data matrix adds another **1 MB** (`float32`). Plenty of room even on a 4 GB card.
 
-For MNIST 28×28 (`n_cols=785`) with `C=256` (categorical grayscale), `category_counts` alone becomes `8 × 16 × 785 × 256 ≈ 100 MB` — still fine, but cut `max_categories` or convert to ordinal to halve it.
+For MNIST 28×28 (`n_cols=785`) with `C=256` (categorical grayscale), `ss_cat_counts` alone becomes `8 × 16 × 785 × 256 ≈ 100 MB` — still fine, but cut `max_categories` or convert to ordinal to halve it.
 
 Use [`estimate_packed_memory`](../api/packed-state.md) to compute the exact footprint before calling `pack_state`.
 

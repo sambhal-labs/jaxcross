@@ -11,9 +11,9 @@ Documentation overhaul. No code changes; all `1.0.0` public APIs remain source-c
 
 ### Added
 - **Complete API narrative coverage** — handwritten entries for all `packed_inference.py` functions
-  (40 total): added missing 7 `batch_*` wrappers (`batch_predictive_probability`, `batch_predictive_sample`,
+  (41 total): added missing 8 `batch_*` wrappers (`batch_predictive_probability`, `batch_predictive_sample`,
   `batch_conditional_entropy`, `batch_column_typicality`, `batch_dependence_probability`,
-  `batch_joint_predictive_probability`, `batch_sample_and_insert`) and 4 `multi_chain_*` wrappers
+  `batch_joint_predictive_probability`, `batch_sample_and_insert`, `batch_mutual_information`) and 4 `multi_chain_*` wrappers
   (`multi_chain_classify_column`, `multi_chain_credible_interval`,
   `multi_chain_joint_predictive_probability`, `multi_chain_sample_and_insert`) to
   `docs/api/packed-inference.md`. Added a "See Also" cross-reference block.
@@ -41,10 +41,10 @@ Documentation overhaul. No code changes; all `1.0.0` public APIs remain source-c
 ### Changed
 - `docs/api/index.md` — module map expanded to 17 modules; added "Three Tiers of
   Inference Functions" table (`packed_*` / `batch_*` / `multi_chain_*`).
-- `README.md` — fixed count drift: packed_inference is 40 public functions (16 packed +
-  15 batch + 9 multi-chain), 134 total exports across 18 modules.
-- `CLAUDE.md` — clarified `packed_inference.py` scope (40) vs full packed-path exports
-  (54) vs library-wide (134).
+- `README.md` — fixed count drift: packed_inference is 41 public functions (16 packed +
+  16 batch + 9 multi-chain), 134 total exports across 18 modules.
+- `CLAUDE.md` — clarified `packed_inference.py` scope (41) vs full packed-path exports
+  (55) vs library-wide (134).
 
 ### Removed
 - `notebooks/gpu_benchmark.ipynb` — stale 4 KB stub referencing "packed v2"

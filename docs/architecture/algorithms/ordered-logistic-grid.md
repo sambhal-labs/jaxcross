@@ -38,7 +38,7 @@ Cutpoints are stored padded — a column with `K` levels uses the first `K-1` en
 
 ### Grid saturation cap
 
-`LOGISTIC_INF = 1e6` (from [types.py](../../api/types.md)) serves two roles:
+`LOGISTIC_INF = 1e10` (from [types.py](../../api/types.md)) serves two roles:
 
 1. **Padding for unused cutpoints** — guarantees the sigmoid saturates at 0 or 1 for padded slots, so they contribute no probability mass to any observed level.
 2. **Grid endpoint cap** — the location grid is clamped to `±LOGISTIC_INF` so that `σ(·)` evaluates to a finite `0` or `1` even at the edges. This prevents `inf − inf` NaNs when JAX evaluates both branches of a `jnp.where`.
