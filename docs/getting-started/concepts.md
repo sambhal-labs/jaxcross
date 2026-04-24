@@ -110,3 +110,28 @@ After running inference, CrossCat supports a rich set of posterior queries:
 | **Credible intervals** | "What's the 90% credible interval for column X?" |
 
 All queries are Bayesian — they account for uncertainty in cluster assignments, not just point estimates.
+
+## When to Use CrossCat (and When Not To)
+
+**Good fit**
+
+- You have a **mixed-type tabular dataset** (continuous, categorical, ordinal, binary, cyclic) and want a single model that handles all columns uniformly.
+- Missing values are **structurally meaningful** — you want the model to impute them rather than dropping rows.
+- You want to **discover structure** — which columns relate, how rows cluster — rather than predict one fixed target.
+- You need **calibrated Bayesian uncertainty** on queries (anomaly scores, imputations, predictions), not just point predictions.
+- Your dataset is **small-to-medium** (hundreds to low millions of rows, tens to hundreds of columns). See the [Scaling guide](../guides/scaling.md) for the 10K+ workflow.
+
+**Not a good fit**
+
+- You have a **single well-defined prediction target** with abundant labeled data — a supervised model (gradient-boosted trees, linear/logistic regression, neural net) will outperform CrossCat on pure predictive accuracy.
+- Your features are **images, audio, or free text** — CrossCat is a tabular model. Extract features first or use a domain-specific model.
+- You need **sub-millisecond inference latency** — posterior queries involve MC sampling and multi-chain averaging, not a single forward pass.
+- Your data is **extremely wide** (tens of thousands of columns) without meaningful type-level structure — the column-assignment Gibbs step scales with column count.
+
+## Further Reading
+
+- [**Quickstart**](quickstart.md) — Run your first model in 60 seconds.
+- [**Glossary**](../glossary.md) — Formal definitions for *view*, *cluster*, *CRP*, *Z-matrix*, *component model*.
+- [**Architecture → Overview**](../architecture/overview.md) — How the pieces fit together.
+- [**Architecture → Algorithms**](../architecture/algorithms/row-gibbs.md) — Math and code for each Gibbs kernel.
+- [**Original CrossCat paper**](https://jmlr.org/papers/v17/11-392.html) — Mansinghka et al., JMLR 2016.

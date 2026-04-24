@@ -95,5 +95,11 @@ sub_idx = result.subsample_idx  # Array (5000,)
 
 ## Constants
 
-- `LOG_EPS = 1e-30` — Numerical stability constant used throughout for underflow protection in `log()` and division operations.
+- `LOG_EPS = 1e-30` — Numerical stability floor. Used throughout as a lower clamp on likelihoods/probabilities before taking logs or dividing (prevents `-inf` / NaN propagation in JIT-traced code where both branches of `jnp.where` execute).
+- `LOGISTIC_INF = 1e6` — Saturation cap for the ordinal-logistic location parameter. Ordinal cutpoints are padded with `+LOGISTIC_INF` beyond the real cutpoint count; the kernel masks these to only update real entries (see the [ordered logistic grid algorithm page](../architecture/algorithms/ordered-logistic-grid.md)).
 - `ORDINAL_N_GRID = 31` — Grid points for ordinal logistic location parameter integration. Override to trade accuracy for speed (captured at import time).
+
+## Related
+
+- [`PackedCrossCatState`](packed-state.md) — the JIT-friendly flattened variant of `CrossCatState` used by the packed kernels and `packed_inference` queries.
+- [`ValidationError`](validation.md) — raised by `assert_valid_state` when state invariants (shape consistency, cluster continuity, suffstat alignment) are violated.

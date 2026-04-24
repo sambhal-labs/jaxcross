@@ -146,9 +146,17 @@ nav:
     - Overview: architecture/overview.md
     - The CrossCat Model: architecture/model.md
     - Gibbs Kernels in Detail: architecture/gibbs-kernels.md
+    - Algorithms:
+      - Row-Assignment Gibbs: architecture/algorithms/row-gibbs.md
+      - Column-Assignment Gibbs: architecture/algorithms/column-gibbs.md
+      - Hyperparameter Transitions: architecture/algorithms/hyper-transitions.md
+      - CRP Concentration Update: architecture/algorithms/crp-alpha.md
+      - Ordered Logistic Grid: architecture/algorithms/ordered-logistic-grid.md
     - Packed State Design: architecture/packed-state.md
     - Performance Optimizations: architecture/performance.md
     - JAX Design Patterns: architecture/jax-patterns.md
+  - Reference:
+    - probcomp/crosscat Parity: reference/probcomp-parity.md
   - Examples:
     - MNIST Benchmark: examples/mnist.md
     - WDI Macroeconomics: examples/wdi-macroeconomics.md

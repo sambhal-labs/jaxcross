@@ -6,7 +6,59 @@
 
 ## Overview
 
-CSV/Parquet/Arrow/NPY I/O, column type detection, and discretization.
+CSV/Parquet/Arrow/NPY I/O, column type detection, and discretization. **Prefer `save_data` / `load_data` (Arrow IPC) for new code** — they preserve column type metadata inside the file itself so you do not need a sidecar schema. CSV / Parquet / NPY entry points remain for compatibility.
+
+---
+
+## High-Level I/O (Recommended)
+
+### `save_data`
+
+```python
+save_data(filepath, data, *, column_names=None, column_types=None, compression="lz4") -> None
+```
+
+Save a data array in Arrow IPC format with column type metadata embedded in the Arrow schema.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Output path (conventionally `.arrow`) |
+| `data` | `Array (n_rows, n_cols)` | Data array (coerced to `float32`) |
+| `column_names` | `list[str] \| None` | Column names. Defaults to `col_0`, `col_1`, ... |
+| `column_types` | `list[ColumnType] \| None` | If provided, stored in Arrow schema metadata for recovery on load |
+| `compression` | `str` | `"lz4"`, `"zstd"`, or `"uncompressed"` (must be `"uncompressed"` for true memory-mapped reads) |
+
+Raises `ValueError` if `compression` is invalid or `column_names` / `column_types` length does not match `data.shape[1]`.
+
+### `load_data`
+
+```python
+load_data(filepath, *, memory_map=True, columns=None) -> tuple[Array, list[str], list[ColumnType] | None]
+```
+
+Load a data array from Arrow IPC format, recovering column type metadata if present.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filepath` | `str \| Path` | Path to `.arrow` file (from `save_data` or `save_arrow`) |
+| `memory_map` | `bool` | Memory-map at the Arrow level (requires uncompressed file for true mmap) |
+| `columns` | `list[str] \| None` | Optional subset of columns to load |
+
+**Returns**: `(data_array, column_names, column_types)`. `column_types` is `None` if the file has no embedded schema metadata.
+
+```python
+from crosscat import save_data, load_data, guess_column_types
+
+data, names = read_csv("raw.csv")
+col_types = guess_column_types(data)
+save_data("dataset.arrow", data, column_names=names, column_types=col_types)
+
+# Later — type info round-trips without a sidecar
+data2, names2, types2 = load_data("dataset.arrow")
+assert types2 == col_types
+```
+
+---
 
 ## `read_csv`
 

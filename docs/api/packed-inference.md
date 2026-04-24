@@ -208,6 +208,47 @@ multi_chain_predictive_cdf(rng_key, packed_states, data, query_col, query_val, *
 
 Predictive CDF averaged across chains.
 
+### `multi_chain_classify_column`
+
+```python
+multi_chain_classify_column(packed_states, data, target_col, candidate_vals, row_id) -> Array
+```
+
+Classify by averaging `packed_classify_column` log-probabilities across chains via log-mean-exp (Bayesian model averaging in probability space). Returns the candidate value with the highest averaged probability — i.e., the argmax class label, not a probability vector.
+
+### `multi_chain_credible_interval`
+
+```python
+multi_chain_credible_interval(rng_key, packed_states, data, query_col, *, n_samples=1000, ci_level=0.90, row_id=None) -> tuple[Array, Array, Array]
+```
+
+Credible interval by pooling posterior predictive samples across all chains (draws `n_samples` *total*, not per chain) and computing percentile-based bounds.
+
+**Returns**: `(median, lower, upper)` scalars. Raises `ValueError` if `ci_level` is not in `(0, 1)`.
+
+### `multi_chain_joint_predictive_probability`
+
+```python
+multi_chain_joint_predictive_probability(packed_states, data, query_cols, query_vals) -> Array
+```
+
+Joint predictive log-probability averaged across chains via log-mean-exp.
+
+**Returns**: Scalar log probability.
+
+### `multi_chain_sample_and_insert`
+
+```python
+multi_chain_sample_and_insert(rng_key, packed_states, data, partial_row) -> tuple[list[PackedCrossCatState], list[Array], list[Array]]
+```
+
+Impute `partial_row` (NaN-masked) independently per chain and insert the completed row into each chain's state. Each chain keeps its own updated state and updated data matrix — the caller typically selects one canonical chain via `select_best_chain`.
+
+**Returns**: `(updated_states, updated_datas, completed_rows)` — one entry per chain.
+
+!!! warning "Memory"
+    Returns *N* copies of the data matrix (one per chain). On memory-constrained hardware, prefer `packed_sample_and_insert` on the best chain only.
+
 ---
 
 ## Batch Queries (Vectorized over Rows)
@@ -298,3 +339,103 @@ batch_credible_interval(rng_key, packed, data, query_col, row_ids, *, n_samples=
 Credible intervals for multiple rows in one JIT call. Draws posterior predictive samples per row and computes percentile-based CI.
 
 **Returns**: `(medians, lower_bounds, upper_bounds)`, each shape `(len(row_ids),)`.
+
+---
+
+## Batch Convenience Wrappers (Python-loop)
+
+!!! note "Python-loop, not vmap"
+    The wrappers below loop in Python over a single-query packed function. They exist for ergonomics when the inner call is expensive enough that the Python overhead is negligible. Prefer the vmap'd batch functions above (`batch_anomaly_score`, `batch_impute_column`, etc.) when throughput matters.
+
+### `batch_predictive_probability`
+
+```python
+batch_predictive_probability(packed, data, query_col, query_vals, row_ids=None, *, condition_cols=None, condition_vals=None) -> Array
+```
+
+Predictive log-probability for multiple queries. Three modes:
+
+- `row_ids` provided — each query uses that row's cluster assignment.
+- `condition_cols` / `condition_vals` provided, `row_ids=None` — every query shares the same conditional cluster weights.
+- Neither provided — marginal mixture (every query returns the same value).
+
+**Returns**: `(n_queries,)` log-probabilities.
+
+### `batch_predictive_sample`
+
+```python
+batch_predictive_sample(rng_key, packed, data, query_cols, row_ids=None, *, n_samples_per_row=1, condition_cols=None, condition_vals=None, n_queries=None) -> Array
+```
+
+Posterior predictive samples for multiple queries. When `row_ids=None` and `condition_cols` is used, supply `n_queries` to control how many independent draws are returned.
+
+**Returns**: `(n_queries, n_samples_per_row, len(query_cols))`.
+
+### `batch_conditional_entropy`
+
+```python
+batch_conditional_entropy(rng_key, packed_states, data, target_cols, given_cols, *, n_samples=500) -> Array
+```
+
+`H(target | given)` for multiple target columns, averaged across chains.
+
+**Returns**: `(n_targets,)` conditional entropies.
+
+### `batch_column_typicality`
+
+```python
+batch_column_typicality(packed_states, col_ids) -> Array
+```
+
+Column typicality for multiple columns, averaged across chains.
+
+**Returns**: `(n_cols,)` typicality scores in [0, 1].
+
+### `batch_dependence_probability`
+
+```python
+batch_dependence_probability(packed_states, col_pairs) -> Array
+```
+
+Dependence probability for a list of `(col_i, col_j)` pairs.
+
+**Returns**: `(n_pairs,)` probabilities in [0, 1]. For the full upper-triangular matrix, use [`packed_dependence_matrix`](#packed_dependence_matrix) instead.
+
+### `batch_joint_predictive_probability`
+
+```python
+batch_joint_predictive_probability(packed, data, query_cols, query_vals_list) -> Array
+```
+
+Joint predictive probability for multiple value-combinations over the same `query_cols`. Each entry of `query_vals_list` must have length `len(query_cols)`.
+
+**Returns**: `(n_combos,)` log joint probabilities.
+
+### `batch_sample_and_insert`
+
+```python
+batch_sample_and_insert(rng_key, packed, data, partial_rows) -> tuple[PackedCrossCatState, Array, list[Array]]
+```
+
+Impute and insert multiple partial rows *sequentially* — later rows condition on earlier insertions.
+
+**Returns**: `(updated_packed, updated_data, completed_rows)`.
+
+### `batch_mutual_information`
+
+```python
+batch_mutual_information(packed_states, column_types, col_pairs, *, n_samples=1000, rng_key=None) -> tuple[Array, Array]
+```
+
+Posterior MI for a batch of `(col_i, col_j)` pairs. Each pair is scored with an independent `fold_in(rng_key, pair_idx)` stream.
+
+**Returns**: `(mi, linfoot)`, each `(n_pairs,)`. MI for columns in different views is clamped to 0. Linfoot = `sqrt(1 - exp(-2 MI))` in [0, 1].
+
+---
+
+## See Also
+
+- [`crosscat.inference`](inference.md) — unpacked counterparts for each packed query. All packed functions preserve parity with the unpacked path (see `tests/test_packed_inference_parity.py`).
+- [`crosscat.packed.kernels`](packed-kernels.md) — the Gibbs kernels that produce the posterior states these queries consume.
+- [Guides → Queries](../guides/queries/predictive-probability.md) — worked examples for the main query families.
+- [Guides → Multi-Chain](../guides/multi-chain.md) — when to use `multi_chain_*` wrappers vs. picking the best chain and running `batch_*` on it.
