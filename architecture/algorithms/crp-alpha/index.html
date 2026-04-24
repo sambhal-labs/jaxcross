@@ -3499,7 +3499,7 @@
 </span></code></pre></div>
 <p>where <code>P(alpha)</code> is a weakly informative prior (typically Gamma). The kernel:</p>
 <ol>
-<li>Builds a log-spaced grid of candidate <code>alpha</code> values (e.g. <code>[0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30]</code>).</li>
+<li>Builds a 31-point log-spaced grid of candidate <code>alpha</code> values spanning <code>[1/N, N]</code>, where <code>N = n_cols</code> for the outer (column) CRP and <code>N = n_rows</code> for each inner (per-view row) CRP. The grid adapts to the dataset size — it is not a fixed range.</li>
 <li>Evaluates the log posterior on each grid point.</li>
 <li>Draws <code>alpha</code> from the categorical induced by softmax.</li>
 </ol>
@@ -3522,8 +3522,8 @@
 </ul>
 <h2 id="hyperparameter-guidance">Hyperparameter Guidance<a class="headerlink" href="#hyperparameter-guidance" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Grid bounds.</strong> The default grid spans <code>[0.01, 30]</code> logarithmically, which is appropriate for most applications. Column counts in the low thousands or row counts in the millions may benefit from extending the upper bound to 100.</li>
-<li><strong>Adaptation.</strong> The grid is fixed at library import time. If you observe the posterior hitting a grid endpoint (visible by enabling <code>jax.config.update("jax_debug_nans", True)</code> and watching for extreme <code>alpha</code> values), extend the grid.</li>
+<li><strong>Grid bounds.</strong> The grid spans <code>[1/N, N]</code> log-spaced on 31 points, so it automatically scales with the dataset: for 100 columns the outer grid is <code>[0.01, 100]</code>; for 10 000 rows each per-view row grid is <code>[1e-4, 1e4]</code>. The grid is built per-sweep from the current <code>n_cols</code> / <code>n_rows</code>, so no manual tuning is needed for typical datasets.</li>
+<li><strong>Adaptation.</strong> Because the grid is recomputed each transition from <code>n_cols</code> / <code>n_rows</code>, it tracks dataset size, but the endpoints are hard-coded (the <code>1/N .. N</code> convention matches probcomp/crosscat). If you observe the posterior concentrating at a grid endpoint, that is a sign the prior/data strongly prefer extreme <code>alpha</code> — investigate the partition before trying to widen the grid.</li>
 </ul>
 <h2 id="gotchas">Gotchas<a class="headerlink" href="#gotchas" title="Permanent link">&para;</a></h2>
 <ul>

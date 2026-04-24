@@ -3565,7 +3565,7 @@
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        θ_new = grid[jax.random.categorical(softmax(log_posts))]
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        write θ_new back into column_hypers[c]
 </span></code></pre></div>
-<p>All type-dispatches are folded into a single <code>lax.switch</code> on <code>column_type[c]</code>, so the kernel is a straight <code>lax.scan</code> over columns.</p>
+<p>Type dispatch is implemented with chained <code>jnp.where</code> selectors on <code>column_type[c]</code> (JAX evaluates every branch, which is acceptable because each type-specific path is cheap relative to the grid-score vmap). The kernel is a <code>jax.vmap(process_one_column)(jnp.arange(n_cols))</code>, not a <code>lax.scan</code> — columns are processed in parallel.</p>
 <h2 id="key-optimizations">Key Optimizations<a class="headerlink" href="#key-optimizations" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Data-driven grid range.</strong> <code>generate_grid</code> uses per-column data statistics (min/max/std) to center the grid — essential for continuous columns with wildly different scales. Without this, most grid points land in the prior tail and sampling quality collapses.</li>

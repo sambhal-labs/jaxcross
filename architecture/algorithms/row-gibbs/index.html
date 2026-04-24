@@ -3607,7 +3607,7 @@
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        5. Add row n&#39;s contribution back into cluster k&#39;s suffstats
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        6. If k is the auxiliary (a new cluster), grow the cluster budget
 </span></code></pre></div>
-<p>Steps 1–6 are expressed as a single <code>lax.scan</code> body in <code>_scan_step_row</code>, which <code>packed_transition_row_assignments</code> wraps over rows, then <code>lax.scan</code>s over views.</p>
+<p>Steps 1–6 are expressed as an inner <code>lax.scan</code> body (<code>scan_one_row</code>) over rows, nested inside an outer <code>lax.scan</code> body (<code>scan_one_view</code>) over views. Both closures live inside <code>packed_transition_row_assignments</code>.</p>
 <h2 id="key-optimizations">Key Optimizations<a class="headerlink" href="#key-optimizations" title="Permanent link">&para;</a></h2>
 <h3 id="vectorized-column-scoring">Vectorized column scoring<a class="headerlink" href="#vectorized-column-scoring" title="Permanent link">&para;</a></h3>
 <p>Prior to v0.9, scoring a row against a cluster was a <code>lax.scan</code> over columns — sequential, one type-dispatch per column. The current path (<code>_score_row_one_cluster</code>) uses <code>jax.vmap(unified_posterior_predictive_logp)</code> over every column in the view at once. This gave the 12× speedup headlined in the README.</p>

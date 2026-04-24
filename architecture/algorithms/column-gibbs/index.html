@@ -3527,15 +3527,15 @@
 </span></code></pre></div>
 <p>Executed as a <code>lax.scan</code> over columns inside <code>packed_transition_column_assignments</code>, which is a top-level <code>@jax.jit</code> entry point (so it recompiles only when the data shape changes).</p>
 <h2 id="auxiliary-view-creation">Auxiliary View Creation<a class="headerlink" href="#auxiliary-view-creation" title="Permanent link">&para;</a></h2>
-<p>When column <code>c</code> lands in a <em>new</em> view, that view needs its own row partition. The kernel draws one on the fly: starting from the CRP prior for row assignments with the outer-DP concentration <code>alpha_col</code> applied at the row level. The new view's suffstats are then computed from the drawn clustering and the observed values of column <code>c</code>.</p>
+<p>When column <code>c</code> lands in a <em>new</em> view, that view needs its own row partition. The kernel draws one on the fly: it samples a fresh row-CRP concentration <code>alpha_v ~ Gamma(1, 1)</code> (via <code>jax.random.gamma(k_alpha, 1.0)</code>) and then draws row assignments from the CRP prior under that <code>alpha_v</code>. If <code>c</code> is moving out of a singleton view, the existing view's <code>alpha_v</code> is reused instead. The outer-DP concentration <code>alpha_col</code> governs column-to-view membership only — it is never used as a row-level concentration. The new view's suffstats are then computed from the drawn clustering and the observed values of column <code>c</code>.</p>
 <p>After the column transition, the <strong>row-assignment kernel</strong> (<a href="../row-gibbs/">row-gibbs.md</a>) will typically run immediately, so the drawn clustering quickly relaxes toward its posterior under the new column.</p>
 <h2 id="max-columns-per-view-overflow">Max-Columns-Per-View Overflow<a class="headerlink" href="#max-columns-per-view-overflow" title="Permanent link">&para;</a></h2>
-<p><code>PackedCrossCatState</code> allocates a fixed-size <code>(n_views, max_cols_per_view)</code> assignment buffer at pack time. If a Gibbs step tries to assign more than <code>max_cols_per_view</code> columns to a single view, the kernel:</p>
+<p><code>PackedCrossCatState</code> allocates a fixed-size <code>(max_views, max_cols_per_view)</code> assignment buffer at pack time. If a Gibbs step assigns more than <code>max_cols_per_view</code> columns to a single view, the kernel:</p>
 <ol>
-<li>Emits a runtime warning via <code>jax.debug.callback</code> (<code>_warn_column_overflow</code>).</li>
-<li>Rejects the overflowing move (keeps the previous assignment).</li>
+<li>Emits a warning via <code>jax.debug.callback</code> (<code>_warn_column_overflow</code>); under <code>set_overflow_policy("raise")</code> or <code>JAXCROSS_OVERFLOW_POLICY=raise</code> this becomes a <code>RuntimeError</code>.</li>
+<li><strong>Silently drops</strong> the columns beyond the budget — they do not land in the view's assignment buffer, so they are missing from the model's sufficient statistics until the next transition that can re-assign them. This is data corruption, not a rejected move.</li>
 </ol>
-<p>To avoid this, set <code>max_cols_per_view = n_cols</code> (the default) at <code>pack_state</code> time — which is always safe, just a bit more memory.</p>
+<p>To avoid this, set <code>max_cols_per_view = n_cols</code> (the default) at <code>pack_state</code> time — which is always safe, just a bit more memory — or run production pipelines with <code>set_overflow_policy("raise")</code> so any overflow surfaces loudly.</p>
 <h2 id="hyperparameter-guidance">Hyperparameter Guidance<a class="headerlink" href="#hyperparameter-guidance" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><code>alpha_col</code> (outer-DP concentration)</strong> — Updated automatically by <a href="../crp-alpha/"><code>packed_transition_crp_alphas</code></a>. Higher values → more views; lower → one-view-fits-all.</li>
