@@ -25,7 +25,7 @@ P(alpha | k, n)  ∝  P(alpha) · alpha^k · Γ(alpha) / Γ(alpha + n)
 
 where `P(alpha)` is a weakly informative prior (typically Gamma). The kernel:
 
-1. Builds a log-spaced grid of candidate `alpha` values (e.g. `[0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30]`).
+1. Builds a 31-point log-spaced grid of candidate `alpha` values spanning `[1/N, N]`, where `N = n_cols` for the outer (column) CRP and `N = n_rows` for each inner (per-view row) CRP. The grid adapts to the dataset size — it is not a fixed range.
 2. Evaluates the log posterior on each grid point.
 3. Draws `alpha` from the categorical induced by softmax.
 
@@ -52,8 +52,8 @@ Because each alpha only depends on *its own* partition's `(k, n)`, the update is
 
 ## Hyperparameter Guidance
 
-- **Grid bounds.** The default grid spans `[0.01, 30]` logarithmically, which is appropriate for most applications. Column counts in the low thousands or row counts in the millions may benefit from extending the upper bound to 100.
-- **Adaptation.** The grid is fixed at library import time. If you observe the posterior hitting a grid endpoint (visible by enabling `jax.config.update("jax_debug_nans", True)` and watching for extreme `alpha` values), extend the grid.
+- **Grid bounds.** The grid spans `[1/N, N]` log-spaced on 31 points, so it automatically scales with the dataset: for 100 columns the outer grid is `[0.01, 100]`; for 10 000 rows each per-view row grid is `[1e-4, 1e4]`. The grid is built per-sweep from the current `n_cols` / `n_rows`, so no manual tuning is needed for typical datasets.
+- **Adaptation.** Because the grid is recomputed each transition from `n_cols` / `n_rows`, it tracks dataset size, but the endpoints are hard-coded (the `1/N .. N` convention matches probcomp/crosscat). If you observe the posterior concentrating at a grid endpoint, that is a sign the prior/data strongly prefer extreme `alpha` — investigate the partition before trying to widen the grid.
 
 ## Gotchas
 
