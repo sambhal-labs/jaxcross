@@ -32,18 +32,18 @@ Executed as a `lax.scan` over columns inside `packed_transition_column_assignmen
 
 ## Auxiliary View Creation
 
-When column `c` lands in a *new* view, that view needs its own row partition. The kernel draws one on the fly: starting from the CRP prior for row assignments with the outer-DP concentration `alpha_col` applied at the row level. The new view's suffstats are then computed from the drawn clustering and the observed values of column `c`.
+When column `c` lands in a *new* view, that view needs its own row partition. The kernel draws one on the fly: it samples a fresh row-CRP concentration `alpha_v ~ Gamma(1, 1)` (via `jax.random.gamma(k_alpha, 1.0)`) and then draws row assignments from the CRP prior under that `alpha_v`. If `c` is moving out of a singleton view, the existing view's `alpha_v` is reused instead. The outer-DP concentration `alpha_col` governs column-to-view membership only — it is never used as a row-level concentration. The new view's suffstats are then computed from the drawn clustering and the observed values of column `c`.
 
 After the column transition, the **row-assignment kernel** ([row-gibbs.md](row-gibbs.md)) will typically run immediately, so the drawn clustering quickly relaxes toward its posterior under the new column.
 
 ## Max-Columns-Per-View Overflow
 
-`PackedCrossCatState` allocates a fixed-size `(n_views, max_cols_per_view)` assignment buffer at pack time. If a Gibbs step tries to assign more than `max_cols_per_view` columns to a single view, the kernel:
+`PackedCrossCatState` allocates a fixed-size `(max_views, max_cols_per_view)` assignment buffer at pack time. If a Gibbs step assigns more than `max_cols_per_view` columns to a single view, the kernel:
 
-1. Emits a runtime warning via `jax.debug.callback` (`_warn_column_overflow`).
-2. Rejects the overflowing move (keeps the previous assignment).
+1. Emits a warning via `jax.debug.callback` (`_warn_column_overflow`); under `set_overflow_policy("raise")` or `JAXCROSS_OVERFLOW_POLICY=raise` this becomes a `RuntimeError`.
+2. **Silently drops** the columns beyond the budget — they do not land in the view's assignment buffer, so they are missing from the model's sufficient statistics until the next transition that can re-assign them. This is data corruption, not a rejected move.
 
-To avoid this, set `max_cols_per_view = n_cols` (the default) at `pack_state` time — which is always safe, just a bit more memory.
+To avoid this, set `max_cols_per_view = n_cols` (the default) at `pack_state` time — which is always safe, just a bit more memory — or run production pipelines with `set_overflow_policy("raise")` so any overflow surfaces loudly.
 
 ## Hyperparameter Guidance
 

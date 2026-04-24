@@ -33,7 +33,7 @@ for view v in 0..n_views:
         6. If k is the auxiliary (a new cluster), grow the cluster budget
 ```
 
-Steps 1–6 are expressed as a single `lax.scan` body in `_scan_step_row`, which `packed_transition_row_assignments` wraps over rows, then `lax.scan`s over views.
+Steps 1–6 are expressed as an inner `lax.scan` body (`scan_one_row`) over rows, nested inside an outer `lax.scan` body (`scan_one_view`) over views. Both closures live inside `packed_transition_row_assignments`.
 
 ## Key Optimizations
 

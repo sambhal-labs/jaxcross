@@ -44,7 +44,7 @@ for column c in 0..n_cols:
         write θ_new back into column_hypers[c]
 ```
 
-All type-dispatches are folded into a single `lax.switch` on `column_type[c]`, so the kernel is a straight `lax.scan` over columns.
+Type dispatch is implemented with chained `jnp.where` selectors on `column_type[c]` (JAX evaluates every branch, which is acceptable because each type-specific path is cheap relative to the grid-score vmap). The kernel is a `jax.vmap(process_one_column)(jnp.arange(n_cols))`, not a `lax.scan` — columns are processed in parallel.
 
 ## Key Optimizations
 
