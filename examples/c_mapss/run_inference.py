@@ -416,12 +416,18 @@ def main() -> int:
     )
 
     data_np, column_types, info = _load_preprocessed(args.fd)
-    if args.subsample and args.subsample < data_np.shape[0]:
+    full_n_rows = data_np.shape[0]
+    train_indices: np.ndarray = np.arange(full_n_rows, dtype=np.int64)
+    if args.subsample and args.subsample < full_n_rows:
         rng = np.random.default_rng(args.seed)
-        sub_idx = rng.choice(data_np.shape[0], size=args.subsample, replace=False)
+        sub_idx = rng.choice(full_n_rows, size=args.subsample, replace=False)
         sub_idx.sort()
+        train_indices = sub_idx.astype(np.int64)
         data_np = data_np[sub_idx]
-        print(f"Subsampled training data to {data_np.shape[0]} rows (seed={args.seed})")
+        print(
+            f"Subsampled training data to {data_np.shape[0]} rows "
+            f"(seed={args.seed}; leaves {full_n_rows - data_np.shape[0]} rows as holdout)"
+        )
     data = jnp.array(data_np)
     print(
         f"Data: {data.shape[0]} rows x {data.shape[1]} cols, "
@@ -429,7 +435,11 @@ def main() -> int:
     )
 
     out_dir = OUT_ROOT / args.fd
+    out_dir.mkdir(parents=True, exist_ok=True)
     expected_shape = (data.shape[0], data.shape[1])
+    # Save the train_indices now so evaluate_holdout.py can run even if
+    # the inference loop is interrupted (it reads the latest checkpoint).
+    np.save(out_dir / "train_indices.npy", train_indices)
 
     # Try resume first if requested
     resume_state: tuple[list, np.ndarray, int] | None = None
@@ -519,6 +529,7 @@ def main() -> int:
         best_chain_idx=best_idx,
     )
     _save_checkpoint(out_dir, finals, traces, final_meta, column_types, data_np)
+    np.save(out_dir / "train_indices.npy", train_indices)
 
     print(f"\n{'=' * 70}\nDONE in {elapsed:.0f}s ({elapsed / 60:.1f} min)\n{'=' * 70}")
     for ci, score in enumerate(final_scores):
