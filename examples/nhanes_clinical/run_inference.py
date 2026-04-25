@@ -30,6 +30,14 @@ Resume after a crash/interrupt (same args as the killed run):
 
     uv run python examples/nhanes_clinical/run_inference.py \
         --chains 4 --sweeps 100 --diag-every 20 --resume
+
+Warm-start Phase 2 from Phase 1 best chain (4 chains x 250 sweeps,
+separate output dir so Phase 1 checkpoints stay intact):
+
+    uv run python examples/nhanes_clinical/run_inference.py \
+        --chains 4 --sweeps 250 --diag-every 25 \
+        --init-from examples/nhanes_clinical/results/inference/best_chain.jxc \
+        --out-subdir inference_warm
 """
 
 from __future__ import annotations
@@ -57,7 +65,7 @@ from crosscat.serialization import load_packed_state, save_packed_state
 from crosscat.types import ColumnType
 
 PREP_ROOT = Path("examples/nhanes_clinical/results/preprocessed")
-OUT_ROOT = Path("examples/nhanes_clinical/results/inference")
+OUT_ROOT_DEFAULT = Path("examples/nhanes_clinical/results/inference")
 
 _TYPE_MAP = {
     "CONTINUOUS": ColumnType.CONTINUOUS,
@@ -89,6 +97,22 @@ def _pack_initial_chains(
     result = initialize(key, data, column_types, n_chains=n_chains)
     states = result.state if n_chains > 1 else [result.state]
     return [pack_state(s, max_views=max_views, max_clusters=max_clusters) for s in states]
+
+
+def _clone_initial_chains(init_from: Path, n_chains: int) -> list:
+    """Warm-start: load one packed state and replicate it across n_chains.
+
+    All chains start at the same state; the first Gibbs sweep (with distinct
+    RNG keys per chain) drives them apart. This is appropriate for posterior
+    *exploration around a high-likelihood mode* — Rhat then measures whether
+    the mode is a single basin vs. multimodal. It does NOT measure cold-start
+    convergence; document this caveat in the results.
+    """
+    if not init_from.exists():
+        raise FileNotFoundError(f"--init-from path not found: {init_from}")
+    seed_state, _ = load_packed_state(str(init_from))
+    print(f"  Warm-start: cloning {init_from} into {n_chains} chains")
+    return [seed_state for _ in range(n_chains)]
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +411,22 @@ def main() -> int:
         help="Fast end-to-end pipeline validation: 2 chains x 6 sweeps x 1000 rows. "
         "Overrides --chains/--sweeps/--diag-every/--subsample.",
     )
+    parser.add_argument(
+        "--init-from",
+        type=str,
+        default=None,
+        help="Path to a .jxc packed state to clone into all chains (warm-start). "
+        "Each chain starts at the same point; distinct RNG keys per chain drive "
+        "them apart in the first Gibbs sweep. Use to seed Phase 2 from Phase 1 best chain.",
+    )
+    parser.add_argument(
+        "--out-subdir",
+        type=str,
+        default=None,
+        help="Override output directory name under results/. Default: 'inference'. "
+        "Use a different name for warm-start runs (e.g. 'inference_warm') to avoid "
+        "clobbering Phase 1 checkpoints.",
+    )
     args = parser.parse_args()
 
     if args.smoke:
@@ -431,8 +471,9 @@ def main() -> int:
         f"NaN fraction {float(jnp.isnan(data).mean()):.2%}"
     )
 
-    out_dir = OUT_ROOT
+    out_dir = OUT_ROOT_DEFAULT.parent / args.out_subdir if args.out_subdir else OUT_ROOT_DEFAULT
     out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Output dir: {out_dir}")
     expected_shape = (data.shape[0], data.shape[1])
     # Save the train_indices now so evaluate_holdout.py can run even if
     # the inference loop is interrupted (it reads the latest checkpoint).
@@ -451,14 +492,17 @@ def main() -> int:
     if resume_state is None:
         print("\nInitializing chains...")
         t0 = time.time()
-        chains = _pack_initial_chains(
-            data,
-            column_types,
-            n_chains,
-            args.seed,
-            max_views=args.max_views,
-            max_clusters=args.max_clusters,
-        )
+        if args.init_from:
+            chains = _clone_initial_chains(Path(args.init_from), n_chains)
+        else:
+            chains = _pack_initial_chains(
+                data,
+                column_types,
+                n_chains,
+                args.seed,
+                max_views=args.max_views,
+                max_clusters=args.max_clusters,
+            )
         traces_so_far = np.zeros((n_chains, 0), dtype=np.float32)
         sweeps_done = 0
         print(f"  {n_chains} chains initialized in {time.time() - t0:.0f}s")
@@ -478,6 +522,8 @@ def main() -> int:
         "data_shape": list(data.shape),
         "n_total_rows": info.get("n_rows", data.shape[0]),
         "n_columns": info.get("n_cols", data.shape[1]),
+        "init_from": args.init_from,
+        "out_subdir": args.out_subdir,
         "_run_start_clock": time.time(),
     }
 
