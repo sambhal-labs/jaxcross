@@ -380,6 +380,49 @@ def _make_advanced_figures(
     train_jax = jnp.array(train_data)
     n_rows, n_cols = train_data.shape
 
+    # Helper: chunked batch_credible_interval to fit on small GPUs.
+    # n_obs ~ 9k * n_samples * n_clusters_max would OOM on a 4 GB card,
+    # so we run in 1000-row chunks and concat.
+    def _chunked_credible_interval(rng_key_seed, query_col, row_ids, n_samples, ci_level):
+        chunk_size = 1000
+        meds, los, his = [], [], []
+        for start in range(0, len(row_ids), chunk_size):
+            end = min(start + chunk_size, len(row_ids))
+            chunk = row_ids[start:end]
+            rkey = jax.random.fold_in(rng_key_seed, start)
+            m, lo, hi = batch_credible_interval(
+                rkey,
+                best_packed,
+                train_jax,
+                query_col=query_col,
+                row_ids=chunk,
+                n_samples=n_samples,
+                ci_level=ci_level,
+            )
+            meds.append(np.asarray(m))
+            los.append(np.asarray(lo))
+            his.append(np.asarray(hi))
+        return np.concatenate(meds), np.concatenate(los), np.concatenate(his)
+
+    def _chunked_classify(query_col, candidate_vals, row_ids):
+        chunk_size = 1500
+        log_ps = []
+        for start in range(0, len(row_ids), chunk_size):
+            end = min(start + chunk_size, len(row_ids))
+            chunk = row_ids[start:end]
+            log_ps.append(
+                np.asarray(
+                    batch_classify_column(
+                        best_packed,
+                        train_jax,
+                        target_col=query_col,
+                        candidate_vals=candidate_vals,
+                        row_ids=chunk,
+                    )
+                )
+            )
+        return np.concatenate(log_ps, axis=0)
+
     # ── (8) Imputation + credible-interval calibration ───────────────────
     # For each clinical column, compute 50/80/90/95% credible intervals
     # for ALL observed rows using best chain. Then check empirical coverage
@@ -408,40 +451,34 @@ def _make_advanced_figures(
         obs_rows = jnp.array(np.where(observed_mask)[0])
         truths = train_data[observed_mask, col_idx]
 
-        # 90% CI for coverage check
+        # 90/50/95% CIs (chunked for low-VRAM GPUs)
         rng_key, sub = jax.random.split(rng_key)
-        med, lo90, hi90 = batch_credible_interval(
+        med, lo90, hi90 = _chunked_credible_interval(
             sub,
-            best_packed,
-            train_jax,
             query_col=col_idx,
             row_ids=obs_rows,
-            n_samples=400,
+            n_samples=200,
             ci_level=0.90,
         )
         rng_key, sub = jax.random.split(rng_key)
-        _, lo50, hi50 = batch_credible_interval(
+        _, lo50, hi50 = _chunked_credible_interval(
             sub,
-            best_packed,
-            train_jax,
             query_col=col_idx,
             row_ids=obs_rows,
-            n_samples=400,
+            n_samples=200,
             ci_level=0.50,
         )
         rng_key, sub = jax.random.split(rng_key)
-        _, lo95, hi95 = batch_credible_interval(
+        _, lo95, hi95 = _chunked_credible_interval(
             sub,
-            best_packed,
-            train_jax,
             query_col=col_idx,
             row_ids=obs_rows,
-            n_samples=400,
+            n_samples=200,
             ci_level=0.95,
         )
-        med_np = np.asarray(med)
+        med_np = med
         for level, lo, hi in [(0.50, lo50, hi50), (0.90, lo90, hi90), (0.95, lo95, hi95)]:
-            lo_np, hi_np = np.asarray(lo), np.asarray(hi)
+            lo_np, hi_np = lo, hi
             cov = float(((truths >= lo_np) & (truths <= hi_np)).mean())
             mean_width = float((hi_np - lo_np).mean())
             coverage_rows.append(
@@ -466,8 +503,8 @@ def _make_advanced_figures(
             truths[sample_idx],
             med_np[sample_idx],
             yerr=[
-                med_np[sample_idx] - np.asarray(lo90)[sample_idx],
-                np.asarray(hi90)[sample_idx] - med_np[sample_idx],
+                med_np[sample_idx] - lo90[sample_idx],
+                hi90[sample_idx] - med_np[sample_idx],
             ],
             fmt="o",
             markersize=2,
@@ -517,16 +554,13 @@ def _make_advanced_figures(
             continue
         miss_rows = jnp.array(np.where(miss_mask)[0])
         rng_key, sub = jax.random.split(rng_key)
-        med_miss, _, _ = batch_credible_interval(
+        med_miss_np, _, _ = _chunked_credible_interval(
             sub,
-            best_packed,
-            train_jax,
             query_col=col_idx,
             row_ids=miss_rows,
             n_samples=200,
             ci_level=0.90,
         )
-        med_miss_np = np.asarray(med_miss)
         observed_vals = train_data[~miss_mask, col_idx]
         naturally_missing_rows.append(
             {
@@ -659,17 +693,12 @@ def _make_advanced_figures(
         if observed_mask.sum() < 50:
             continue
         obs_rows = jnp.array(np.where(observed_mask)[0])
-        # NHANES binary labels are encoded as 0/1 after preprocess
         candidates = jnp.array([0.0, 1.0])
-        log_p = np.asarray(
-            batch_classify_column(
-                best_packed,
-                train_jax,
-                target_col=label_idx,
-                candidate_vals=candidates,
-                row_ids=obs_rows,
-            )
-        )  # shape: (n_obs, 2)
+        log_p = _chunked_classify(
+            query_col=label_idx,
+            candidate_vals=candidates,
+            row_ids=obs_rows,
+        )
         # Convert to P(label=1) via log-softmax
         log_p1 = log_p[:, 1] - np.logaddexp(log_p[:, 0], log_p[:, 1])
         p1 = np.exp(log_p1)
@@ -927,9 +956,19 @@ def main() -> int:
     pl.DataFrame(sim_cols).write_csv(out_dir / "similarity_anchors.csv")
 
     print("\n  Top-5 nearest neighbours per anchor (across full cohort):")
-    full_query_ids = jnp.concatenate([anchor_ids, all_ids])
-    sim_full = np.asarray(batch_row_similarity(chains, full_query_ids))
-    sim_anchor_to_all = sim_full[: len(anchor_idx), len(anchor_idx) :]
+    # Chunked: per-anchor similarity to all 9254 rows in 500-row chunks.
+    # Avoids the 9264x9264 ~ 5 GB allocation that OOMs a 4 GB GPU.
+    chunk_size = 500
+    sim_anchor_to_all = np.zeros((len(anchor_idx), n_rows), dtype=np.float32)
+    for j, ai in enumerate(anchor_idx):
+        for start in range(0, n_rows, chunk_size):
+            end = min(start + chunk_size, n_rows)
+            chunk_ids = jnp.concatenate(
+                [jnp.array([int(ai)], dtype=jnp.int64), jnp.arange(start, end, dtype=jnp.int64)]
+            )
+            chunk_sim = np.asarray(batch_row_similarity(chains, chunk_ids))
+            # Row 0 is the anchor; columns 1: are the chunk
+            sim_anchor_to_all[j, start:end] = chunk_sim[0, 1:]
     nearest_rows = []
     for j, ai in enumerate(anchor_idx):
         row = sim_anchor_to_all[j].copy()
