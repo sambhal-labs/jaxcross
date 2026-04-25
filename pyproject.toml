@@ -54,6 +54,7 @@ benchmark = [
     "pandas>=2.0",
     "seaborn>=0.13",
     "polars>=1.0",
+    "pyreadstat>=1.3.4",
 ]
 tensorboard = [
     "tensorboardX>=2.6",
