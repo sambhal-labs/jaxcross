@@ -120,7 +120,7 @@ We initialize 4 chains via the standard Chinese-Restaurant-Process and run
 100 sweeps. After 94 minutes:
 
 * Chain 0: log_joint = −223,441 ⭐ (best)
-* Chain 1: −233,398
+* Chain 1: −234,142
 * Chain 2: −237,567
 * Chain 3: −226,189
 

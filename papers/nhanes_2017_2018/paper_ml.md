@@ -200,8 +200,9 @@ ground-truth held-out set for CI coverage. We **also** mask DIQ010 in all test
 rows so the model cannot peek at diabetes labels at insertion time.
 
 We run a fresh cold-start 4 × 150-sweep ensemble on the train fold (110 min
-wall). Per-row log-likelihood is **−24.04 nats**, matching Phase 2's −24.11 —
-the same posterior structure on the held-out fold.
+wall). The best-chain per-row log-joint is **−23.95 nats**, comparable to
+Phase 2's **−24.11** on the full cohort — i.e. the same posterior structure
+recovers on the held-out fold.
 
 For evaluation:
 * **Diabetes classification** — `packed_insert_rows` adds the 1,851 test rows
@@ -313,7 +314,7 @@ on observed rows.*
 
 | Column | n_obs | 50 % CI | 90 % CI | 95 % CI |
 |---|---:|---:|---:|---:|
-| LBXGH (HbA1c) | 6,045 | 53.1 % | **90.7 %** | 95.1 % |
+| LBXGH (HbA1c) | 6,045 | 53.1 % | **91.1 %** | 95.1 % |
 | LBXSGL (glucose) | 5,901 | 54.9 % | **90.6 %** | 94.3 % |
 | BMXBMI | 8,005 | 56.1 % | **92.6 %** | 96.1 % |
 | BPXSY1 (systolic BP) | 6,302 | 53.9 % | **91.9 %** | 95.5 % |
