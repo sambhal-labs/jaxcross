@@ -48,9 +48,10 @@ interpretable phenotypic structure and (b) produces credible intervals on
 imputed biomarker values that meet nominal coverage in a strict held-out
 evaluation.
 
-**Design, Setting, and Participants.** Cross-sectional analysis of 9,254
-non-pregnant participants (≥ 1 year of age; both sexes; all race/ethnic
-groups) from NHANES 2017–2018 (CDC National Center for Health Statistics).
+**Design, Setting, and Participants.** Cross-sectional analysis of all 9,254
+participants in NHANES 2017–2018 (ages 0–80 years, both sexes, all
+race/Hispanic-origin groups, public-use release; CDC National Center for
+Health Statistics).
 Twelve topic tables (DEMO_J, BMX_J, BPX_J, BIOPRO_J, CBC_J, GHB_J, TCHOL_J,
 HDL_J, TRIGLY_J, DIQ_J, BPQ_J, MCQ_J) were left-joined on the SEQN respondent
 ID, yielding a 9,254 × 29 mixed-type matrix with 27.6 % missing cells.
@@ -84,7 +85,7 @@ adjusted Rand index 0.656, **fully unsupervised**.
 Under stratified 80/20 held-out evaluation, **diabetes classification AUC was
 0.851** (95 % bootstrap CI 0.817–0.883) on 1,742 test rows with observed
 DIQ010, comparable to published single-cycle NHANES supervised baselines
-(0.817–0.86). **Empirical 90 % credible-interval coverage was 89.0 %** on
+(0.817 lifestyle-only / 0.957 with-labs). **Empirical 90 % credible-interval coverage was 89.0 %** on
 1,432 biomarker cells the model never saw during training (target: 90 %), and
 95 % CI coverage was 93.3 % (target: 95 %); 50 % CI coverage was 50.8 % across
 the 6 biomarkers. All discovered structure was reproducible from cold start
@@ -165,12 +166,14 @@ during training?
 
 We performed a cross-sectional analysis of NHANES 2017–2018, the most recent
 pre-pandemic full cycle of the NHANES program administered by the U.S. Centers
-for Disease Control and Prevention's National Center for Health Statistics.
+for Disease Control and Prevention's National Center for Health Statistics
+([authoritative URL](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017)).
 NHANES is a publicly available, de-identified, IRB-cleared population dataset
 that combines an in-person interview, a standardized physical examination, and
 a fasting blood draw. The CDC's published informed-consent and IRB
 documentation cover all secondary use; no additional ethics review was
-required for this analysis.
+required for this analysis. Raw data are released as SAS XPT (Transport)
+files, one per topic table, totalling ~17 MB across the 12 tables we used.
 
 ### Cohort Construction
 
@@ -181,8 +184,13 @@ data release: **DEMO_J** (demographics), **BMX_J** (anthropometry), **BPX_J**
 **HDL_J** (HDL), **TRIGLY_J** (triglycerides + LDL), **DIQ_J** (diabetes
 self-report), **BPQ_J** (blood-pressure / hypertension self-report), and
 **MCQ_J** (medical conditions). Tables were left-joined on the SEQN
-respondent ID. After filtering to non-pregnant participants with at least one
-biomarker measurement, the analytic cohort was **9,254 participants**.
+respondent ID using `polars`. The analytic cohort was the full
+**9,254 participants** in DEMO_J 2017–2018, with no additional restriction
+(NHANES 2017–2018 covers ages 0 – 80 years, both sexes, all race / Hispanic
+origin groups; both pregnant and non-pregnant participants are included in
+the public-use file). The final analytic matrix has shape
+**9,254 × 29 mixed-type variables** (cell-level missingness 27.6 %; only
+1,588 participants have complete data on all 29 variables).
 
 ### Variables
 
@@ -261,8 +269,8 @@ NaN-aware Pearson correlation (linear-only column dependence), Ward
 hierarchical clustering on |1 − corr| (column dendrogram only), and
 PCA(10) + KMeans(8) on column-mean-imputed rows (row clustering only). For the
 classification benchmark, we contextualized the held-out AUC against four
-published NHANES diabetes-prediction studies [Mehrabkhani 2025; Dinh 2019;
-3-cycle 2013–18 study; CATBoost 2024]; for the structure-discovery comparison,
+published NHANES diabetes-prediction studies [Mehrabkhani 2025;
+Dinh 2019; Liu 2023]; for the structure-discovery comparison,
 we cited Long et al. 2024 [*Nature Cardiovascular Research*].
 
 ### Code and Data Availability
@@ -284,12 +292,21 @@ sufficient detail to be reimplemented against the cited CrossCat primitives
 
 ### Cohort Characteristics
 
-Of 9,254 NHANES 2017–2018 participants, mean age was 34.4 (range 1–80) years;
-49.2 % were male; race/ethnic groups were 25.4 % non-Hispanic White, 24.7 %
-non-Hispanic Black, 26.3 % Mexican-American or other Hispanic, 12.0 %
-non-Hispanic Asian, 11.6 % other. Diabetes self-report (DIQ010) was observed
-in 8,709 participants (94.1 %), with 893 (10.3 %) reporting a physician
-diagnosis. Missingness rates by variable are reported in Supplement Table S1.
+Of 9,254 NHANES 2017–2018 participants, mean age was **34.3** years
+(median 31, range 0–80); **49.2 % were male, 50.8 % female**. Race / Hispanic
+origin distribution (NHANES `RIDRETH3`, n = 8,620 with observed value):
+**34.0 % Non-Hispanic White, 22.9 % Non-Hispanic Black, 14.8 %
+Mexican-American, 12.6 % Non-Hispanic Asian, 8.9 % Other Hispanic,
+6.9 % Other / Multi-Racial**. Education (`DMDEDUC2`, 5-tier ordinal,
+n = 5,556 of 5,569 adult participants who answered the question):
+8.6 % less-than-9th-grade, 11.5 % 9th–12th, 23.8 % high-school graduate /
+GED, 32.0 % some college / AA, 24.0 % college graduate or above. Diabetes
+self-report (DIQ010, n = 8,709 observed) was positive in 893 (**10.3 %**);
+hypertension self-report (BPQ020, n = 6,151) in 2,137 (**34.7 %**); coronary
+heart disease self-report (MCQ160C, n = 5,553) in 265 (**4.8 %**).
+Cell-level missingness across the 9,254 × 29 matrix was 27.6 %; only 1,588
+participants had complete data on all 29 variables. Per-variable observed
+counts and missingness rates are tabulated in Supplement Table S1.
 
 ### Discovered Structure: 3 Views
 
@@ -383,12 +400,19 @@ attained:
 * **Log-loss = 0.346** (95 % CI 0.281–0.418)
 * **Expected calibration error (10-bin) = 0.057**
 
-The held-out AUC's 95 % bootstrap CI covered the published Mehrabkhani 2025
-estimate of 0.817 at the lower bound, and contained the Dinh 2019 (0.86) and
-CATBoost 2024 (0.83) estimates within the interval. The 3-cycle 2013–2018
-study's reported 0.903 lay above our CI on a 3-times larger pooled cohort
-(see *Discussion: cohort size*). A decile-binned classifier calibration curve
-is in Figure 8.
+The held-out AUC's 95 % bootstrap CI is bounded below by Mehrabkhani et al.
+2025's reported 0.817 ([NHANES 2007–2018, lifestyle features only,
+n = 29,509](https://pmc.ncbi.nlm.nih.gov/articles/PMC11931972/)), and bounded
+above by Dinh et al. 2019's lifestyle-only AUC of 0.862 ([NHANES 1999–2014,
+ensemble of 4 supervised classifiers,
+n ≈ 21,000](https://bmcmedinformdecismak.biomedcentral.com/articles/10.1186/s12911-019-0918-5)).
+With laboratory-biomarker features (the comparator setting closer to ours,
+since our model uses laboratory variables), Dinh et al. 2019 reports a
+substantially higher AUC of 0.957. Liu et al. 2023 (*Archives of Medical
+Science*) reports an AUC of 0.903 in a 2,355-row high-risk subset of NHANES
+2013–2018; per-cycle that cohort (~785 participants) is much smaller than
+ours, so the comparison should be interpreted with cohort-restriction caveats.
+A decile-binned classifier calibration curve is in Figure 8.
 
 ![Figure 8 — held-out diabetes calibration curve](../../assets/nhanes_2017_2018/figures/holdout_calibration.png)
 
@@ -473,16 +497,17 @@ NHANES-based clinical-machine-learning literature.
 #### Diabetes prediction.
 
 Published NHANES diabetes-prediction analyses report AUCs in the range
-0.79–0.90, all using supervised gradient-boosted ensembles or random forests
-on multi-cycle pooled cohorts [Mehrabkhani 2025; Dinh 2019; CATBoost 2024;
-3-cycle 2013–2018 study]. Our held-out AUC of 0.851 (95 % CI 0.817–0.883)
-falls inside this range and statistically covers the Mehrabkhani 2025 point
-estimate (0.817). Critically, *none* of these comparators reports per-row
+0.82–0.96, all using supervised gradient-boosted ensembles or random forests
+on multi-cycle pooled cohorts [Mehrabkhani 2025 lifestyle-only AUC 0.817;
+Dinh 2019 lifestyle-only AUC 0.862; Dinh 2019 with-labs AUC 0.957;
+Liu 2023 high-risk subset AUC 0.903]. Our held-out AUC of 0.851
+(95 % CI 0.817–0.883) sits between the lifestyle-only and the with-labs
+comparators. Critically, *none* of these comparators reports per-row
 credible-interval coverage on the predicted probability or on imputed
 covariates — they produce point predictions only. Our analysis adds calibrated
-uncertainty to a single-cycle cohort while sacrificing approximately 5
-percentage points of raw AUC versus the highest-pooled-cohort comparator
-(0.903 from the 3-cycle 2013–2018 study).
+uncertainty as a unique contribution to a single-cycle cohort, at the cost
+of ~10 percentage points of raw AUC versus the highest-AUC supervised
+with-labs comparator (Dinh 2019).
 
 #### Unsupervised phenotyping.
 
@@ -518,20 +543,21 @@ range for the missing biomarker?".
 ### Single-Cycle vs Multi-Cycle Cohort Construction
 
 A common observation about our analysis is that 9,254 participants is a
-smaller cohort than published NHANES studies that pool 17,000–50,000+ across
-multiple cycles. We argue that, on a per-cycle basis, our cohort is in fact
-larger than the literature average (Figure 9):
+smaller cohort than some published NHANES studies that pool 21,000–50,000+
+across multiple cycles. We argue that, on a per-cycle basis, our cohort is
+in fact larger than the literature average (Figure 9):
 
 ![Figure 9 — per-cycle cohort sizes](../../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
 
 *Figure 9. Average per-cycle cohort size across NHANES diabetes-prediction
-and phenotyping literature. The literature pools cycles to grow N; on a
-per-cycle basis, our 9,254 single-cycle cohort is the largest analysis.*
+and phenotyping literature: Liu 2023 ~785/cycle (high-risk subset),
+Dinh 2019 ~2,625/cycle, Long 2024 ~3,333/cycle, Mehrabkhani 2025
+~4,918/cycle, Ours 9,254 (single cycle).*
 
 NHANES 2017–2018 was a
 deliberately oversampled cycle and yielded 9,254 analyzable participants,
-versus per-cycle averages of 2,625 (Dinh 2019), 4,920 (Mehrabkhani 2025), and
-3,500 (Long 2024).
+versus per-cycle averages of 785 (Liu 2023, high-risk subset),
+2,625 (Dinh 2019), 4,918 (Mehrabkhani 2025), and 3,333 (Long 2024).
 
 Pooling cycles trades sample size for three known confounds that
 single-cycle analysis avoids: (1) **HbA1c assay standardization changed in
@@ -629,19 +655,36 @@ debt explicitly.
 3. **Mehrabkhani B, et al.** Learning from the machine: is diabetes in adults
    predicted by lifestyle variables? A retrospective predictive modelling
    study of NHANES 2007–2018. *BMJ Open Diabetes Research & Care.* 2025.
+   Cohort n=29,509; lifestyle features only; XGBoost AUC 0.817.
+   [PMC11931972](https://pmc.ncbi.nlm.nih.gov/articles/PMC11931972/)
 4. **Long G, et al.** Cardiometabolic and renal phenotypes and transitions in
    the United States population. *Nature Cardiovascular Research.* 2024.
+   NHANES 1988-2018, ~50,000 participants, 10 phenotypes.
+   [s44161-023-00391-y](https://www.nature.com/articles/s44161-023-00391-y)
 5. **Dinh A, Miertschin S, Young A, Mohanty SD.** A data-driven approach to
    predicting diabetes and cardiovascular disease with machine learning.
-   *BMC Medical Informatics and Decision Making.* 2019;19.
-6. **Cha PC, et al.** Unsupervised clustering identified clinically relevant
+   *BMC Medical Informatics and Decision Making.* 2019;19. NHANES 1999-2014,
+   ~21,000 participants. Diabetes XGBoost ensemble AUC 0.862 (lifestyle
+   only) / 0.957 (with laboratory features).
+   [10.1186/s12911-019-0918-5](https://bmcmedinformdecismak.biomedcentral.com/articles/10.1186/s12911-019-0918-5)
+6. **Liu X, et al.** Machine learning predicts diabetes risk in high-risk
+   populations: analysis of NHANES data. *Archives of Medical Science.* 2023.
+   NHANES 2013-2018 high-risk subset, n=2,355, 19 features. XGBoost AUC 0.903.
+   [archivesofmedicalscience.com/209547](https://www.archivesofmedicalscience.com/Machine-learning-predicts-diabetes-risk-in-high-risk-populations-based-on-the-National,209547,0,2.html)
+7. **Cha PC, et al.** Unsupervised clustering identified clinically relevant
    metabolic syndrome endotypes in UK and Taiwan Biobanks. *iScience.* 2024.
-7. **Centers for Disease Control and Prevention.** Multiple Imputation Models
+   [PubMed 39040048](https://pubmed.ncbi.nlm.nih.gov/39040048/)
+8. **Centers for Disease Control and Prevention.** Multiple Imputation Models
    and Procedures for NHANES III. 2001.
-8. **Schenker N, et al.** Multiple Imputation of Completely Missing Repeated
+   [wwwn.cdc.gov/Nchs/Data/Nhanes3/7a/doc/mimodels.pdf](https://wwwn.cdc.gov/Nchs/Data/Nhanes3/7a/doc/mimodels.pdf)
+9. **Schenker N, et al.** Multiple Imputation of Completely Missing Repeated
    Measures Data within Person from a Complex Sample: Application to
    Accelerometer Data in NHANES. 2016.
-9. **Rubin DB.** *Multiple Imputation for Nonresponse in Surveys.* Wiley, 1987.
+   [PMC5096983](https://pmc.ncbi.nlm.nih.gov/articles/PMC5096983/)
+10. **Rubin DB.** *Multiple Imputation for Nonresponse in Surveys.* Wiley, 1987.
+11. **Centers for Disease Control and Prevention, National Center for Health
+    Statistics.** NHANES 2017–2018 Public-Use Data Files (SAS XPT).
+    [wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017)
 
 ---
 

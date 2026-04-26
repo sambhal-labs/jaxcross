@@ -137,16 +137,16 @@ def fig_in_vs_holdout() -> None:
     ax.text(
         1.5,
         0.823,
-        "Mehrabkhani 2025 (0.817)",
+        "Mehrabkhani 2025 lifestyle (0.817)",
         color="grey",
         fontsize=8,
         ha="right",
     )
-    ax.axhline(0.903, color="grey", linestyle=":", alpha=0.7)
+    ax.axhline(0.957, color="grey", linestyle=":", alpha=0.7)
     ax.text(
         1.5,
         0.909,
-        "3-cycle 2013-18 paper (0.903)",
+        "Dinh 2019 with-labs (0.957)",
         color="grey",
         fontsize=8,
         ha="right",
@@ -207,16 +207,23 @@ def fig_in_vs_holdout() -> None:
 def fig_per_cycle_n() -> None:
     """Bar chart: per-cycle cohort size — ours vs literature pools."""
     studies = [
-        ("Dinh 2019\n(NHANES 1999–2014, 8 cycles)", 21000 / 8, "supervised RF/ensemble"),
         (
-            "Long et al. 2024\n(Nature Cardiovasc Res, 1988–2018, 15 cyc)",
+            "Liu et al. 2023\n(Arch Med Sci, 2013–2018 high-risk, 3 cyc, n=2,355)",
+            2355 / 3,
+            "XGBoost",
+        ),
+        ("Dinh 2019\n(NHANES 1999–2014, 8 cycles, n≈21k)", 21000 / 8, "XGBoost ensemble"),
+        (
+            "Long et al. 2024\n(Nature Cardiovasc Res, 1988–2018, 15 cyc, n≈50k)",
             50000 / 15,
             "k-prototypes / GMM",
         ),
-        ("Mehrabkhani 2025\n(NHANES 2007–2018, 6 cycles)", 29509 / 6, "XGBoost"),
-        ("3-cycle 2013–18 study\n(NHANES 2013–2018, 3 cycles)", 17000 / 3, "RF / XGBoost"),
-        ("CATBoost 2024\n(NHANES 2017–2020, 1.5 cyc)", 12000 / 1.5, "CATBoost"),
-        ("Ours\n(NHANES 2017–2018, 1 cycle)", 9254, "jaxcross (Bayesian non-param)"),
+        (
+            "Mehrabkhani 2025\n(NHANES 2007–2018 lifestyle, 6 cyc, n=29,509)",
+            29509 / 6,
+            "XGBoost (lifestyle)",
+        ),
+        ("Ours\n(NHANES 2017–2018, 1 cycle, n=9,254)", 9254, "jaxcross (Bayesian)"),
     ]
     studies.sort(key=lambda x: x[1])
     names = [s[0] for s in studies]

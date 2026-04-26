@@ -90,13 +90,17 @@ We applied **CrossCat** — a two-level Dirichlet-process Bayesian-nonparametric
 joint model — to NHANES 2017–2018, the most recent pre-pandemic full cycle
 of the U.S. CDC's National Health and Nutrition Examination Survey.
 
-* **Cohort:** 9,254 participants × 29 variables (continuous biomarkers,
-  categorical demographics, ordinal education, binary clinical
-  self-reports), with 27.6 % missing at the cell level.
+* **Data source:** CDC NCHS NHANES 2017–2018 public-use release
+  ([wwwn.cdc.gov/nchs/nhanes](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017))
+  — 12 SAS XPT topic tables, ~17 MB raw, no authorization required.
+* **Cohort:** **9,254 participants × 29 mixed-type variables** (23 continuous
+  biomarkers, 2 categorical demographics, 1 ordinal education, 3 binary
+  clinical self-reports). **27.6 % of cells are missing**; only 1,588
+  participants have complete data on all 29 variables.
 * **Model:** CrossCat, fit using `jaxcross` (Sambhal Labs JAX/GPU library;
   private, available on request for academic collaboration / commercial
-  licensing).
-  Fit *fully unsupervised* — no diabetes label is fed in as a target.
+  licensing). Fit *fully unsupervised* — no diabetes label is fed in as a
+  target.
 * **Hardware:** single $300 GTX 1650 GPU. Total wall time: ~8 hours.
 
 We ran inference in three phases (cold-start ensemble, warm-start ensemble,
@@ -233,18 +237,20 @@ recipe in this blog can.
 We compared our held-out diabetes classification AUC against five published
 NHANES-based ML papers (left panel above; literature lines are grey):
 
-| Paper | Cycles pooled | Total n | Method | AUC |
-|---|---|---:|---|---:|
-| Mehrabkhani et al. 2025 (BMJ ODRC) | 6 | 29,509 | XGBoost | 0.817 |
-| 3-cycle 2013–2018 study | 3 | ~17,000 | RF / XGBoost | 0.903 |
-| Dinh et al. 2019 (BMC MIDM) | 8 | ~21,000 | Ensemble | 0.86 |
-| CATBoost 2024 (Sci Rep) | 1.5 | ~12,000 | CATBoost | 0.83 |
-| **Ours (held-out)** | **1** | **9,254** | **jaxcross (unsupervised + classify)** | **0.851 [0.817, 0.883]** |
+| Paper | Cycles | n | Features | Method | Reported AUC |
+|---|---|---:|---:|---|---:|
+| Mehrabkhani et al. 2025 (BMJ ODRC) | 6 | 29,509 | lifestyle only | XGBoost | **0.817** |
+| Dinh et al. 2019 (BMC MIDM) | 8 | ~21,000 | 123, with labs | XGBoost ensemble | **0.957** with-labs ; 0.862 lifestyle |
+| Liu et al. 2023 (Arch Med Sci) | 3 | **2,355** (high-risk subset) | 19 | XGBoost | **0.903** |
+| **Ours (held-out)** | **1** | **9,254** | **29 mixed-type, with labs** | **jaxcross (unsupervised + classify)** | **0.851 [0.817, 0.883]** |
 
-Our held-out 95 % bootstrap CI covers Mehrabkhani 2025's point estimate at
-the lower bound and contains both Dinh 2019 (0.86) and CATBoost 2024 (0.83)
-within the interval. The 3-cycle 2013–2018 study reports 0.903 on a 3×
-larger pooled cohort.
+Our held-out 95 % bootstrap CI sits **between the lifestyle-only literature
+floor (Mehrabkhani 2025: 0.817) and Dinh 2019's lifestyle-only 0.862**.
+With laboratory features, Dinh 2019's supervised ensemble beats us on raw
+AUC (0.957 vs 0.851); they had 123 hand-engineered features, we used 29
+mixed-type variables in an unsupervised joint model. Liu et al. 2023's 0.903
+is on a 2,355-row high-risk subset (4× smaller than our cohort), so the
+comparison is not apples-to-apples on cohort breadth.
 
 ![Per-cycle cohort sizes](../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
 

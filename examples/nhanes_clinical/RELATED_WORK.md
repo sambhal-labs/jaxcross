@@ -27,7 +27,8 @@ and **none of them report empirical held-out CI coverage at all**.
 | Metric | Our held-out result | Best literature peer | Verdict |
 |---|---|---|---|
 | Diabetes AUC (held-out 1,742 test rows) | 0.851 [95 % CI 0.817–0.883] | Mehrabkhani 2025: 0.817 | Comparable; we cover their point estimate at the lower bound |
-| Diabetes AUC vs best (3-cycle 2013-18 paper) | 0.851 [0.817–0.883] | 0.903 | They beat us on raw AUC, on a larger pooled cohort with no CIs |
+| Diabetes AUC vs Liu 2023 (high-risk subset) | 0.851 [0.817–0.883] | 0.903 | Their cohort is 2,355 (high-risk only) vs our 9,254; cohort breadth differs |
+| Diabetes AUC vs Dinh 2019 with-labs | 0.851 [0.817–0.883] | 0.957 | Supervised XGBoost with 123 hand-engineered features beats us on raw AUC; we win on calibration |
 | 90 % CI held-out coverage on biomarkers | 89.0 % (1,432 cells) | None reported | Unique contribution — closest analogue is Rubin-style MI confidence intervals, methodologically very different |
 | Single-cycle vs pooled cycles | NHANES 2017-2018 only | All literature pools 3-15 cycles | Avoids assay-drift + non-stationarity confounds |
 
@@ -37,10 +38,9 @@ and **none of them report empirical held-out CI coverage at all**.
 
 | Paper | Cycles | n | Method | Held-out AUC | What's missing vs ours |
 |---|---|---|---|---|---|
-| Mehrabkhani et al. 2025, BMJ Open Diabetes Res Care | 2007–2018 | 29,509 | XGBoost (lifestyle features) | **0.817** | Point predictions; no uncertainty |
-| 3-cycle 2013-2018 study | 2013–2018 | ~17k | RF / XGBoost | **0.903** | Highest reported; no CI |
-| Dinh et al. 2019, BMC Med Inform Decis Mak | 1999–2014 | ~21k | Ensemble | 0.86 | Held-out test split |
-| CATBoost lifestyle study, Sci Rep 2024 | 2017–2020 | ~12k | Gradient boosting | 0.83 | Lifestyle vars only |
+| Mehrabkhani et al. 2025, BMJ Open Diabetes Res Care | 2007–2018 | 29,509 | XGBoost (lifestyle only) | **0.817** | Point predictions; no uncertainty |
+| Liu et al. 2023, Archives of Medical Science | 2013–2018 | **2,355** (high-risk subset) | XGBoost (19 risk factors) | **0.903** | High-risk subset only |
+| Dinh et al. 2019, BMC Med Inform Decis Mak | 1999–2014 | ~21k | XGBoost ensemble (123 features) | 0.862 lifestyle / **0.957 with-labs** | Ensemble; highest reported with labs |
 | Prediabetes EHR + NHANES recalibration, BMC MIDM 2024 | EHR + 2017–2020 | mixed | Logistic + recal | n/a | Recalibration framework |
 
 **All of these are supervised, all give point predictions only.** None of them

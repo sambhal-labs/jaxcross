@@ -16,9 +16,10 @@ auditors actually want to see.
   and within 2.5 % of the in-sample 91.5 %. **No prior NHANES paper reports
   empirical CI coverage on held-out cells.**
 - **Held-out diabetes AUC = 0.851 [95 % CI 0.817–0.883]** on a 1,742-row test
-  fold. Statistically comparable to Mehrabkhani 2025 (0.817), Dinh 2019 (0.86),
-  CATBoost 2024 (0.83) on a single NHANES cycle, and the only model in the list
-  to ship calibrated CIs alongside.
+  fold. Sits between lifestyle-only literature (Mehrabkhani 2025: 0.817;
+  Dinh 2019 lifestyle: 0.862) and supervised with-labs ensembles
+  (Dinh 2019 with-labs: 0.957) on a single NHANES cycle, and the only model
+  in the list to ship calibrated CIs alongside.
 - **Diabetes-axis row clustering matches the actual diabetes label at ARI = 0.656**,
   fully unsupervised.
 
@@ -225,10 +226,10 @@ Phase 2 (−24.11) — same posterior structure on the held-out fold.
 
 | Paper | Reported AUC | Inside our 95 % CI? |
 |---|---|---|
-| Mehrabkhani 2025 (NHANES 2007–2018, lifestyle) | 0.817 | **at lower bound — comparable** |
-| Dinh 2019 (NHANES 1999–2014) | 0.86 | inside — comparable |
-| CATBoost 2024 (NHANES 2017–2020, lifestyle) | 0.83 | inside — comparable |
-| 3-cycle 2013–2018 study | 0.903 | above — they win on raw AUC |
+| Mehrabkhani 2025 (NHANES 2007–2018, lifestyle, n=29,509) | 0.817 | **at lower bound — comparable** |
+| Dinh 2019 (NHANES 1999–2014, n≈21k, lifestyle features) | 0.862 | inside our CI — comparable |
+| Dinh 2019 (NHANES 1999–2014, n≈21k, with laboratory features) | **0.957** | above — supervised with-labs beats us on raw AUC |
+| Liu 2023 (NHANES 2013–2018 high-risk subset, n=2,355) | 0.903 | above; cohort 4× smaller than ours |
 
 We are **statistically comparable to the median NHANES diabetes-prediction
 paper** while operating on a single 9,254-row cycle (vs their multi-cycle
@@ -276,8 +277,8 @@ basis our cohort is one of the largest single-cycle analyses:
 
 | Paper | Cycles | Total n | Cycles pooled | n per cycle |
 |---|---|---|---|---|
-| Mehrabkhani et al. 2025 | 2007–2018 | 29,509 | 6 | ~4,920 |
-| 3-cycle 2013-2018 | 2013–2018 | ~17,000 | 3 | ~5,670 |
+| Mehrabkhani et al. 2025 | 2007–2018 | 29,509 | 6 | ~4,918 |
+| Liu et al. 2023 (high-risk) | 2013–2018 | **2,355** | 3 | ~785 |
 | Dinh 2019 | 1999–2014 | ~21,000 | 8 | ~2,625 |
 | Long et al. 2024 (Nature CR) | 1988–2018 | ~50,000+ | 15 | ~3,500 |
 | **Ours** | **2017–2018** | **9,254** | **1** | **9,254** ⭐ |

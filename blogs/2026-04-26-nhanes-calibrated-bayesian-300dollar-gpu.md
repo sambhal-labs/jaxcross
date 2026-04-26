@@ -18,9 +18,10 @@ of total wall time:
   income, structurally isolated.
 * **Held-out 90 % credible-interval coverage = 89.0 %** on 1,432 biomarker
   cells the model never saw during training. Within 1 % of nominal.
-* **Held-out diabetes AUC = 0.851 [95 % CI 0.817, 0.883]** — statistically
-  comparable to the supervised single-cycle NHANES literature (0.817 ⤴
-  Mehrabkhani 2025; 0.86 ⤴ Dinh 2019; 0.83 ⤴ CATBoost 2024).
+* **Held-out diabetes AUC = 0.851 [95 % CI 0.817, 0.883]** — sits between
+  the lifestyle-only literature (Mehrabkhani 2025: 0.817; Dinh 2019
+  no-labs: 0.862) and the with-labs literature (Dinh 2019: 0.957; we
+  trail their supervised XGBoost on raw AUC, win on calibration).
 
 This blog is the engineering walkthrough: how we got there, what the
 multi-phase MCMC strategy looks like, what broke, and what the
@@ -60,8 +61,17 @@ ceiling.
 ## Dataset: NHANES 2017–2018, the public-clinical benchmark
 
 NHANES is the canonical large mixed-type, missing-data-rich, public clinical
-dataset run by the U.S. CDC. We pull 12 SAS XPT topic tables, left-join on
-`SEQN`, and end up with a 9,254 × 29 mixed-type matrix:
+dataset run by the U.S. CDC. Source / shape / size:
+
+* **Source URL:** [wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2017)
+* **Format:** 12 SAS XPT (Transport) topic tables, downloaded via `urllib`,
+  total ~17 MB raw.
+* **License:** public-use, no authorization required for the raw tables;
+  IRB-cleared at source by NCHS Research Ethics Review Board.
+* **Final analytic matrix:** **9,254 participants × 29 columns**, after a
+  `polars` left-join on the `SEQN` respondent ID across all 12 tables.
+
+Column-type breakdown:
 
 | Type | Count | Examples |
 |---|---:|---|
@@ -245,8 +255,10 @@ diabetes-AUC range:
 ![In-sample vs held-out](../assets/nhanes_2017_2018/figures/fig_in_vs_holdout.png)
 
 Diabetes AUC drops 0.973 → 0.851 [0.817, 0.883] under held-out (left panel)
-— honest, expected, and the 95 % CI **covers Mehrabkhani 2025's 0.817 at the
-lower bound**. The CI calibration story (right panel) drops only ~2 points
+— honest, expected, and the 95 % CI **covers Mehrabkhani 2025's
+lifestyle-only 0.817 at the lower bound** (the upper grey dotted line at
+0.957 is Dinh 2019's with-labs supervised ensemble, which beats us on raw
+AUC). The CI calibration story (right panel) drops only ~2 points
 from in-sample to held-out — well within tolerance.
 
 ---
@@ -303,10 +315,10 @@ The literature pools cycles to grow N. Here's per-cycle sample size:
 
 | Paper | Cycles | Total n | Per cycle |
 |---|---|---:|---:|
-| Mehrabkhani 2025 | 6 | 29,509 | 4,920 |
-| Dinh 2019 | 8 | ~21,000 | 2,625 |
-| Long et al. 2024 | 15 | ~50,000 | 3,500 |
-| 3-cycle 2013–18 | 3 | 17,000 | 5,670 |
+| Mehrabkhani 2025 (lifestyle features only) | 6 | 29,509 | 4,918 |
+| Long et al. 2024 (Nature CR phenotyping) | 15 | ~50,000 | ~3,333 |
+| Dinh 2019 (with labs) | 8 | ~21,000 | 2,625 |
+| Liu et al. 2023 (high-risk subset) | 3 | **2,355** | 785 |
 | **Ours** | **1** | **9,254** | **9,254** ⭐ |
 
 NHANES 2017–2018 is a deliberately oversampled cycle. Per cycle, our cohort
