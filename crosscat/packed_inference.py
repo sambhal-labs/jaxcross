@@ -24,13 +24,15 @@ from crosscat.types import LOG_EPS
 # ---------------------------------------------------------------------------
 
 
-def _find_local_col_index(packed: PackedCrossCatState, view_idx: int, col_idx: int) -> Array:
+def _find_local_col_index(
+    packed: PackedCrossCatState, view_idx: int | Array, col_idx: int | Array
+) -> Array:
     """Find local index of col_idx within view_idx's column list."""
     col_list = packed.view_column_indices[view_idx]
     return jnp.argmax(col_list == col_idx)
 
 
-def _cluster_weights_packed(packed: PackedCrossCatState, view_idx: int) -> Array:
+def _cluster_weights_packed(packed: PackedCrossCatState, view_idx: int | Array) -> Array:
     """CRP-based cluster weights for a view.
 
     Returns normalized weights of shape (max_clusters,).
@@ -159,8 +161,8 @@ def _resolve_cluster_weights(
 
 def _logp_one_column_mixture(
     packed: PackedCrossCatState,
-    view_idx: int,
-    col_idx: int,
+    view_idx: int | Array,
+    col_idx: int | Array,
     x: Array,
     weights: Array,
 ) -> Array:
@@ -220,8 +222,8 @@ def _logp_one_column_mixture(
 def _sample_one_column(
     rng_key: Array,
     packed: PackedCrossCatState,
-    view_idx: int,
-    col_idx: int,
+    view_idx: int | Array,
+    col_idx: int | Array,
     weights: Array,
 ) -> Array:
     """Sample a single value from the cluster mixture for col_idx in view_idx."""
