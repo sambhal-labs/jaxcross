@@ -6,6 +6,8 @@ instead of Python for-loops in the core computation paths.
 
 from __future__ import annotations
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 from jax import Array
@@ -22,13 +24,15 @@ from crosscat.types import LOG_EPS
 # ---------------------------------------------------------------------------
 
 
-def _find_local_col_index(packed: PackedCrossCatState, view_idx: int, col_idx: int) -> Array:
+def _find_local_col_index(
+    packed: PackedCrossCatState, view_idx: int | Array, col_idx: int | Array
+) -> Array:
     """Find local index of col_idx within view_idx's column list."""
     col_list = packed.view_column_indices[view_idx]
     return jnp.argmax(col_list == col_idx)
 
 
-def _cluster_weights_packed(packed: PackedCrossCatState, view_idx: int) -> Array:
+def _cluster_weights_packed(packed: PackedCrossCatState, view_idx: int | Array) -> Array:
     """CRP-based cluster weights for a view.
 
     Returns normalized weights of shape (max_clusters,).
@@ -157,8 +161,8 @@ def _resolve_cluster_weights(
 
 def _logp_one_column_mixture(
     packed: PackedCrossCatState,
-    view_idx: int,
-    col_idx: int,
+    view_idx: int | Array,
+    col_idx: int | Array,
     x: Array,
     weights: Array,
 ) -> Array:
@@ -218,8 +222,8 @@ def _logp_one_column_mixture(
 def _sample_one_column(
     rng_key: Array,
     packed: PackedCrossCatState,
-    view_idx: int,
-    col_idx: int,
+    view_idx: int | Array,
+    col_idx: int | Array,
     weights: Array,
 ) -> Array:
     """Sample a single value from the cluster mixture for col_idx in view_idx."""
@@ -1875,6 +1879,39 @@ def batch_row_typicality(
     return accum / jnp.maximum(len(packed_states), 1.0)
 
 
+@partial(jax.jit, static_argnames=("n_samples",))
+def _per_chain_marginal_entropy(
+    rng_key: Array,
+    packed: PackedCrossCatState,
+    target_cols: Array,
+    n_samples: int,
+) -> Array:
+    """Marginal H(X) for a batch of target columns on one packed state.
+
+    Uses the marginal-cluster approximation (the packed path does not
+    support explicit conditioning, so H(X|Y) collapses to H(X)). For each
+    target the posterior predictive is sampled ``n_samples`` times and the
+    sample mean of -log p(x) is returned. Vectorized over targets and MC
+    samples; compiles once per (target_cols.shape, packed shape).
+    """
+
+    def _entropy_one_target(target_col: Array, key: Array) -> Array:
+        view_idx = packed.column_assignments[target_col]
+        weights = _cluster_weights_packed(packed, view_idx)
+        sample_keys = jax.random.split(key, n_samples)
+
+        def _one_sample(k: Array) -> Array:
+            k_sample, _ = jax.random.split(jax.random.fold_in(k, 999))
+            x = _sample_one_column(k_sample, packed, view_idx, target_col, weights)
+            return _logp_one_column_mixture(packed, view_idx, target_col, x, weights)
+
+        log_ps = jax.vmap(_one_sample)(sample_keys)
+        return -jnp.mean(log_ps)
+
+    target_keys = jax.random.split(rng_key, target_cols.shape[0])
+    return jax.vmap(_entropy_one_target)(target_cols, target_keys)
+
+
 def packed_conditional_entropy(
     rng_key: Array,
     packed_states: list[PackedCrossCatState],
@@ -1888,41 +1925,31 @@ def packed_conditional_entropy(
 
     H(X|Y) = -E_{y~p(Y)}[ E_{x~p(X|y)}[ log p(x|y) ] ]
 
+    .. note:: The packed path does not support explicit conditioning, so the
+        estimate collapses to the marginal H(target). ``given_cols`` is kept
+        for API symmetry with the unpacked ``conditional_entropy``.
+
     Args:
         rng_key: JAX PRNG key.
         packed_states: List of PackedCrossCatState.
         data: Observation matrix.
         target_col: Column whose entropy to compute.
-        given_cols: Conditioning columns.
+        given_cols: Conditioning columns (currently ignored; see note above).
         n_samples: Number of MC samples.
 
     Returns:
         Conditional entropy estimate (nats).
     """
-    entropy_estimates = []
+    del data, given_cols
+    target_cols = jnp.asarray([target_col], dtype=jnp.int32)
     keys = jax.random.split(rng_key, len(packed_states))
-
-    for s_idx, packed in enumerate(packed_states):
-        s_keys = jax.random.split(keys[s_idx], n_samples)
-        log_ps = []
-
-        for i in range(n_samples):
-            # Sample target (marginal approximation — packed path doesn't
-            # support explicit conditioning, so H(X|Y) is approximated by
-            # drawing y from marginal and evaluating log p(x) per sample)
-            k1, k2 = jax.random.split(jax.random.fold_in(s_keys[i], 999))
-            target_samples = packed_predictive_sample(k1, packed, data, [target_col], n_samples=1)
-            target_val = target_samples[0, 0]
-
-            # Evaluate log prob of target
-            log_p = packed_predictive_probability(
-                packed, data, [target_col], jnp.array([target_val])
-            )
-            log_ps.append(float(log_p))
-
-        entropy_estimates.append(-jnp.mean(jnp.array(log_ps)))
-
-    return jnp.mean(jnp.array(entropy_estimates))
+    per_chain = jnp.stack(
+        [
+            _per_chain_marginal_entropy(keys[i], packed, target_cols, n_samples)[0]
+            for i, packed in enumerate(packed_states)
+        ]
+    )
+    return jnp.mean(per_chain)
 
 
 def packed_joint_predictive_probability(
@@ -2205,36 +2232,43 @@ def batch_conditional_entropy(
     rng_key: Array,
     packed_states: list[PackedCrossCatState],
     data: Array,
-    target_cols: list[int],
+    target_cols: list[int] | Array,
     given_cols: list[int],
     *,
     n_samples: int = 500,
 ) -> Array:
     """Compute conditional entropy H(target | given) for multiple target columns.
 
-    .. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
-        Accepts ``list[PackedCrossCatState]`` because the underlying
-        ``packed_conditional_entropy`` performs multi-state averaging.
+    GPU-vectorized: a single JIT compilation handles all targets and MC
+    samples per chain (via ``vmap``), avoiding the per-target XLA recompile
+    that the previous Python-loop wrapper triggered. Compiles once per
+    ``(len(target_cols), packed shape)``.
+
+    .. note:: The packed path does not support explicit conditioning, so the
+        estimate collapses to the marginal H(target). ``given_cols`` is kept
+        for API symmetry with the unpacked ``conditional_entropy``.
 
     Args:
         rng_key: JAX PRNG key.
         packed_states: List of PackedCrossCatState.
         data: Observation matrix.
-        target_cols: List of target column indices.
-        given_cols: Conditioning column indices.
+        target_cols: Target column indices.
+        given_cols: Conditioning column indices (currently ignored; see note).
         n_samples: MC samples per target.
 
     Returns:
         (n_targets,) array of conditional entropies.
     """
-    results = []
-    keys = jax.random.split(rng_key, len(target_cols))
-    for i, tc in enumerate(target_cols):
-        h = packed_conditional_entropy(
-            keys[i], packed_states, data, tc, given_cols, n_samples=n_samples
-        )
-        results.append(h)
-    return jnp.array(results)
+    del data, given_cols
+    target_cols_arr = jnp.asarray(target_cols, dtype=jnp.int32)
+    keys = jax.random.split(rng_key, len(packed_states))
+    per_chain = jnp.stack(
+        [
+            _per_chain_marginal_entropy(keys[i], packed, target_cols_arr, n_samples)
+            for i, packed in enumerate(packed_states)
+        ]
+    )  # (n_chains, n_targets)
+    return jnp.mean(per_chain, axis=0)
 
 
 def batch_column_typicality(
