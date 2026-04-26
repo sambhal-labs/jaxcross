@@ -64,7 +64,7 @@ from crosscat.packed.kernels import multi_chain_packed_gibbs_sweep, packed_log_j
 from crosscat.serialization import load_packed_state, save_packed_state
 from crosscat.types import ColumnType
 
-PREP_ROOT = Path("examples/nhanes_clinical/results/preprocessed")
+PREP_ROOT_DEFAULT = Path("examples/nhanes_clinical/results/preprocessed")
 OUT_ROOT_DEFAULT = Path("examples/nhanes_clinical/results/inference")
 
 _TYPE_MAP = {
@@ -76,11 +76,11 @@ _TYPE_MAP = {
 }
 
 
-def _load_preprocessed():
-    if not PREP_ROOT.exists():
-        raise FileNotFoundError(f"Missing {PREP_ROOT} — run preprocess_nhanes.py first")
-    train = np.load(PREP_ROOT / "train_data.npy")
-    info = json.loads((PREP_ROOT / "column_info.json").read_text())
+def _load_preprocessed(prep_dir: Path):
+    if not prep_dir.exists():
+        raise FileNotFoundError(f"Missing {prep_dir} — run preprocess_nhanes.py first")
+    train = np.load(prep_dir / "train_data.npy")
+    info = json.loads((prep_dir / "column_info.json").read_text())
     column_types = [_TYPE_MAP[c["type"]] for c in info["columns"]]
     return train, column_types, info
 
@@ -427,6 +427,15 @@ def main() -> int:
         "Use a different name for warm-start runs (e.g. 'inference_warm') to avoid "
         "clobbering Phase 1 checkpoints.",
     )
+    parser.add_argument(
+        "--prep-dir",
+        type=str,
+        default=None,
+        help="Override the preprocessed-data directory. Default: "
+        "'examples/nhanes_clinical/results/preprocessed'. Set this to "
+        "'examples/nhanes_clinical/results/preprocessed_holdout' for the "
+        "held-out evaluation run.",
+    )
     args = parser.parse_args()
 
     if args.smoke:
@@ -452,7 +461,9 @@ def main() -> int:
         f"diag_every={args.diag_every}"
     )
 
-    data_np, column_types, info = _load_preprocessed()
+    prep_dir = Path(args.prep_dir) if args.prep_dir else PREP_ROOT_DEFAULT
+    print(f"Prep dir:   {prep_dir}")
+    data_np, column_types, info = _load_preprocessed(prep_dir)
     full_n_rows = data_np.shape[0]
     train_indices: np.ndarray = np.arange(full_n_rows, dtype=np.int64)
     if args.subsample and args.subsample < full_n_rows:
