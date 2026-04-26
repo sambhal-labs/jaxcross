@@ -159,7 +159,7 @@ def main() -> int:
     base = tables["DEMO_J"].select(["SEQN"])
     print(f"Anchor: DEMO_J has {base.height:,} participants")
 
-    for code, jtype, transform, table, label in COLUMN_SCHEMA:
+    for code, _jtype, _transform, table, _label in COLUMN_SCHEMA:
         src = tables[table]
         if code not in src.columns:
             raise RuntimeError(f"{code} not in {table}")
@@ -173,7 +173,7 @@ def main() -> int:
     # Replace NHANES-coded "Refused" / "Don't know" markers with NaN for
     # self-reported items only (DIQ010, BPQ020, MCQ160C — the other tables
     # already use SAS . missingness which polars converted to NaN).
-    for code, jtype, transform, *_ in COLUMN_SCHEMA:
+    for code, _jtype, transform, *_ in COLUMN_SCHEMA:
         if transform in ("yes_no", "remap"):
             base = base.with_columns(
                 pl.when(pl.col(code).is_in(list(NHANES_MISSING)))
@@ -231,10 +231,10 @@ def main() -> int:
             f"observed={c['n_observed']:5d}/{n_rows}  NaN={nan:.1%}  — {c['label']}"
         )
     print(f"\nOverall NaN fraction: {np.isnan(train).mean():.1%}")
-    print(
-        f"Rows with at least one observation: {int((np.isfinite(train).any(axis=1)).sum()):,}/{n_rows}"
-    )
-    print(f"Rows with all observations: {int((np.isfinite(train).all(axis=1)).sum()):,}/{n_rows}")
+    n_any = int(np.isfinite(train).any(axis=1).sum())
+    n_all = int(np.isfinite(train).all(axis=1).sum())
+    print(f"Rows with at least one observation: {n_any:,}/{n_rows}")
+    print(f"Rows with all observations: {n_all:,}/{n_rows}")
 
     np.save(OUT_DIR / "train_data.npy", train)
     np.save(OUT_DIR / "seqn.npy", seqn)

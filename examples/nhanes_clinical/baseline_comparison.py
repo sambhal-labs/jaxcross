@@ -103,9 +103,8 @@ def main() -> int:
     n_components = min(10, n_cols)
     pca = PCA(n_components=n_components, random_state=42)
     embedded = pca.fit_transform(train_imputed)
-    print(
-        f"PCA explained variance ratio (top {n_components}): {pca.explained_variance_ratio_.round(3).tolist()}"
-    )
+    explained = pca.explained_variance_ratio_.round(3).tolist()
+    print(f"PCA explained variance ratio (top {n_components}): {explained}")
     print(f"Cumulative: {pca.explained_variance_ratio_.cumsum().round(3).tolist()}")
 
     km = KMeans(n_clusters=8, n_init=10, random_state=42)
