@@ -74,10 +74,10 @@ glucose, HbA1c, and self-reported diabetes only; and (c) **Income** — 1
 variable × 1 cluster — comprising family income to poverty ratio alone.
 Between-chain agreement on the column partition was perfect (adjusted Rand
 index 1.000). The 4 diabetes-axis row clusters partitioned the cohort into
-sizes (7,644 / 1,096 / 388 / 126) corresponding to euglycemic,
-a glycemic-severity gradient with self-report rates 0.1 % / 48 % / 92 % / 65 %
-in clusters C0–C3 (notable: cluster C3 with the most severe biochemistry has
-only 65 % self-report, identifying a substantial undiagnosed-fraction subgroup);
+sizes (7,644 / 1,096 / 388 / 126) along a glycemic-severity gradient with
+diabetes self-report rates 0.1 % / 48 % / 92 % / 65 % in clusters C0–C3
+respectively (notable: cluster C3 with the most severe biochemistry has only
+65 % self-report, identifying a substantial undiagnosed-fraction subgroup);
 diabetes-axis cluster membership matched the self-reported diabetes label at
 adjusted Rand index 0.656, **fully unsupervised**.
 
@@ -293,13 +293,13 @@ diagnosis. Missingness rates by variable are reported in Supplement Table S1.
 
 ### Discovered Structure: 3 Views
 
-![Figure 1 — view structure overview](../../examples/nhanes_clinical/results/discovery_warm/view_overview.png)
+![Figure 1 — view structure overview](../../assets/nhanes_2017_2018/figures/view_overview.png)
 
 *Figure 1. Best-chain view structure. Three views — general health phenotype
 (25 columns × 8 row clusters), diabetes axis (3 columns × 4 row clusters),
 income (1 column × 1 cluster).*
 
-![Figure 2 — view-sorted Z-matrix](../../examples/nhanes_clinical/results/discovery_warm/z_matrix_sorted.png)
+![Figure 2 — view-sorted Z-matrix](../../assets/nhanes_2017_2018/figures/z_matrix_sorted.png)
 
 *Figure 2. 29 × 29 dependency matrix (probability that two columns are in the
 same view, averaged across the 6 Phase-2 chains), columns permuted by best-chain
@@ -320,7 +320,7 @@ All 6 warm-started Phase-2 chains discovered the same 3-view partition (Figure
 The pairwise adjusted Rand index of the column partition across the 6 chains
 was 1.000 for all 15 chain pairs (Figure 4) — perfect reproducibility.
 
-![Figure 4 — between-chain view consistency](../../examples/nhanes_clinical/results/discovery_warm/view_consistency.png)
+![Figure 4 — between-chain view consistency](../../assets/nhanes_2017_2018/figures/view_consistency.png)
 
 *Figure 4. Pairwise adjusted Rand index of column partitions across the 6
 Phase-2 chains. All off-diagonal entries equal 1.000 — perfect agreement on
@@ -328,7 +328,7 @@ the 3-view partition.*
 
 ### Within-View Row Clusters and the Diabetes-Axis Phenotypes
 
-![Figure 3 — diabetes-axis cluster profile](../../examples/nhanes_clinical/results/discovery_warm/cluster_profile_v01.png)
+![Figure 3 — diabetes-axis cluster profile](../../assets/nhanes_2017_2018/figures/cluster_profile_v01.png)
 
 *Figure 3. Standardized cluster means for View 1 (the diabetes axis: glucose,
 HbA1c, self-reported diabetes), showing the 4 row clusters and their sizes.*
@@ -390,7 +390,7 @@ study's reported 0.903 lay above our CI on a 3-times larger pooled cohort
 (see *Discussion: cohort size*). A decile-binned classifier calibration curve
 is in Figure 8.
 
-![Figure 8 — held-out diabetes calibration curve](../../examples/nhanes_clinical/results/discovery_holdout/holdout_calibration.png)
+![Figure 8 — held-out diabetes calibration curve](../../assets/nhanes_2017_2018/figures/holdout_calibration.png)
 
 *Figure 8. Decile calibration of the held-out diabetes classifier. Predicted
 P(DIQ010 = 1) decile means (x) vs observed positive fraction (y); diagonal
@@ -398,7 +398,7 @@ is ideal. ECE-10bin = 0.057.*
 
 ### Held-Out Credible-Interval Coverage on Biomarker Cells
 
-![Figure 6 — held-out CI coverage per biomarker](../../examples/nhanes_clinical/results/paper_figures/fig_holdout_coverage.png)
+![Figure 6 — held-out CI coverage per biomarker](../../assets/nhanes_2017_2018/figures/fig_holdout_coverage.png)
 
 *Figure 6. Empirical 50 / 90 / 95 % credible-interval coverage per biomarker
 on 1,432 cells the model never saw during training. Dotted lines mark
@@ -429,7 +429,7 @@ new contribution.
 Comparing in-sample (Phase 2, n = 9,254 full cohort) to held-out (Phase 3,
 n = 1,742 test rows / 1,432 masked biomarker cells), Figure 7:
 
-![Figure 7 — in-sample vs held-out](../../examples/nhanes_clinical/results/paper_figures/fig_in_vs_holdout.png)
+![Figure 7 — in-sample vs held-out](../../assets/nhanes_2017_2018/figures/fig_in_vs_holdout.png)
 
 *Figure 7. In-sample vs held-out comparison. Left: classification AUC, with
 horizontal grey lines marking literature peers. Right: 50 / 90 / 95 % CI
@@ -522,7 +522,7 @@ smaller cohort than published NHANES studies that pool 17,000–50,000+ across
 multiple cycles. We argue that, on a per-cycle basis, our cohort is in fact
 larger than the literature average (Figure 9):
 
-![Figure 9 — per-cycle cohort sizes](../../examples/nhanes_clinical/results/paper_figures/fig_per_cycle_n.png)
+![Figure 9 — per-cycle cohort sizes](../../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
 
 *Figure 9. Average per-cycle cohort size across NHANES diabetes-prediction
 and phenotyping literature. The literature pools cycles to grow N; on a

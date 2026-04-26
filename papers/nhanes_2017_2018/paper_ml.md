@@ -202,7 +202,7 @@ All Phase 3 artifacts are produced by `make_holdout_split.py`,
 
 ### 5.1. Discovered structure: 3 views
 
-![View structure](../../examples/nhanes_clinical/results/discovery_warm/view_overview.png)
+![View structure](../../assets/nhanes_2017_2018/figures/view_overview.png)
 
 *Figure 1: best-chain view structure. Bar lengths = number of columns per view;
 inset text lists view membership; right-side annotation shows the number of
@@ -226,7 +226,7 @@ The Phase 2 best chain (and all 5 other warm-start chains) discover 3 views:
   structurally predict any biomarker. Epidemiologically correct: income
   modulates risk through behavior / care, not biology.
 
-![View-sorted Z-matrix](../../examples/nhanes_clinical/results/discovery_warm/z_matrix_sorted.png)
+![View-sorted Z-matrix](../../assets/nhanes_2017_2018/figures/z_matrix_sorted.png)
 
 *Figure 2: 29 × 29 dependency matrix (probability that two columns are in the
 same view, averaged over the 6 warm-start chains), with columns permuted
@@ -236,7 +236,7 @@ chains agree on every column's view assignment).*
 
 ### 5.2. Per-view cluster phenotypes
 
-![Diabetes-axis cluster profile](../../examples/nhanes_clinical/results/discovery_warm/cluster_profile_v01.png)
+![Diabetes-axis cluster profile](../../assets/nhanes_2017_2018/figures/cluster_profile_v01.png)
 
 *Figure 3: standardized cluster means for View 1 (the diabetes axis). Cluster
 sizes (left axis): C0 = 7,644, C1 = 1,096, C2 = 388, C3 = 126.* C0 is
@@ -253,7 +253,7 @@ profile are in the supplement (`cluster_profile_v00.png`, `cluster_profile_v02.p
 
 ### 5.3. Reproducibility — between-chain view consistency
 
-![View consistency](../../examples/nhanes_clinical/results/discovery_warm/view_consistency.png)
+![View consistency](../../assets/nhanes_2017_2018/figures/view_consistency.png)
 
 *Figure 4: pairwise adjusted Rand index of column partitions across the 6 Phase
 2 chains. Off-diagonal entries are all 1.000 — perfect agreement on the 3-view
@@ -284,7 +284,7 @@ splitting BMI and DIQ010 across views; we flag it explicitly in §7.
 
 ### 5.5. In-sample CI calibration on observed cells
 
-![In-sample calibration](../../examples/nhanes_clinical/results/discovery_warm/imputation_calibration.png)
+![In-sample calibration](../../assets/nhanes_2017_2018/figures/imputation_calibration.png)
 
 *Figure 5: per-row posterior median vs observed value (with 90 % CI bars) for
 6 biomarkers. Headers report MAE in z-units and the 90 %-CI empirical coverage
@@ -305,7 +305,7 @@ observed value contributed to that row's cluster assignment — see §7.)
 
 ### 5.6. Held-out evaluation — the main result
 
-![Held-out coverage](../../examples/nhanes_clinical/results/paper_figures/fig_holdout_coverage.png)
+![Held-out coverage](../../assets/nhanes_2017_2018/figures/fig_holdout_coverage.png)
 
 *Figure 6: held-out CI coverage on 1,432 biomarker cells the model never saw
 during training. Dotted lines show nominal target coverage. Cell-weighted
@@ -324,7 +324,7 @@ aggregate 90 % CI cov = 89.0 %; 95 % CI cov = 93.3 %.*
 **The held-out 90 % CI coverage is within 1 % of nominal.** No prior NHANES
 paper reports this metric.
 
-![In-sample vs held-out side-by-side](../../examples/nhanes_clinical/results/paper_figures/fig_in_vs_holdout.png)
+![In-sample vs held-out side-by-side](../../assets/nhanes_2017_2018/figures/fig_in_vs_holdout.png)
 
 *Figure 7: in-sample vs held-out comparison. (Left) Diabetes AUC: 0.973
 in-sample → 0.851 [0.817, 0.883] held-out, with horizontal grey lines at
@@ -336,7 +336,7 @@ benefits from having seen the label); the CI calibration drops only
 
 #### 5.6.1. Held-out classification calibration
 
-![Held-out diabetes calibration](../../examples/nhanes_clinical/results/discovery_holdout/holdout_calibration.png)
+![Held-out diabetes calibration](../../assets/nhanes_2017_2018/figures/holdout_calibration.png)
 
 *Figure 8: decile calibration of the held-out diabetes classifier. Predicted
 P(DIQ010 = 1) deciles (x) vs observed positive fraction (y); diagonal is
@@ -400,7 +400,7 @@ that gold-standard NHANES structure-discovery paper:
 
 ### 6.3. Per-cycle cohort framing
 
-![Per-cycle n](../../examples/nhanes_clinical/results/paper_figures/fig_per_cycle_n.png)
+![Per-cycle n](../../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
 
 *Figure 9: average n per cycle across NHANES diabetes-prediction / phenotyping
 literature. The literature pools cycles to grow N; per cycle, our 9,254-row

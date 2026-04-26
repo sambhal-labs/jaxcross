@@ -110,8 +110,10 @@ held-out evaluation), then asked two questions:
 
 ## What the model discovered (without supervision)
 
+![Three-view structure overview](../assets/nhanes_2017_2018/figures/view_overview.png)
+
 The CrossCat posterior cleanly separates the 29 variables into 3 phenotypic
-**axes**:
+**axes** (above):
 
 ### Axis 1 — General health phenotype (25 variables, 8 row-clusters)
 
@@ -126,7 +128,12 @@ demographic-age × adiposity × cardiometabolic-risk subgroups.
 
 **Glucose (LBXSGL), HbA1c (LBXGH), self-reported diabetes (DIQ010).** The
 model put exactly the three diabetes-related variables into their own
-phenotypic axis. The 4 row clusters partition the cohort into:
+phenotypic axis. The standardized cluster means show the gradient
+visually:
+
+![Diabetes-axis cluster profile](../assets/nhanes_2017_2018/figures/cluster_profile_v01.png)
+
+The 4 row clusters partition the cohort into:
 
 | Cluster | n | Glucose (z) | HbA1c (z) | % self-report diabetes | Interpretation |
 |---|---:|---:|---:|---:|---|
@@ -153,6 +160,8 @@ modulates risk through behavior or care access. Epidemiologically correct.
 ---
 
 ## The calibration check (the regulator question)
+
+![Held-out CI coverage per biomarker](../assets/nhanes_2017_2018/figures/fig_holdout_coverage.png)
 
 We held out 1,432 biomarker cells across 6 columns:
 HbA1c, glucose, BMI, systolic BP, total cholesterol, LDL. The model never
@@ -219,8 +228,10 @@ recipe in this blog can.
 
 ## Comparison with the existing literature
 
+![In-sample vs held-out](../assets/nhanes_2017_2018/figures/fig_in_vs_holdout.png)
+
 We compared our held-out diabetes classification AUC against five published
-NHANES-based ML papers:
+NHANES-based ML papers (left panel above; literature lines are grey):
 
 | Paper | Cycles pooled | Total n | Method | AUC |
 |---|---|---:|---|---:|
@@ -235,8 +246,10 @@ the lower bound and contains both Dinh 2019 (0.86) and CATBoost 2024 (0.83)
 within the interval. The 3-cycle 2013–2018 study reports 0.903 on a 3×
 larger pooled cohort.
 
+![Per-cycle cohort sizes](../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
+
 **On a per-cycle basis, our 9,254 cohort is one of the largest single-cycle
-analyses in the literature.** The literature pools cycles to grow N, but
+analyses in the literature** (red bar above). The literature pools cycles to grow N, but
 pooling NHANES across 2008 (HbA1c assay standardization), 2017 (assay
 re-standardization), and the rising US-diabetes-prevalence trend (9.1 %
 in 2007 → 14.7 % in 2018) introduces real confounds that single-cycle

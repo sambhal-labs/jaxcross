@@ -166,6 +166,8 @@ points from in-sample to held-out.
 
 ### Three views, one diabetes axis
 
+![View structure](../assets/nhanes_2017_2018/figures/view_overview.png)
+
 The Phase-2 best chain (and all 5 other chains) discover this:
 
 | View | # cols | # row clusters | Composition |
@@ -174,10 +176,20 @@ The Phase-2 best chain (and all 5 other chains) discover this:
 | 1 | 3 | 4 | **Glucose + HbA1c + DIQ010** — the diabetes axis |
 | 2 | 1 | 1 | INDFMPIR (income, alone) |
 
+The 29 × 29 dependency matrix sorted by view membership shows the partition
+crisply — three solid blocks, with the small (3-column) diabetes block
+sitting clearly apart from the 25-column health block:
+
+![View-sorted Z-matrix](../assets/nhanes_2017_2018/figures/z_matrix_sorted.png)
+
 The diabetes axis comes out as a structurally separate dimension. The 4 row
-clusters in View 1 partition the cohort along a glycemic-severity gradient
-(per-cluster diabetes-self-report rates: 0.1 %, 48 %, 92 %, 65 % for
-C0–C3 respectively). C3 is the clinically interesting cluster: severe
+clusters in View 1 partition the cohort along a glycemic-severity gradient,
+visible directly in the per-cluster mean profile:
+
+![Diabetes-axis cluster profile](../assets/nhanes_2017_2018/figures/cluster_profile_v01.png)
+
+Per-cluster diabetes-self-report rates: 0.1 %, 48 %, 92 %, 65 % for C0–C3
+respectively. C3 is the clinically interesting cluster: severe
 biochemistry (glucose +4.3 SD, HbA1c +4.9 SD) with **only 65 %
 self-reporting diabetes** — the model surfaces a substantial undiagnosed-
 fraction subgroup at the highest-severity end, without ever seeing the
@@ -192,17 +204,23 @@ intuition (income modulates risk through behavior / care, not biology).
 
 ### Reproducibility — the killer ARI
 
+![Between-chain view consistency](../assets/nhanes_2017_2018/figures/view_consistency.png)
+
 Six independently RNG-perturbed chains all converge on **the same 3-view
 partition with the same 8 / 4 / 1 cluster counts**. Pairwise ARI on the
-column partition: 1.000 across all 15 pairs. That's not "Bayesian models
-agree on average"; that's "every chain found the same answer."
+column partition: 1.000 across all 15 pairs (the all-yellow off-diagonal
+above). That's not "Bayesian models agree on average"; that's "every chain
+found the same answer."
 
 ---
 
 ## The calibration story (what makes this regulator-grade)
 
+![Held-out CI coverage per biomarker](../assets/nhanes_2017_2018/figures/fig_holdout_coverage.png)
+
 Per-cell predicted credible interval, with empirical coverage check on cells
-the model never saw:
+the model never saw. The dotted lines are nominal targets — the orange
+(90 %) bars sit right on the orange dotted line for almost every column:
 
 | Column | n cells | 50 % CI | **90 % CI** | 95 % CI | MAE (z) |
 |---|---:|---:|---:|---:|---:|
@@ -220,6 +238,16 @@ model — XGBoost on lifestyle features, deep tabular nets, gradient-boosted
 ensembles — gives you a point estimate. We give you an interval, and we
 empirically verify the interval holds its nominal coverage on cells the model
 never saw.
+
+The honest comparison vs in-sample numbers and the published-literature
+diabetes-AUC range:
+
+![In-sample vs held-out](../assets/nhanes_2017_2018/figures/fig_in_vs_holdout.png)
+
+Diabetes AUC drops 0.973 → 0.851 [0.817, 0.883] under held-out (left panel)
+— honest, expected, and the 95 % CI **covers Mehrabkhani 2025's 0.817 at the
+lower bound**. The CI calibration story (right panel) drops only ~2 points
+from in-sample to held-out — well within tolerance.
 
 ---
 
@@ -268,6 +296,8 @@ you need to know where to chunk.
 ---
 
 ## Per-cycle cohort framing — why our 9,254 is fine
+
+![Per-cycle cohort sizes](../assets/nhanes_2017_2018/figures/fig_per_cycle_n.png)
 
 The literature pools cycles to grow N. Here's per-cycle sample size:
 
