@@ -1,7 +1,7 @@
 # Unsupervised Discovery of the Diabetes Axis in NHANES 2017–2018: A Bayesian-Nonparametric Approach with Empirically Calibrated Credible Intervals
 
 **Authors:** *(corresponding author + clinical co-investigators TBD)*
-**Affiliation:** Sambhal Labs / jaxcross open-source contributors
+**Affiliation:** Sambhal Labs
 **Submission target:** *JAMA Network Open* / *Lancet Digital Health* — original investigation
 **Date:** April 2026
 
@@ -142,12 +142,13 @@ retraining.
 
 Two practical barriers have limited Bayesian-nonparametric joint models in
 clinical settings: scale (the original CrossCat reference implementation was
-CPU-bound and impractical above ~10² rows × ~10¹ columns) and reproducibility
-(no published, end-to-end open-source recipe exists for any public clinical
-dataset). We address both by applying **jaxcross**, a JAX-accelerated
-reimplementation that runs on consumer GPUs, to the full 9,254-participant ×
-29-variable NHANES 2017–2018 dataset, and by releasing the entire pipeline
-under a permissive open-source license.
+CPU-bound and impractical above ~10² rows × ~10¹ columns) and an absence of
+published end-to-end recipes on public clinical datasets. We address both by
+applying **jaxcross**, a JAX-accelerated GPU-capable reimplementation
+(Sambhal Labs, private library; access available on request for academic
+collaboration or commercial deployment), to the full 9,254-participant ×
+29-variable NHANES 2017–2018 dataset, and by documenting the entire
+pipeline at sufficient detail to be reimplemented from the cited primitives.
 
 In this study, we evaluate two clinically motivated questions. First, does the
 model recover clinically interpretable phenotypic structure under
@@ -208,8 +209,9 @@ had complete data across all 29 variables.
 
 ### Statistical Model
 
-We fit a **CrossCat** model [Mansinghka 2016] using the open-source
-**jaxcross** implementation. CrossCat is a two-level Dirichlet-process
+We fit a **CrossCat** model [Mansinghka 2016] using
+**jaxcross** (Sambhal Labs, JAX/GPU-accelerated implementation; private
+repository, access on request). CrossCat is a two-level Dirichlet-process
 mixture: an outer DP partitions the columns into views; within each view, an
 inner DP partitions the rows into clusters; each cluster has independent
 per-column conjugate likelihoods (Normal-Gamma for continuous,
@@ -265,11 +267,16 @@ we cited Long et al. 2024 [*Nature Cardiovascular Research*].
 
 ### Code and Data Availability
 
-All code is open source under the jaxcross repository
-(`examples/nhanes_clinical/`). Raw NHANES tables are public from
-[CDC](https://wwwn.cdc.gov/nchs/nhanes/). Random seeds are deterministic:
-seed 42 for inference (Phases 1, 2, 3), seed 7 for the held-out split,
-seed 99 for reproducibility-related queries.
+The data fetch and preprocessing scripts depend only on the publicly available
+NHANES tables ([CDC](https://wwwn.cdc.gov/nchs/nhanes/)). The inference and
+discovery pipeline (`examples/nhanes_clinical/`) depends on the jaxcross
+library, a private Sambhal Labs implementation; access is available on request
+for academic collaboration and under commercial licensing terms for clinical
+deployment. Random seeds are deterministic: seed 42 for inference
+(Phases 1, 2, 3), seed 7 for the held-out split, seed 99 for
+reproducibility-related queries. Methods are described in this manuscript at
+sufficient detail to be reimplemented against the cited CrossCat primitives
+[Mansinghka 2016].
 
 ---
 
@@ -599,7 +606,7 @@ calibration claims are directly on the critical path.
 
 We thank the NHANES program and the Centers for Disease Control and
 Prevention's National Center for Health Statistics for making the
-2017–2018 cycle freely available. The jaxcross open-source library that
+2017–2018 cycle freely available. The jaxcross library (Sambhal Labs) that
 underlies this analysis builds on the original CrossCat methodology of
 Mansinghka, Shafto, and colleagues at MIT; we acknowledge that intellectual
 debt explicitly.
@@ -646,6 +653,6 @@ debt explicitly.
   clusters).
 * **Figure S2.** General-health-view cluster sizes.
 * **Figure S3.** Phase 1 (cold) vs Phase 2 (warm-start) log-joint trace plot.
-* **Reproducibility appendix.** All code, random seeds, JAX version, and GPU
-  hardware specification documented in the companion arXiv preprint and the
-  open-source repository.
+* **Reproducibility appendix.** All random seeds, JAX version, GPU hardware
+  specification, and exact run-command listings are documented in the
+  companion arXiv preprint. jaxcross library access is via Sambhal Labs.

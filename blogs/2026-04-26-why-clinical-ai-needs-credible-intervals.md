@@ -27,8 +27,9 @@ credible intervals hit their nominal coverage.** The answer is yes — within
 1 % of nominal. We argue the same recipe is what every clinical-AI vendor
 should be running, internally, before they go to a regulator.
 
-The full code and reproducibility recipe is open-source under
-[jaxcross](https://github.com/sambhal-labs/jaxcross/tree/main/examples/nhanes_clinical).
+The full reproducibility recipe runs against jaxcross — a Sambhal Labs
+JAX/GPU implementation of CrossCat, available under academic-collaboration
+or commercial-licensing terms (private repository).
 The companion technical and clinical preprints have the formal write-ups.
 
 ---
@@ -92,7 +93,9 @@ of the U.S. CDC's National Health and Nutrition Examination Survey.
 * **Cohort:** 9,254 participants × 29 variables (continuous biomarkers,
   categorical demographics, ordinal education, binary clinical
   self-reports), with 27.6 % missing at the cell level.
-* **Model:** CrossCat (open-source `jaxcross` library, JAX/GPU-accelerated).
+* **Model:** CrossCat, fit using `jaxcross` (Sambhal Labs JAX/GPU library;
+  private, available on request for academic collaboration / commercial
+  licensing).
   Fit *fully unsupervised* — no diabetes label is fed in as a target.
 * **Hardware:** single $300 GTX 1650 GPU. Total wall time: ~8 hours.
 
@@ -297,13 +300,17 @@ WBC; those would be the next cells to validate.
 
 ## Reproduce it yourself
 
-The full pipeline is open-source. On a $300 NVIDIA GTX 1650 (or any modern
-consumer GPU), in ~8 hours of total wall time:
+The full pipeline (data fetch / preprocess / inference / evaluation) runs on
+a $300 NVIDIA GTX 1650 (or any modern consumer GPU) in ~8 hours of total
+wall time **for jaxcross licensees**. The data fetch uses only public CDC
+NHANES tables; the inference scripts depend on the jaxcross library
+(Sambhal Labs, private). Once licensed access is in place, the run-list is:
 
 ```bash
-git clone https://github.com/sambhal-labs/jaxcross
-cd jaxcross
+# jaxcross install (Sambhal Labs library — academic / commercial license required)
 uv sync --extra gpu
+
+# public NHANES data + recipe
 uv run python examples/nhanes_clinical/fetch_nhanes.py
 uv run python examples/nhanes_clinical/preprocess_nhanes.py
 uv run python examples/nhanes_clinical/run_inference.py \
@@ -325,12 +332,15 @@ from public CDC NHANES tables. The full step-by-step is in the README under
 
 ## Resources
 
-* **Library:** [jaxcross](https://github.com/sambhal-labs/jaxcross), MIT-licensed
+* **Library:** jaxcross — Sambhal Labs (private repository). Academic-
+  collaboration access on request; commercial licensing for clinical-AI
+  deployments via the Sambhal Labs contact form.
 * **NHANES data:** [CDC NCHS NHANES 2017–2018](https://wwwn.cdc.gov/nchs/nhanes/)
+  (publicly available, no licensing required for the raw tables).
 * **Companion ML preprint:** *(arXiv link TBD)*
 * **Companion clinical preprint:** *(submission link TBD)*
 
 If your team is shipping clinical AI and is hitting the
-"calibrated-uncertainty-on-imputation" question, this is the open-source
-recipe to start from. Reach out via GitHub Issues or the Sambhal Labs
-contact form for engagement.
+"calibrated-uncertainty-on-imputation" question, this is the recipe to
+start from. Reach out via the Sambhal Labs contact form for library access
+and engagement.

@@ -1,7 +1,7 @@
-# JAX-CrossCat for NHANES 2017–2018: Open-Source Bayesian-Nonparametric Structure Discovery with Held-Out Calibrated Uncertainty
+# JAX-CrossCat for NHANES 2017–2018: Bayesian-Nonparametric Structure Discovery with Held-Out Calibrated Uncertainty
 
 **Authors:** *(corresponding author + collaborators TBD)*
-**Affiliation:** Sambhal Labs / jaxcross open-source contributors
+**Affiliation:** Sambhal Labs
 **Date:** April 2026
 **Preprint target:** arXiv (cs.LG, stat.AP), NeurIPS Datasets & Benchmarks 2026
 
@@ -9,12 +9,14 @@
 
 ## Abstract
 
-We present an open-source application of CrossCat — a two-level Dirichlet-process
+We present an application of CrossCat — a two-level Dirichlet-process
 mixture model — to a real, large, mixed-type, missing-data-rich clinical dataset
 (NHANES 2017–2018, 9,254 participants × 29 mixed-type columns, 27.6 % missing
-values) using **jaxcross**, a JAX/GPU-accelerated reimplementation. We demonstrate
-that on a single $300 GTX 1650 GPU, a 6-chain warm-start ensemble (250 sweeps
-each, 4 h 38 min wall) reproducibly discovers a 3-view column partition (general
+values) using **jaxcross**, a JAX/GPU-accelerated implementation maintained
+by Sambhal Labs as a private library (academic-collaboration and
+commercial-licensing access available on request). We demonstrate that on a
+single $300 GTX 1650 GPU, a 6-chain warm-start ensemble (250 sweeps each,
+4 h 38 min wall) reproducibly discovers a 3-view column partition (general
 health phenotype × diabetes axis × income), with **between-chain view ARI =
 1.000** and 4 row-clusters in the diabetes axis whose membership matches the
 self-reported diabetes label at ARI = 0.656, **fully unsupervised**. Under a
@@ -26,8 +28,10 @@ while uniquely shipping **89.0 % empirical 90 % credible-interval coverage** on
 the masked cells (within 1 % of nominal). We argue that single-cycle analysis on
 this size cohort is methodologically cleaner than the multi-cycle pooling used
 by most NHANES literature (which trades sample size for assay-drift,
-survey-weight, and population non-stationarity confounds). Code, data, and
-artifacts are reproducible end-to-end on a single consumer GPU.
+survey-weight, and population non-stationarity confounds). Methods are
+documented in this manuscript at sufficient detail to be reimplemented from
+the cited primitives; the full pipeline runs on a single consumer GPU once
+jaxcross library access is in place.
 
 **Keywords:** CrossCat, Dirichlet process mixture, calibrated Bayesian
 inference, NHANES, mixed-type clinical data, structure discovery, JAX.
@@ -58,15 +62,18 @@ intervals — without ever rebuilding the model.
 The original CrossCat reference implementation
 [probcomp/crosscat](https://github.com/probcomp/crosscat) was Python-with-Cython
 and CPU-only, fitting at most a few hundred rows × tens of columns in a usable
-time. **jaxcross** is a JAX-accelerated reimplementation that supports JIT-
-compiled GPU inference, multi-chain ensembles via `vmap`/`pmap`, and a packed
-state representation that fits 9k × 29 datasets in 4 GB of VRAM.
+time. **jaxcross** (Sambhal Labs, private library) is a JAX-accelerated
+reimplementation that supports JIT-compiled GPU inference, multi-chain
+ensembles via `vmap`/`pmap`, and a packed state representation that fits
+9k × 29 datasets in 4 GB of VRAM. Library access for academic collaboration
+or commercial deployment is available via the corresponding author.
 
 **Contributions of this paper:**
 
-1. **First open-source CrossCat-on-NHANES recipe** (data fetch, polars-based
+1. **First end-to-end CrossCat-on-NHANES recipe** (data fetch, polars-based
    preprocessing, multi-phase inference, structure discovery, baselines, and
-   held-out evaluation). Reproducible end-to-end on a $300 GTX 1650 in ~8 hours.
+   held-out evaluation). Methodology documented in full; pipeline runs end-to-end
+   on a $300 GTX 1650 in ~8 hours under jaxcross (Sambhal Labs).
 2. **Held-out 90 % credible-interval coverage of 89.0 %** on 1,432 biomarker
    cells the model never saw during training — within 1 % of nominal.
    To our knowledge no prior NHANES paper reports empirical held-out CI coverage
@@ -412,8 +419,9 @@ The original CrossCat paper [Mansinghka et al. 2016, JMLR] introduced the
 methodology with synthetic + small clinical demos. **InferenceQL** and
 **GenSQL** (PACMPL 2024) build on CrossCat and have been applied to AutoML
 for clinical-trial oversight in three real-world proprietary trials. To our
-knowledge **there is no published CrossCat-on-NHANES paper**. Open-source
-jaxcross + the artifact set in this paper closes that gap.
+knowledge **there is no published CrossCat-on-NHANES paper**. The jaxcross
+library and the artifact set in this paper close that gap; library access is
+via Sambhal Labs (academic / commercial licensing).
 
 ---
 
@@ -455,8 +463,9 @@ jaxcross + the artifact set in this paper closes that gap.
 
 ## 8. Conclusion
 
-We present an open-source application of CrossCat to NHANES 2017–2018 that
-delivers **calibrated Bayesian-nonparametric structure discovery**:
+We present an application of CrossCat to NHANES 2017–2018, implemented via
+the jaxcross library, that delivers **calibrated Bayesian-nonparametric
+structure discovery**:
 
 * A 3-view column partition (general health × diabetes axis × income),
   reproducible across 6 chains (between-chain ARI = 1.000).
@@ -469,19 +478,23 @@ delivers **calibrated Bayesian-nonparametric structure discovery**:
   comparable to the supervised single-cycle NHANES literature, with
   calibrated uncertainty as the unique addition.
 
-We release the entire pipeline under a permissive open-source license
-(`jaxcross` library + this `examples/nhanes_clinical/` reproducible recipe)
-so that the community can verify, extend, and apply the methodology to other
-public clinical datasets. We argue the result has direct relevance to
-regulatory-grade clinical-AI evaluation, where calibrated uncertainty is no
-longer optional.
+The full pipeline (jaxcross library + `examples/nhanes_clinical/`) is
+maintained at Sambhal Labs and available under academic-collaboration or
+commercial-licensing terms; methodology is documented in this paper at
+sufficient detail to be reimplemented from the cited primitives. We argue
+the result has direct relevance to regulatory-grade clinical-AI evaluation,
+where calibrated uncertainty is no longer optional.
 
 ---
 
 ## Reproducibility
 
-Everything in the paper is reproducible end-to-end on a $300 GTX 1650 GPU in
-~8 hours of wall time:
+Everything in the paper runs end-to-end on a $300 GTX 1650 GPU in
+~8 hours of wall time **for jaxcross licensees** (Sambhal Labs, private
+library). The data fetch and preprocessing steps depend only on public CDC
+NHANES tables; the inference and discovery scripts depend on the jaxcross
+library. The run-list below documents the exact invocations used to produce
+every number in this paper:
 
 ```bash
 # 1. Fetch the 12 NHANES 2017-2018 SAS XPT tables (~17 MB)
@@ -514,9 +527,10 @@ uv run python examples/nhanes_clinical/baseline_comparison.py
 uv run python examples/nhanes_clinical/make_paper_figures.py
 ```
 
-Library: [jaxcross on GitHub](https://github.com/sambhal-labs/jaxcross), with
-documented packed-state + JIT inference pipeline and an XLA-cache-aware
-test suite.
+Library: jaxcross (Sambhal Labs, private repository) implements the packed-state
+JIT inference pipeline used here, with an XLA-cache-aware test suite. Access
+for academic collaboration or commercial deployment via the corresponding
+author.
 
 ---
 

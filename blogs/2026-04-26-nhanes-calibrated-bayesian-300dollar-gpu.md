@@ -6,11 +6,12 @@
 
 ## TL;DR
 
-We applied **jaxcross** — a JAX/GPU port of the original
-[probcomp/crosscat](https://github.com/probcomp/crosscat) Bayesian-nonparametric
-joint model — to NHANES 2017–2018 (9,254 participants × 29 mixed-type clinical
-columns, 27.6 % missing). On a single $300 GTX 1650 (4 GB VRAM), in about 7
-hours of total wall time:
+We applied **jaxcross** — Sambhal Labs' JAX/GPU implementation of CrossCat
+(reimagined from the original
+[probcomp/crosscat](https://github.com/probcomp/crosscat) reference) — to
+NHANES 2017–2018 (9,254 participants × 29 mixed-type clinical columns,
+27.6 % missing). On a single $300 GTX 1650 (4 GB VRAM), in about 8 hours
+of total wall time:
 
 * **3 column views** discovered, **6/6 chains agreeing perfectly** —
   general-health phenotype, the diabetes axis (glucose / HbA1c / DIQ010), and
@@ -26,7 +27,9 @@ multi-phase MCMC strategy looks like, what broke, and what the
 held-out-evaluation evidence actually says. The companion arXiv preprint has
 the formal write-up.
 
-Repo: [github.com/sambhal-labs/jaxcross/tree/main/examples/nhanes_clinical](https://github.com/sambhal-labs/jaxcross/tree/main/examples/nhanes_clinical).
+**Library access:** jaxcross is a Sambhal Labs library (private repository).
+Academic-collaboration and commercial-licensing access available on request —
+see *Resources* at the end of the post.
 
 ---
 
@@ -290,15 +293,21 @@ methodological choice.
 
 ---
 
-## Reproducibility — full pipeline in one bash block
+## Reproducibility — full pipeline (for licensees)
+
+The data fetch / preprocessing scripts depend only on public CDC NHANES
+tables. The inference scripts (`run_inference.py`, `discover_structure.py`,
+`evaluate_holdout.py`, …) depend on jaxcross, a Sambhal Labs library
+distributed under academic-collaboration / commercial-licensing terms (not on
+public PyPI; not on a public GitHub repo). The exact run-command sequence
+below produces every number in this post on the licensed setup:
 
 ```bash
-# 1. Install (uv recommended)
-git clone https://github.com/sambhal-labs/jaxcross
-cd jaxcross
+# 0. Library install (Sambhal Labs jaxcross — academic / commercial license required;
+#    contact the labs for access. Once installed:)
 uv sync --extra gpu  # for CUDA, or --extra dev for CPU-only
 
-# 2. Fetch + preprocess (~1 minute)
+# 1. Fetch + preprocess (~1 minute, public CDC NHANES tables only)
 uv run python examples/nhanes_clinical/fetch_nhanes.py
 uv run python examples/nhanes_clinical/preprocess_nhanes.py
 
@@ -349,7 +358,8 @@ or clinical-adjacent estimates:
   / Kaiser do this in-house with proprietary tools.
 * **Clinical-AI startups** — Tempus, Volpara, Owkin all face the
   "calibration on missing data" problem and currently solve it with bespoke
-  Bayesian models. Open-source jaxcross is a credible alternative.
+  Bayesian models. jaxcross (Sambhal Labs) is a credible licensable
+  alternative.
 
 The pitch is one sentence: **"every commercial clinical-risk model gives you
 a point estimate; we give you an interval, and we empirically verify the
@@ -375,11 +385,12 @@ training."** The held-out 89 % number is the proof.
 
 ## Resources
 
-* **Library:** [jaxcross](https://github.com/sambhal-labs/jaxcross)
-  (open-source, MIT-licensed, currently v1.0.1)
+* **Library:** jaxcross — Sambhal Labs (private repository; currently v1.0.1).
+  Academic-collaboration access on request; commercial licensing for
+  clinical-AI deployments via the Sambhal Labs contact form.
 * **NHANES data source:** [CDC NCHS NHANES 2017–2018](https://wwwn.cdc.gov/nchs/nhanes/)
+  (publicly available, no licensing required for the raw tables).
 * **Companion arXiv preprint:** *(link TBD on submission)*
-* **Discussion / questions:** GitHub Issues on the jaxcross repo
 
 If your team is hitting calibrated-clinical-uncertainty problems and wants a
-worked example, this is the open-source recipe to start from.
+worked example, this is the recipe — reach out for library access.
