@@ -202,7 +202,7 @@ into the best chain, `batch_classify_column` for diabetes, and
 | BPXSY1 (systolic BP) | 253 | 47.8 % | 90.1 % | 93.7 % | 0.642 |
 | LBXTC (total chol.) | 270 | 54.4 % | 90.4 % | 95.9 % | 0.716 |
 | LBDLDL | 113 | 42.5 % | 89.4 % | 95.6 % | 0.835 |
-| **Cell-weighted aggregate** | **1,432** | **~50 %** | **~89.0 %** | **~93.4 %** | — |
+| **Cell-weighted aggregate** | **1,432** | **~50 %** | **~89.0 %** | **~93.3 %** | — |
 
 Held-out 90 % CI mean coverage = **89.0 %**, **within 1 % of nominal**.
 
@@ -212,7 +212,7 @@ Held-out 90 % CI mean coverage = **89.0 %**, **within 1 % of nominal**.
 |---|---|---|---|
 | AUC | 0.973 | 0.851 | -0.122 |
 | 90 % CI coverage | 91.5 % | 89.0 % | -2.5 % |
-| 95 % CI coverage | 95.3 % | 93.4 % | -1.9 % |
+| 95 % CI coverage | 95.3 % | 93.3 % | -2.0 % |
 
 The CI calibration story is essentially preserved under held-out evaluation.
 The 12-point AUC drop is honest and expected (in-sample = trained-on-row-with-label).

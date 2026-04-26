@@ -72,10 +72,12 @@ which they do, perfectly).
 
 | Cluster | size (best chain) | Likely phenotype |
 |---|---:|---|
-| C0 | 7694 | Euglycemic |
-| C1 | 1116 | Borderline / mildly elevated |
-| C2 | 323 | Likely undiagnosed diabetic |
-| C3 | 121 | Diagnosed diabetic |
+| Cluster | n | Glucose (z) | HbA1c (z) | % DIQ010=1 | Interpretation |
+|---|---:|---:|---:|---:|---|
+| C0 | 7644 | -0.30 | -0.33 | 0.1 % | Euglycemic |
+| C1 | 1096 | +0.43 | +0.50 | 48 % | Mild dysglycemia, mostly diagnosed |
+| C2 | 388 | +2.10 | +2.20 | 92 % | Established diabetes |
+| C3 | 126 | +4.34 | +4.91 | 65 % | Severe biochemistry, ~35 % undiagnosed |
 
 The model put exactly the three diabetes-related variables in their own dimension and
 discovered the 4-stage gradient *without ever seeing the diabetes label as a target.*
@@ -87,7 +89,7 @@ Cluster sizes are stable across all 6 chains within ~5 %.
 LBDLDL, LBXSAL, LBXSASSI, LBXSATSI, LBXSBU, LBXWBCSI, LBXRBCSI, LBXHGB, LBXPLTSI,
 LBXMCVSI, RIAGENDR, RIDRETH3, DMDEDUC2, BPQ020, MCQ160C`
 
-Best-chain cluster sizes: 2318 / 1883 / 1859 / 1663 / 887 / 323 / 316 / 5. The dominant
+Best-chain cluster sizes: 2269 / 1911 / 1814 / 1672 / 932 / 342 / 310 / 4. The dominant
 4 clusters likely partition the cohort along **age × adiposity × cardiometabolic risk**;
 the smaller clusters are anomalous-phenotype subpopulations. See
 [cluster_profile_v00.png](results/discovery_warm/cluster_profile_v00.png) for
@@ -248,7 +250,7 @@ true held-out value falls inside the 50 / 90 / 95 % CI.
 | BPXSY1 (systolic BP) | 253 | 47.8 % | **90.1 %** | 93.7 % | 0.642 |
 | LBXTC (total chol.) | 270 | 54.4 % | **90.4 %** | 95.9 % | 0.716 |
 | LBDLDL | 113 | 42.5 % | **89.4 %** | 95.6 % | 0.835 |
-| **Cell-weighted aggregate** | **1,432** | **~50 %** | **~89.0 %** | **~93.4 %** | — |
+| **Cell-weighted aggregate** | **1,432** | **~50 %** | **~89.0 %** | **~93.3 %** | — |
 
 Held-out 90 % CI mean coverage = **89.0 %**, **within 1.0 % of nominal**.
 The drop from in-sample 91.5 % to held-out 89.0 % is only 2.5 percentage points,
@@ -263,7 +265,7 @@ contribution.
 |---|---|---|
 | Diabetes AUC | 0.973 | **0.851 [0.817, 0.883]** |
 | 90 % CI mean coverage | 91.5 % | **89.0 %** |
-| 95 % CI mean coverage | 95.3 % | 93.4 % |
+| 95 % CI mean coverage | 95.3 % | 93.3 % |
 
 The CI calibration story holds up under strict held-out evaluation.
 
