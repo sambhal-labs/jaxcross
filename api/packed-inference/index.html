@@ -9586,6 +9586,9 @@ over rows — only a small loop over the list of posterior states.</p>
 
         <p>Estimate conditional entropy H(target | given) using packed states.</p>
 <p>H(X|Y) = -E_{y~p(Y)}[ E_{x~p(X|y)}[ log p(x|y) ] ]</p>
+<p>.. note:: The packed path does not support explicit conditioning, so the
+    estimate collapses to the marginal H(target). <code>given_cols</code> is kept
+    for API symmetry with the unpacked <code>conditional_entropy</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9677,7 +9680,7 @@ over rows — only a small loop over the list of posterior states.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Conditioning columns.</p>
+                <p>Conditioning columns (currently ignored; see note above).</p>
               </div>
             </td>
             <td>
@@ -10720,7 +10723,7 @@ Defaults to 1 unless inferrable from <code>row_ids</code>.</p>
 
 
 <h3 id="crosscat.packed_inference.batch_conditional_entropy" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">batch_conditional_entropy</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">target_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">given_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+            <code class="highlight language-python"><span class="n">batch_conditional_entropy</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">packed_states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PackedCrossCatState</span><span class="p">],</span> <span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">target_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="n">Array</span><span class="p">,</span> <span class="n">given_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
 
 <a href="#crosscat.packed_inference.batch_conditional_entropy" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -10728,9 +10731,13 @@ Defaults to 1 unless inferrable from <code>row_ids</code>.</p>
     <div class="doc doc-contents ">
 
         <p>Compute conditional entropy H(target | given) for multiple target columns.</p>
-<p>.. note:: Convenience wrapper — loops in Python, not GPU-vectorized.
-    Accepts <code>list[PackedCrossCatState]</code> because the underlying
-    <code>packed_conditional_entropy</code> performs multi-state averaging.</p>
+<p>GPU-vectorized: a single JIT compilation handles all targets and MC
+samples per chain (via <code>vmap</code>), avoiding the per-target XLA recompile
+that the previous Python-loop wrapper triggered. Compiles once per
+<code>(len(target_cols), packed shape)</code>.</p>
+<p>.. note:: The packed path does not support explicit conditioning, so the
+    estimate collapses to the marginal H(target). <code>given_cols</code> is kept
+    for API symmetry with the unpacked <code>conditional_entropy</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -10802,11 +10809,11 @@ Defaults to 1 unless inferrable from <code>row_ids</code>.</p>
                 <code>target_cols</code>
             </td>
             <td>
-                  <code><span title="list">list</span>[<span title="int">int</span>]</code>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | <span title="jax.Array">Array</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>List of target column indices.</p>
+                <p>Target column indices.</p>
               </div>
             </td>
             <td>
@@ -10822,7 +10829,7 @@ Defaults to 1 unless inferrable from <code>row_ids</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Conditioning column indices.</p>
+                <p>Conditioning column indices (currently ignored; see note).</p>
               </div>
             </td>
             <td>
